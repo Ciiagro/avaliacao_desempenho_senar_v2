@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Presidência &mdash; recursos{% endblock %}
+
+{% block content %}
+<h1>Recursos &mdash; presidência</h1>
+
+<h2>Aguardando decisão</h2>
+{% if not pendentes %}
+    <p class="muted">Nenhum recurso aguardando decisão.</p>
+{% endif %}
+{% for r in pendentes %}
+    <div class="card" style="margin-bottom:12px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">Resultado contestado: {{ r.resultado_final_em_texto or '-' }}</p>
+        <a class="botao botao-pequeno" href="{{ url_for('recursos.recurso_presidencia_detalhe', recurso_id=r.id) }}">Decidir</a>
+    </div>
+{% endfor %}
+
+<h2>Decididos</h2>
+{% if not decididos %}
+    <p class="muted">Nenhum ainda.</p>
+{% endif %}
+{% for r in decididos %}
+    <p class="muted">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</p>
+{% endfor %}
+{% endblock %}

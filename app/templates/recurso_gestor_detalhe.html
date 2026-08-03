@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Responder recurso{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('recursos.recurso_gestor_area') }}" class="back-link">&larr; Recursos a responder</a>
+<h1>{{ recurso.avaliado.nome }} &mdash; Exercício {{ recurso.ciclo.exercicio }}</h1>
+<p class="muted">Resultado contestado: {{ recurso.resultado_final_em_texto or '-' }}</p>
+<p><strong>Motivo do recurso:</strong> {{ recurso.motivo }}</p>
+
+{% for e in recurso.eventos %}
+    {% if e.tipo == 'encaminhamento_comissao_gestor' %}
+        <p><strong>Comentário da Comissão:</strong> {{ e.texto }}</p>
+    {% endif %}
+{% endfor %}
+
+<div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>(I) Autoavaliação</th>
+                <th>(II) Avaliação do gestor (atual)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in dados.fatores %}
+                <tr>
+                    <td>{{ fator.ordem }}</td>
+                    <td>{{ fator.nome }}</td>
+                    <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
+                    <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if recurso.status == 'aguardando_gestor' %}
+    <form method="post" style="margin-top:20px;">
+        <h2>Sua resposta</h2>
+        <label><input type="radio" name="decisao" value="manteve" required> Manter a avaliação como está</label><br>
+        <label><input type="radio" name="decisao" value="revisou" required> Revisar as notas abaixo</label>
+
+        <table class="tabela tabela-formulario" style="margin-top:12px;">
+            <thead>
+                <tr>
+                    <th>Fator</th>
+                    <th>10</th><th>8</th><th>6</th><th>4</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fator in dados.fatores %}
+                    <tr>
+                        <td>{{ fator.nome }}</td>
+                        {% for valor in [10, 8, 6, 4] %}
+                            <td class="celula-radio">
+                                <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
+                                       {% if dados.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="muted">Só preencha as notas acima se escolher "Revisar". Se marcar "Manter", elas são ignoradas.</p>
+
+        <label for="justificativa">Justificativa (obrigatória nos dois casos)</label>
+        <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
+
+        <button type="submit" class="botao" style="margin-top:12px;">Enviar resposta</button>
+    </form>
+{% else %}
+    <h2 style="margin-top:20px;">Linha do tempo</h2>
+    {% for e in recurso.eventos %}
+        <p class="muted">
+            <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
+            {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
+            {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou a você: "{{ e.texto }}"
+            {% elif e.tipo == 'resposta_gestor' %}Sua resposta: {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }} &mdash; "{{ e.texto }}"
+            {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado.
+            {% elif e.tipo == 'fechamento_comissao' %}Comissão confirmou o encerramento.
+            {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer.
+            {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou para a presidência.
+            {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'acatou' if e.decisao == 'acatado' else 'não acatou' }}: "{{ e.texto }}"
+            {% elif e.tipo == 'aceite_funcionario' %}Empregado aceitou sua decisão.
+            {% endif %}
+        </p>
+    {% endfor %}
+{% endif %}
+{% endblock %}

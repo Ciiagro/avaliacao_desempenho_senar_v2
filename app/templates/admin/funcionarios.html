@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Funcionários{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Funcionários</h1>
+
+<h2>Cadastrar um funcionário</h2>
+{% if not setores %}
+    <p class="flash flash-warning">
+        Nenhum setor cadastrado ainda. Cadastre pelo menos um em
+        <a href="{{ url_for('admin.setores') }}">Administração &gt; Setores</a> (opcional, mas recomendado).
+    </p>
+{% endif %}
+<form method="post" class="form-grid">
+    <input type="text" name="nome" placeholder="Nome completo" required>
+    <input type="text" name="cargo_nome" placeholder="Cargo (ex: Assistente Administrativo)" list="lista-cargos">
+    <datalist id="lista-cargos">
+        {% for cargo in cargos %}
+            <option value="{{ cargo.nome }}">
+        {% endfor %}
+    </datalist>
+    <select name="setor_id">
+        <option value="">Setor (opcional)...</option>
+        {% for setor in setores %}
+            <option value="{{ setor.id }}">{{ setor.nome }}</option>
+        {% endfor %}
+    </select>
+    <select name="nivel_hierarquico" required>
+        <option value="">Nível hierárquico (define o formulário)...</option>
+        {% for nivel in niveis %}
+            <option value="{{ nivel }}">{{ nivel }}</option>
+        {% endfor %}
+    </select>
+    <input type="email" name="email" placeholder="E-mail (opcional)">
+    <input type="text" name="matricula" placeholder="Matrícula (opcional)">
+    <input type="text" name="cpf" placeholder="CPF (opcional)">
+    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
+        Data de nascimento
+        <input type="date" name="data_nascimento">
+    </label>
+    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
+        Data de admissão
+        <input type="date" name="data_admissao">
+    </label>
+    <select name="sexo">
+        <option value="">Sexo (opcional)...</option>
+        {% for opcao in opcoes_sexo %}
+            <option value="{{ opcao }}">{{ opcao }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="salario" placeholder="Salário (opcional)">
+    <select name="elegivel_avaliacao">
+        <option value="auto">Elegível p/ avaliação: Automático (pela data de admissão)</option>
+        <option value="sim">Elegível p/ avaliação: Forçar Sim</option>
+        <option value="nao">Elegível p/ avaliação: Forçar Não</option>
+    </select>
+    <button type="submit" class="botao">Cadastrar</button>
+</form>
+
+<h2>Importar em lote (.xlsx ou .csv)</h2>
+<p class="muted" style="font-size:0.78rem; line-height:1.4;">Colunas esperadas: <code>nome</code>, <code>nivel_hierarquico</code> (obrigatório — Empregado / Gestor / Superintendente, decide qual formulário é usado), <code>cargo</code> (opcional — cargo real da pessoa, ex: Assistente Administrativo; é criado automaticamente se não existir), <code>setor</code> (opcional — é criado automaticamente se não existir), <code>email</code>, <code>matricula</code>, <code>cpf</code> (opcional), <code>data_nascimento</code> (opcional — AAAA-MM-DD), <code>data_admissao</code> (opcional — AAAA-MM-DD), <code>sexo</code> (opcional — Feminino / Masculino / Outro), <code>salario</code> (opcional), <code>elegivel_avaliacao</code> (opcional — Sim / Não; se vazio, calcula automaticamente pela data de admissão, exigindo 1 ano de casa).</p>
+<form method="post" action="{{ url_for('admin.importar_funcionarios') }}" enctype="multipart/form-data" class="form-inline">
+    <input type="file" name="arquivo" accept=".xlsx,.csv" required>
+    <button type="submit" class="botao">Importar</button>
+</form>
+
+{% if setor_filtro %}
+    <p class="flash flash-warning" style="display:inline-block;">
+        Mostrando só o setor <strong>{{ setor_filtro.nome }}</strong>.
+        <a href="{{ url_for('admin.setores') }}">&larr; Voltar para Setores</a>
+        &middot;
+        <a href="{{ url_for('admin.funcionarios') }}">Ver todos os funcionários</a>
+    </p>
+{% endif %}
+
+<form method="post" action="{{ url_for('admin.gerar_senhas_pendentes') }}" style="margin-bottom:12px;" onsubmit="return confirm('Gerar senha temporária para todo mundo que ainda não tem?');">
+    <button type="submit" class="botao botao-secundario">Gerar senha para quem ainda não tem</button>
+</form>
+
+<div class="tabela-toolbar">
+    <input type="search" id="busca-funcionario" placeholder="Buscar por nome, cargo ou setor...">
+    <button type="button" id="botao-sensiveis" class="botao botao-secundario">Mostrar dados sensíveis</button>
+    <a href="{{ url_for('admin.exportar_funcionarios') }}" class="botao">Exportar para Excel</a>
+</div>
+
+<div class="tabela-container" id="tabela-funcionarios-container">
+    <table class="tabela" id="tabela-funcionarios">
+        <thead>
+            <tr>
+                <th>Funcionário</th>
+                <th>Nível hierárquico</th>
+                <th>Elegível avaliação</th>
+                <th>Login</th>
+                <th>E-mail</th>
+                <th class="coluna-sensivel">CPF</th>
+                <th class="coluna-sensivel">Nascimento</th>
+                <th class="coluna-sensivel">Sexo</th>
+                <th class="coluna-sensivel">Salário</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in lista %}
+                <tr class="linha-funcionario" data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else ''))|lower }}">
+                    <td>
+                        <div class="funcionario-nome">{{ f.nome }}</div>
+                        <div class="funcionario-subinfo muted">
+                            {{ f.cargo.nome if f.cargo else 'Sem cargo' }}
+                            {% if f.matricula %} &middot; Mat.: {{ f.matricula }}{% endif %}
+                        </div>
+                        <div class="funcionario-subinfo muted">{{ f.setor.nome if f.setor else 'Sem setor' }}</div>
+                        <div class="funcionario-subinfo muted">Adm.: {{ f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '-' }}</div>
+                    </td>
+                    <td>
+                        {% if f.nivel_hierarquico %}
+                            <span class="badge badge-nivel-{{ f.nivel_hierarquico|lower }}">{{ f.nivel_hierarquico }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% set eleg = f.is_elegivel_avaliacao() %}
+                        {% if eleg is none %}-
+                        {% elif eleg %}<span class="badge badge-elegivel-sim">Sim</span>
+                        {% else %}<span class="badge badge-elegivel-nao">Não</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not f.senha_hash %}
+                            <span class="badge badge-new">Sem senha</span>
+                        {% elif f.senha_provisoria %}
+                            <span class="badge badge-pending">Senha provisória</span>
+                        {% else %}
+                            <span class="badge badge-ok">Ativo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ f.email or '-' }}</td>
+                    <td class="coluna-sensivel">{{ f.cpf|formatar_cpf }}</td>
+                    <td class="coluna-sensivel">{{ f.data_nascimento.strftime('%d/%m/%Y') if f.data_nascimento else '-' }}</td>
+                    <td class="coluna-sensivel">{{ f.sexo or '-' }}</td>
+                    <td class="coluna-sensivel">{{ '%.2f'|format(f.salario) if f.salario is not none else '-' }}</td>
+                    <td>
+                        <div class="acoes-funcionario">
+                            <a class="botao-icone" href="{{ url_for('admin.editar_funcionario', funcionario_id=f.id) }}" title="Editar" aria-label="Editar {{ f.nome }}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            </a>
+                            <form method="post" action="{{ url_for('admin.redefinir_senha', funcionario_id=f.id) }}" onsubmit="return confirm('Gerar uma nova senha temporária para {{ f.nome }}?');" style="display:inline;">
+                                <button type="submit" class="botao-icone botao-icone-secundario" title="Redefinir senha" aria-label="Redefinir senha de {{ f.nome }}">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-8.83 8.83a4 4 0 1 1-5.66 5.66 4 4 0 0 1 5.66-5.66zm0 0L15 7.83m0 0 2.83 2.83L21 7.5 18.5 5"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+(function () {
+    var busca = document.getElementById('busca-funcionario');
+    var linhas = document.querySelectorAll('#tabela-funcionarios .linha-funcionario');
+    busca.addEventListener('input', function () {
+        var termo = busca.value.trim().toLowerCase();
+        linhas.forEach(function (linha) {
+            var visivel = !termo || linha.dataset.busca.indexOf(termo) !== -1;
+            linha.style.display = visivel ? '' : 'none';
+        });
+    });
+
+    var botaoSensiveis = document.getElementById('botao-sensiveis');
+    var container = document.getElementById('tabela-funcionarios-container');
+    botaoSensiveis.addEventListener('click', function () {
+        var mostrando = container.classList.toggle('mostrar-sensiveis');
+        botaoSensiveis.textContent = mostrando ? 'Ocultar dados sensíveis' : 'Mostrar dados sensíveis';
+    });
+})();
+</script>
+{% endblock %}

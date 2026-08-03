@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Minha área{% endblock %}
+
+{% block content %}
+<h1>Olá, {{ funcionario.nome.split(' ')[0] }}</h1>
+
+{% if resultados_liberados %}
+    <h2>Meus resultados finais</h2>
+    <div class="cards">
+        {% for r in resultados_liberados %}
+            <div class="card">
+                <h2>{{ '%.2f'|format(r.resultado_final) }} &middot; {{ r.conceito }}</h2>
+                <p>Exercício {{ r.ciclo.exercicio }} &mdash; autoavaliação x0,30 + avaliação do gestor x0,70</p>
+                <p>
+                    <a class="botao botao-pequeno" href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=r.ciclo.id) }}">Ver as duas avaliações</a>
+                    <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=r.ciclo.id) }}">Baixar PDF</a>
+                    <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=r.ciclo.id) }}">Baixar Excel</a>
+                </p>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% if ciclo %}
+    <p class="muted">Ciclo aberto: exercício {{ ciclo.exercicio }}</p>
+
+    <h2>Minha autoavaliação</h2>
+    {% set elegivel = funcionario.is_elegivel_avaliacao() %}
+    {% if elegivel is sameas false %}
+        <p class="muted">Você ainda não completou o tempo mínimo de casa para ser avaliado neste ciclo.</p>
+    {% else %}
+        <a class="botao"
+           href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=funcionario.id, avaliador_id=funcionario.id, tipo='auto') }}">
+            {% if autoavaliacao and autoavaliacao.status == 'concluida' %}
+                Ver minha autoavaliação
+            {% elif autoavaliacao %}
+                Continuar minha autoavaliação
+            {% else %}
+                Fazer minha autoavaliação
+            {% endif %}
+        </a>
+        {% if autoavaliacao %}
+            <p class="muted">
+                Status:
+                {% if autoavaliacao.status == 'concluida' %}
+                    <span class="badge badge-ok">Concluída</span>
+                {% else %}
+                    <span class="badge badge-pending">Em andamento</span>
+                {% endif %}
+            </p>
+        {% endif %}
+    {% endif %}
+
+    {% if linhas %}
+        <h2>Pessoas que eu avalio</h2>
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th>Empregado</th>
+                    <th>Cargo</th>
+                    <th>Minha avaliação</th>
+                    <th>Autoavaliação dele(a)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas %}
+                    <tr>
+                        <td>{{ linha.avaliado.nome }}</td>
+                        <td>{{ linha.avaliado.cargo.nome if linha.avaliado.cargo else '-' }}</td>
+                        <td>
+                            {% if linha.status == 'concluida' %}
+                                <span class="badge badge-ok">Concluída</span>
+                            {% elif linha.status == 'em_andamento' %}
+                                <span class="badge badge-pending">Em andamento</span>
+                            {% else %}
+                                <span class="badge badge-new">Não iniciada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linha.autoavaliacao_status == 'concluida' %}
+                                <span class="badge badge-ok">Concluída</span>
+                            {% elif linha.autoavaliacao_status == 'em_andamento' %}
+                                <span class="badge badge-pending">Em andamento</span>
+                            {% else %}
+                                <span class="badge badge-new">Não iniciada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="botao"
+                               href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=linha.avaliado.id, avaliador_id=funcionario.id, tipo='gestor') }}">
+                                {% if linha.status == 'concluida' %}Ver{% else %}Avaliar{% endif %}
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% else %}
+    <p class="flash flash-warning">Nenhum ciclo de avaliação está aberto no momento.</p>
+{% endif %}
+{% endblock %}

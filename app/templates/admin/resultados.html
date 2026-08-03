@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Resultado final{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Resultado final da avaliação</h1>
+<p class="muted">
+    Resultado = Autoavaliação &times; 0,30 + Avaliação do Gestor &times; 0,70.
+    Conceito: A (8,0 a 10,0) &middot; B (7,0 a 7,9) &middot; C (abaixo de 7,0).
+    Visível somente aqui, na Administração, até você liberar individualmente para o empregado.
+</p>
+
+{% if not ciclo %}
+    <p class="flash flash-warning">Nenhum ciclo cadastrado ainda.</p>
+{% else %}
+    <form method="get" class="form-inline" style="margin-bottom:16px;">
+        <select name="ciclo_id" onchange="this.form.submit()">
+            {% for c in ciclos %}
+                <option value="{{ c.id }}" {% if c.id == ciclo.id %}selected{% endif %}>
+                    Exercício {{ c.exercicio }} ({{ c.status }})
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <div class="tabela-toolbar">
+        <input type="search" id="busca-resultados" placeholder="Buscar por nome...">
+        <label class="checkbox-inline" style="margin-left:16px; font-weight:normal;">
+            <input type="checkbox" id="filtro-concluidos"> Mostrar somente quem já concluiu
+        </label>
+        <a class="botao botao-secundario" style="margin-left:auto;"
+           href="{{ url_for('admin.exportar_resultados_pdf', ciclo_id=ciclo.id) }}">
+            Baixar PDF
+        </a>
+        <a class="botao botao-secundario"
+           href="{{ url_for('admin.exportar_resultados_excel', ciclo_id=ciclo.id) }}">
+            Baixar planilha (.xlsx)
+        </a>
+    </div>
+
+    <div class="tabela-container">
+        <table class="tabela tabela-resultados" id="tabela-resultados">
+            <thead>
+                <tr>
+                    <th style="width:8%;">Mat.</th>
+                    <th style="width:18%;">Nome</th>
+                    <th style="width:10%;">Admissão</th>
+                    <th style="width:10%;" class="centro">Autoaval.</th>
+                    <th style="width:10%;" class="centro">Aval. gestor</th>
+                    <th style="width:9%;">Resultado</th>
+                    <th style="width:8%;">Conceito</th>
+                    <th style="width:12%;">Visível p/ empregado?</th>
+                    <th style="width:10%;">Ciência</th>
+                    <th style="width:15%;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas %}
+                    <tr data-busca="{{ linha.funcionario.nome|lower }}" data-concluido="{{ 'sim' if linha.pronto else 'nao' }}">
+                        <td>{{ linha.funcionario.matricula or '-' }}</td>
+                        <td>
+                            <a class="funcionario-nome" href="{{ url_for('admin.detalhe_resultado', avaliado_id=linha.funcionario.id, ciclo_id=ciclo.id) }}">{{ linha.funcionario.nome }}</a>
+                            <div class="funcionario-subinfo muted">{{ linha.funcionario.setor.nome if linha.funcionario.setor else '-' }}</div>
+                        </td>
+                        <td>{{ linha.funcionario.data_admissao.strftime('%d/%m/%Y') if linha.funcionario.data_admissao else '-' }}</td>
+                        <td class="centro {% if linha.media_auto is not none %}{% if linha.media_auto >= 8 %}nota-alta{% elif linha.media_auto >= 7 %}nota-media{% else %}nota-baixa{% endif %}{% endif %}">
+                            {{ '%.2f'|format(linha.media_auto) if linha.media_auto is not none else '-' }}
+                        </td>
+                        <td class="centro {% if linha.media_gestor is not none %}{% if linha.media_gestor >= 8 %}nota-alta{% elif linha.media_gestor >= 7 %}nota-media{% else %}nota-baixa{% endif %}{% endif %}">
+                            {{ '%.2f'|format(linha.media_gestor) if linha.media_gestor is not none else '-' }}
+                        </td>
+                        <td>
+                            {% if linha.resultado_final is not none %}
+                                <strong>{{ '%.2f'|format(linha.resultado_final) }}</strong>
+                            {% else %}
+                                <span class="muted">aguardando conclusão</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linha.conceito %}
+                                <span class="badge {% if linha.conceito == 'A' %}badge-ok{% elif linha.conceito == 'B' %}badge-pending{% else %}badge-danger{% endif %}">{{ linha.conceito }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linha.liberado %}
+                                <span class="badge badge-ok">Liberado</span>
+                            {% else %}
+                                <span class="badge badge-new">Não liberado</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linha.ciente %}
+                                <span class="badge badge-ok" title="Confirmada em {{ (linha.ciente_em|fortaleza).strftime('%d/%m/%Y %H:%M') if linha.ciente_em else '-' }}">Confirmada</span>
+                            {% elif linha.liberado %}
+                                {% if linha.prazo_ciencia and linha.prazo_ciencia < agora %}
+                                    <span class="badge badge-danger" title="Prazo era {{ linha.prazo_ciencia.strftime('%d/%m/%Y') }}">Atrasada</span>
+                                {% else %}
+                                    <span class="badge badge-new" title="{% if linha.prazo_ciencia %}Prazo até {{ linha.prazo_ciencia.strftime('%d/%m/%Y') }}{% endif %}">Aguardando</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linha.pronto %}
+                                <div class="acoes-vinculo">
+                                    <a class="botao-icone botao-icone-secundario" href="{{ url_for('admin.baixar_resultado_pdf', avaliado_id=linha.funcionario.id, ciclo_id=ciclo.id) }}" title="Baixar PDF" aria-label="Baixar PDF de {{ linha.funcionario.nome }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                    </a>
+                                    <a class="botao-icone botao-icone-secundario" href="{{ url_for('admin.baixar_resultado_excel', avaliado_id=linha.funcionario.id, ciclo_id=ciclo.id) }}" title="Baixar Excel" aria-label="Baixar Excel de {{ linha.funcionario.nome }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                    </a>
+                                    {% if linha.liberado %}
+                                        <form method="post" action="{{ url_for('admin.bloquear_resultado', avaliado_id=linha.funcionario.id) }}" style="display:inline;">
+                                            <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+                                            <button type="submit" class="botao-icone botao-icone-secundario" title="Bloquear de novo" aria-label="Bloquear resultado de {{ linha.funcionario.nome }}">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="{{ url_for('admin.liberar_resultado', avaliado_id=linha.funcionario.id) }}" style="display:inline;" onsubmit="return confirm('Liberar o resultado final para {{ linha.funcionario.nome }} ver na área dele(a)?');">
+                                            <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+                                            <button type="submit" class="botao-icone" title="Liberar" aria-label="Liberar resultado de {{ linha.funcionario.nome }}">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        (function () {
+            var input = document.getElementById('busca-resultados');
+            var filtroConcluidos = document.getElementById('filtro-concluidos');
+            var linhas = document.querySelectorAll('#tabela-resultados tbody tr[data-busca]');
+
+            function aplicarFiltros() {
+                var termo = (input.value || '').trim().toLowerCase();
+                var somenteConcluidos = filtroConcluidos.checked;
+                linhas.forEach(function (linha) {
+                    var nome = linha.getAttribute('data-busca') || '';
+                    var concluido = linha.getAttribute('data-concluido') === 'sim';
+                    var passaBusca = nome.indexOf(termo) !== -1;
+                    var passaConcluido = !somenteConcluidos || concluido;
+                    linha.style.display = (passaBusca && passaConcluido) ? '' : 'none';
+                });
+            }
+
+            if (input) input.addEventListener('input', aplicarFiltros);
+            if (filtroConcluidos) filtroConcluidos.addEventListener('change', aplicarFiltros);
+        })();
+    </script>
+{% endif %}
+{% endblock %}

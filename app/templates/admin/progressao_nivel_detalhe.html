@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Progressão de Nível — {{ funcionario.nome }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.progressao_nivel') }}" class="back-link">&larr; Progressão de Nível</a>
+<h1>{{ funcionario.nome }}</h1>
+<p class="muted">Nível hierárquico atual:
+    <span class="badge badge-nivel-{{ funcionario.nivel_hierarquico|lower }}">{{ funcionario.nivel_hierarquico }}</span>
+</p>
+<form method="post" action="{{ url_for('admin.alterar_nivel_manual', funcionario_id=funcionario.id) }}" class="form-inline">
+    <select name="nivel_novo">
+        {% for nivel in niveis %}
+            <option value="{{ nivel }}" {% if nivel == funcionario.nivel_hierarquico %}selected{% endif %}>{{ nivel }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="botao botao-secundario">Alterar nível manualmente</button>
+</form>
+<p class="muted" style="font-size:0.85em;">
+    Isso troca o nível na hora, sem depender da situação do par calculada abaixo — não conta como
+    um par "gasto" pra fins de cálculo. Se quiser que também conte pro cálculo do próximo par, use
+    "Registrar progressão retroativa" mais abaixo.
+</p>
+
+<h2>Notas por exercício</h2>
+<p class="muted">
+    Anos "Importado/digitado" você pode editar/excluir aqui direto. Anos "Avaliação do sistema" vêm
+    da autoavaliação + avaliação do gestor de verdade, calculados sozinhos — não dá pra digitar
+    por cima.
+</p>
+<table class="tabela">
+    <thead>
+        <tr>
+            <th>Exercício</th>
+            <th>Nota</th>
+            <th>Conceito</th>
+            <th>Origem</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for n in notas %}
+            <tr>
+                <td>{{ n.exercicio }}</td>
+                <td>{{ "%.2f"|format(n.nota) }}</td>
+                <td>
+                    <span class="badge {% if n.conceito == 'A' %}badge-ok{% elif n.conceito == 'B' %}badge-pending{% else %}badge-danger{% endif %}">{{ n.conceito }}</span>
+                </td>
+                <td class="muted">{{ n.origem }}</td>
+                <td>
+                    {% if n.editavel %}
+                        <form method="post" action="{{ url_for('admin.excluir_nota_historico', funcionario_id=funcionario.id, exercicio=n.exercicio) }}" style="display:inline;">
+                            <button type="submit" class="botao-icone botao-icone-secundario" title="Excluir">🗑</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="muted">Nenhuma nota lançada ainda.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<form method="post" action="{{ url_for('admin.salvar_nota_historico', funcionario_id=funcionario.id) }}" class="form-inline">
+    <input type="number" name="exercicio" placeholder="Exercício (ex: 2024)" required>
+    <input type="text" name="nota" placeholder="Nota (ex: 8,3)" required>
+    <button type="submit" class="botao">Salvar nota</button>
+</form>
+<p class="muted" style="font-size:0.85em;">Use isso só pra anos anteriores ao sistema (pré-2025) ou correções pontuais — anos com avaliação real dentro do sistema já aparecem sozinhos acima.</p>
+
+<h2>Ponto de partida do par</h2>
+<p class="muted">
+    A partir de qual exercício a contagem do par conta pra essa pessoa. Deixe em branco se ela ainda
+    não tirou conceito A em nenhum ano; use "?" se a situação for ambígua e precisar de confirmação
+    manual depois.
+    {% if ponteiro and ponteiro.exercicio_inicio %}Hoje: <strong>{{ ponteiro.exercicio_inicio }}</strong>.
+    {% elif ponteiro and ponteiro.precisa_confirmacao %}Hoje: <strong>"?" (precisa confirmar)</strong>.
+    {% else %}Hoje: <strong>não definido</strong>.{% endif %}
+</p>
+<form method="post" action="{{ url_for('admin.salvar_ponto_partida', funcionario_id=funcionario.id) }}" class="form-inline">
+    <input type="text" name="exercicio_inicio" placeholder="Ano (ex: 2023) ou &quot;?&quot;"
+           value="{{ ponteiro.exercicio_inicio if ponteiro and ponteiro.exercicio_inicio else ('?' if ponteiro and ponteiro.precisa_confirmacao else '') }}">
+    <button type="submit" class="botao">Salvar ponto de partida</button>
+</form>
+
+<h2>Situação calculada</h2>
+{% if resumo.pode_subir %}
+    <div style="padding:16px; border-radius:8px; background:var(--ok-bg, #e6f6ec); border:1px solid var(--ok, #2e7d32);">
+        <p style="font-size:1.3rem; font-weight:700; margin:0; color:var(--ok, #2e7d32);">✅ {{ resumo.titulo }}</p>
+        <p class="muted" style="margin:6px 0 0 0;">{{ resumo.motivo }}</p>
+    </div>
+{% elif no_topo %}
+    <div style="padding:16px; border-radius:8px; background:#f8ecdf; border:1px solid #a15b21;">
+        <p style="font-size:1.3rem; font-weight:700; margin:0; color:#a15b21;">🏁 {{ resumo.titulo }}</p>
+        <p class="muted" style="margin:6px 0 0 0;">{{ resumo.motivo }}</p>
+    </div>
+{% else %}
+    <div style="padding:16px; border-radius:8px; background:var(--pending-bg, #fff4e0); border:1px solid var(--pending, #b8860b);">
+        <p style="font-size:1.3rem; font-weight:700; margin:0; color:var(--pending, #b8860b);">🕓 {{ resumo.titulo }}</p>
+        <p class="muted" style="margin:6px 0 0 0;">{{ resumo.motivo }}</p>
+    </div>
+{% endif %}
+
+{% if resumo.pode_subir and not no_topo %}
+<div style="display:flex; gap:12px; align-items:center; margin-top:12px; flex-wrap:wrap;">
+    <form method="post" action="{{ url_for('admin.efetivar_progressao', funcionario_id=funcionario.id) }}" class="form-inline">
+        <select name="nivel_novo">
+            {% for nivel in niveis %}
+                <option value="{{ nivel }}" {% if nivel == funcionario.nivel_hierarquico %}selected{% endif %}>{{ nivel }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="botao">Sim, subir de nível</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.marcar_nao_efetivada', funcionario_id=funcionario.id) }}" class="form-inline">
+        <button type="submit" class="botao botao-secundario">Não subir agora</button>
+    </form>
+</div>
+<p class="muted" style="margin-top:6px;">
+    Qualquer uma das duas opções encerra o par {{ situacao.par_inicio }}-{{ situacao.par_fim }} —
+    o próximo par passa a contar a partir de {{ situacao.par_fim + 1 if situacao.par_fim else '' }},
+    não fica reaberto pra decidir depois.
+</p>
+{% endif %}
+
+<h3>Pares já decididos</h3>
+{% if progressoes %}
+<table class="tabela">
+    <thead>
+        <tr>
+            <th>Par</th>
+            <th>Decidido em</th>
+            <th>Nível anterior</th>
+            <th>Nível novo</th>
+            <th>Resultado</th>
+            <th>Decidido por</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in progressoes %}
+            <tr>
+                <td>{{ p.exercicio_inicio }}–{{ p.exercicio_fim }}</td>
+                <td>{{ p.efetivada_em_exercicio }}</td>
+                <td>{{ p.nivel_anterior }}</td>
+                <td>{{ p.nivel_novo }}</td>
+                <td>
+                    {% if p.nivel_anterior != p.nivel_novo %}
+                        <span class="badge badge-ok">Subiu</span>
+                    {% else %}
+                        <span class="badge badge-new">Não subiu</span>
+                    {% endif %}
+                </td>
+                <td>{{ p.decidido_por }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin.excluir_progressao', funcionario_id=funcionario.id, progressao_id=p.id) }}" style="display:inline;">
+                        <button type="submit" class="botao-icone botao-icone-secundario" title="Excluir">🗑</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <p class="muted">Nenhum par decidido dentro do sistema ainda.</p>
+{% endif %}
+<h3>Eventos registrados</h3>
+{% if eventos %}
+<table class="tabela">
+    <thead>
+        <tr>
+            <th>Tipo</th>
+            <th>Exercício</th>
+            <th>Observação</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in eventos %}
+            <tr>
+                <td>{{ e.tipo }}</td>
+                <td>{{ e.exercicio }}</td>
+                <td>{{ e.observacao }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin.excluir_evento_funcionario', funcionario_id=funcionario.id, evento_id=e.id) }}" style="display:inline;">
+                        <button type="submit" class="botao-icone botao-icone-secundario" title="Excluir">🗑</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <p class="muted">Nenhum evento registrado.</p>
+{% endif %}
+
+<h3>Registrar evento (ex: mudança de função)</h3>
+<form method="post" action="{{ url_for('admin.registrar_evento_funcionario', funcionario_id=funcionario.id) }}" class="form-inline">
+    <select name="tipo" required>
+        <option value="">Tipo de evento...</option>
+        {% for tipo in tipos_evento %}
+            <option value="{{ tipo }}">{{ tipo }}</option>
+        {% endfor %}
+    </select>
+    <input type="number" name="exercicio" placeholder="Exercício (ex: 2024)" required>
+    <input type="text" name="observacao" placeholder="Observação (opcional)">
+    <button type="submit" class="botao">Registrar evento</button>
+</form>
+
+<h3>Registrar progressão retroativa (já aconteceu, antes do sistema)</h3>
+<p class="muted">
+    Use isso quando a pessoa já subiu de nível de verdade fora do sistema — ex.: usando o par
+    2023+2024. Diferente do botão "Efetivar progressão" acima, este aqui não depende da situação
+    atual estar elegível: você digita direto o par, o ano em que valeu e o nível novo. Depois de
+    registrar, o próximo par já passa a contar automaticamente a partir daqui (não precisa mexer
+    no "ponto de partida" à mão).
+</p>
+<form method="post" action="{{ url_for('admin.registrar_progressao_retroativa', funcionario_id=funcionario.id) }}" class="form-inline">
+    <input type="number" name="exercicio_inicio" placeholder="Início do par (ex: 2023)" required>
+    <input type="number" name="exercicio_fim" placeholder="Fim do par (ex: 2024)" required>
+    <input type="number" name="efetivada_em_exercicio" placeholder="Valeu a partir de (ex: 2025)" required>
+    <select name="nivel_anterior">
+        <option value="">Nível anterior...</option>
+        {% for nivel in niveis %}
+            <option value="{{ nivel }}">{{ nivel }}</option>
+        {% endfor %}
+    </select>
+    <select name="nivel_novo">
+        <option value="">Nível novo...</option>
+        {% for nivel in niveis %}
+            <option value="{{ nivel }}" {% if nivel == funcionario.nivel_hierarquico %}selected{% endif %}>{{ nivel }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="botao">Registrar progressão retroativa</button>
+</form>
+
+{% if ponteiro and ponteiro.observacao %}
+<h3>Observação do histórico importado</h3>
+<p class="muted">{{ ponteiro.observacao }}</p>
+{% endif %}
+{% endblock %}

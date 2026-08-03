@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Administração{% endblock %}
+
+{% block content %}
+<h1>Administração</h1>
+
+<div class="cards">
+    <a class="card" href="{{ url_for('admin.funcionarios') }}">
+        <h2>Funcionários</h2>
+        <p>{{ total_funcionarios }} ativo(s) cadastrado(s)</p>
+    </a>
+    <a class="card" href="{{ url_for('admin.setores') }}">
+        <h2>Setores</h2>
+        <p>Cadastre os setores/departamentos da empresa</p>
+    </a>
+    <a class="card" href="{{ url_for('admin.vinculos') }}">
+        <h2>Vínculos avaliador × avaliado</h2>
+        <p>Defina quem cada gestor avalia no ciclo atual</p>
+    </a>
+    <a class="card" href="{{ url_for('admin.andamento') }}">
+        <h2>Andamento das avaliações</h2>
+        <p>Veja quem já concluiu a autoavaliação e a avaliação do gestor</p>
+    </a>
+    <a class="card" href="{{ url_for('admin.resultados') }}">
+        <h2>Resultado final</h2>
+        <p>Nota final (auto x0,30 + gestor x0,70) e conceito, com liberação individual para o empregado</p>
+    </a>
+    <a class="card" href="{{ url_for('admin.progressao_nivel') }}">
+        <h2>Progressão de Nível</h2>
+        <p>Quem tem conceito A em dois exercícios seguidos e pode subir de nível hierárquico</p>
+    </a>
+    <a class="card" href="{{ url_for('admin.comissao') }}">
+        <h2>Comissão de recursos</h2>
+        <p>Defina quem faz parte da Comissão e quem é a presidência, pra decidir recursos</p>
+    </a>
+</div>
+
+<h2>Ciclos de avaliação</h2>
+<form method="post" action="{{ url_for('admin.criar_ciclo') }}" class="form-inline">
+    <input type="number" name="exercicio" placeholder="Exercício (ex: 2026)" required>
+    <input type="date" name="data_inicio" title="Início do ciclo">
+    <input type="date" name="data_fim" title="Fim do ciclo">
+    <label class="muted" style="margin:0;">Prazo autoavaliação
+        <input type="date" name="data_limite_autoavaliacao">
+    </label>
+    <label class="muted" style="margin:0;">Prazo avaliação gestor
+        <input type="date" name="data_limite_gestor">
+    </label>
+    <button type="submit" class="botao">Criar ciclo</button>
+</form>
+
+<table class="tabela">
+    <thead>
+        <tr>
+            <th>Exercício</th>
+            <th>Início</th>
+            <th>Fim</th>
+            <th>Prazo autoavaliação</th>
+            <th>Prazo avaliação gestor</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ciclo in ciclos %}
+            <tr>
+                <td>{{ ciclo.exercicio }}</td>
+                <td>{{ ciclo.data_inicio.strftime('%d/%m/%Y') if ciclo.data_inicio else '-' }}</td>
+                <td>{{ ciclo.data_fim.strftime('%d/%m/%Y') if ciclo.data_fim else '-' }}</td>
+                <td>{{ ciclo.data_limite_autoavaliacao.strftime('%d/%m/%Y') if ciclo.data_limite_autoavaliacao else '-' }}</td>
+                <td>{{ ciclo.data_limite_gestor.strftime('%d/%m/%Y') if ciclo.data_limite_gestor else '-' }}</td>
+                <td>{{ ciclo.status }}</td>
+                <td>
+                    <div class="acoes-vinculo">
+                        <button type="button" class="botao botao-secundario botao-pequeno botao-editar-prazos" data-ciclo-id="{{ ciclo.id }}">Editar</button>
+                        {% if ciclo.status == 'aberto' %}
+                            <form method="post" action="{{ url_for('admin.encerrar_ciclo', ciclo_id=ciclo.id) }}" style="display:inline;">
+                                <button type="submit" class="botao botao-secundario botao-pequeno">Encerrar</button>
+                            </form>
+                        {% else %}
+                            <form method="post" action="{{ url_for('admin.reabrir_ciclo', ciclo_id=ciclo.id) }}" style="display:inline;">
+                                <button type="submit" class="botao botao-secundario botao-pequeno">Reabrir</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            <tr class="linha-edicao-prazos" data-edicao-prazos="{{ ciclo.id }}" style="display:none;">
+                <td colspan="7">
+                    <form method="post" action="{{ url_for('admin.editar_prazos_ciclo', ciclo_id=ciclo.id) }}" class="form-inline">
+                        <label class="muted" style="margin:0;">Exercício
+                            <input type="number" name="exercicio" value="{{ ciclo.exercicio }}" style="width:90px;">
+                        </label>
+                        <label class="muted" style="margin:0;">Início
+                            <input type="date" name="data_inicio" value="{{ ciclo.data_inicio.isoformat() if ciclo.data_inicio else '' }}">
+                        </label>
+                        <label class="muted" style="margin:0;">Fim
+                            <input type="date" name="data_fim" value="{{ ciclo.data_fim.isoformat() if ciclo.data_fim else '' }}">
+                        </label>
+                        <label class="muted" style="margin:0;">Prazo autoavaliação
+                            <input type="date" name="data_limite_autoavaliacao" value="{{ ciclo.data_limite_autoavaliacao.isoformat() if ciclo.data_limite_autoavaliacao else '' }}">
+                        </label>
+                        <label class="muted" style="margin:0;">Prazo avaliação gestor
+                            <input type="date" name="data_limite_gestor" value="{{ ciclo.data_limite_gestor.isoformat() if ciclo.data_limite_gestor else '' }}">
+                        </label>
+                        <button type="submit" class="botao botao-pequeno">Salvar</button>
+                        <button type="button" class="botao botao-secundario botao-pequeno botao-cancelar-prazos" data-ciclo-id="{{ ciclo.id }}">Cancelar</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<script>
+    document.querySelectorAll('.botao-editar-prazos').forEach(function (botao) {
+        botao.addEventListener('click', function () {
+            var id = botao.getAttribute('data-ciclo-id');
+            var linha = document.querySelector('.linha-edicao-prazos[data-edicao-prazos="' + id + '"]');
+            if (linha) linha.style.display = linha.style.display === 'none' ? '' : 'none';
+        });
+    });
+    document.querySelectorAll('.botao-cancelar-prazos').forEach(function (botao) {
+        botao.addEventListener('click', function () {
+            var id = botao.getAttribute('data-ciclo-id');
+            var linha = document.querySelector('.linha-edicao-prazos[data-edicao-prazos="' + id + '"]');
+            if (linha) linha.style.display = 'none';
+        });
+    });
+</script>
+{% endblock %}

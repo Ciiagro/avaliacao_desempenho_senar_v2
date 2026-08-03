@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Início - Avaliação de Desempenho{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="hero-logo-box">
+        <img src="{{ url_for('static', filename='img/logo_senar.png') }}" alt="SENAR" class="hero-logo">
+    </div>
+    <h1>Avaliação de Desempenho<span class="destaque">dos Colaboradores</span></h1>
+</div>
+
+{% if ciclo %}
+    <p class="muted subtitulo" style="text-align:center;">Ciclo aberto: <strong>Exercício {{ ciclo.exercicio }}</strong></p>
+{% else %}
+    <p class="flash flash-warning" style="text-align:center;">
+        Nenhum ciclo de avaliação está aberto no momento. Peça ao RH para abrir um ciclo em
+        <a href="{{ url_for('admin.painel') }}">Administração</a>.
+    </p>
+{% endif %}
+
+<div class="cards">
+    {% if funcionario %}
+        <a class="card" href="{{ url_for('main.minha_area') }}">
+            <h2>Ir para minha área</h2>
+            <p>Continuar logado como {{ funcionario.nome }}.</p>
+        </a>
+    {% else %}
+        <a class="card" href="{{ url_for('main.login') }}">
+            <h2>Entrar</h2>
+            <p>Faça login com seu e-mail e senha para fazer sua autoavaliação ou avaliar quem você gerencia.</p>
+        </a>
+    {% endif %}
+
+    <a class="card" href="{{ url_for('admin.painel') }}">
+        <h2>Administração</h2>
+        <p>
+            Acesso restrito ao RH.
+            {% if session.get('admin_logueado') %}Você está logado nessa área.{% endif %}
+        </p>
+    </a>
+    {% if session.get('admin_logueado') %}
+        <a class="card" href="{{ url_for('admin.logout') }}">
+            <h2>Sair da Administração</h2>
+            <p>Encerrar a sessão de Administração neste dispositivo.</p>
+        </a>
+    {% endif %}
+</div>
+{% endblock %}

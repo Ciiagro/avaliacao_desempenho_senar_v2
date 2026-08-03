@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Resultado detalhado{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.resultados', ciclo_id=ciclo.id) }}" class="back-link">&larr; Resultado final</a>
+<h1>{{ avaliado.nome }}</h1>
+<p class="muted">
+    Exercício {{ ciclo.exercicio }} &middot; {{ avaliado.setor.nome if avaliado.setor else '-' }}
+    {% if liberado %}
+        &middot; <span class="badge badge-ok">Resultado liberado para o empregado</span>
+    {% else %}
+        &middot; <span class="badge badge-new">Resultado ainda não liberado</span>
+    {% endif %}
+</p>
+
+<div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>(I) Autoavaliação</th>
+                <th>(II) Avaliação do gestor</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in dados.fatores %}
+                <tr>
+                    <td>{{ fator.ordem }}</td>
+                    <td>{{ fator.nome }}</td>
+                    <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
+                    <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
+                </tr>
+            {% endfor %}
+            <tr>
+                <td></td>
+                <td><strong>SOMA</strong></td>
+                <td><strong>{{ dados.soma_auto if dados.soma_auto is not none else '-' }}</strong></td>
+                <td><strong>{{ dados.soma_gestor if dados.soma_gestor is not none else '-' }}</strong></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><strong>MÉDIA (SOMA/{{ dados.fatores|length }})</strong></td>
+                <td><strong>{{ '%.2f'|format(dados.media_auto) if dados.media_auto is not none else '-' }}</strong></td>
+                <td><strong>{{ '%.2f'|format(dados.media_gestor) if dados.media_gestor is not none else '-' }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="cards" style="margin-top:16px;">
+    <div class="card">
+        <h2>
+            {% if dados.resultado_final is not none %}
+                {{ '%.2f'|format(dados.resultado_final) }}
+            {% else %}
+                &ndash;
+            {% endif %}
+        </h2>
+        <p>Resultado final (Auto &times; 0,30 + Gestor &times; 0,70)</p>
+    </div>
+    {% if dados.conceito %}
+        <div class="card">
+            <h2>{{ dados.conceito }}</h2>
+            <p>Conceito</p>
+        </div>
+    {% endif %}
+</div>
+
+{% if dados.resultado_final is not none %}
+    <p style="margin-top:12px;">
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('admin.baixar_resultado_pdf', avaliado_id=avaliado.id, ciclo_id=ciclo.id) }}">Baixar PDF</a>
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('admin.baixar_resultado_excel', avaliado_id=avaliado.id, ciclo_id=ciclo.id) }}">Baixar Excel</a>
+        {% if liberado %}
+            <form method="post" action="{{ url_for('admin.bloquear_resultado', avaliado_id=avaliado.id) }}" style="display:inline;">
+                <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+                <button type="submit" class="botao botao-secundario botao-pequeno">Bloquear de novo</button>
+            </form>
+        {% else %}
+            <form method="post" action="{{ url_for('admin.liberar_resultado', avaliado_id=avaliado.id) }}" style="display:inline;" onsubmit="return confirm('Liberar o resultado final para {{ avaliado.nome }} ver na área dele(a)?');">
+                <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+                <button type="submit" class="botao botao-pequeno">Liberar</button>
+            </form>
+        {% endif %}
+    </p>
+{% endif %}
+
+<div class="secoes-comentarios" style="display:flex; gap:24px; margin-top:24px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:280px;">
+        <h2>Comentários &mdash; Autoavaliação</h2>
+        {% if dados.avaliacao_auto %}
+            <p class="muted">Status: {{ 'Concluída' if dados.avaliacao_auto.status == 'concluida' else 'Em andamento' }}</p>
+            <p><strong>Pontos fortes:</strong><br>{{ dados.avaliacao_auto.pontos_fortes or '-' }}</p>
+            <p><strong>Oportunidades de desenvolvimento:</strong><br>{{ dados.avaliacao_auto.oportunidades_desenvolvimento or '-' }}</p>
+            <p><strong>Plano de ação:</strong><br>{{ dados.avaliacao_auto.plano_acao or '-' }}</p>
+            <p><strong>Resultados alcançados:</strong><br>{{ dados.avaliacao_auto.resultados_alcancados or '-' }}</p>
+            {% if dados.avaliacao_auto.status == 'concluida' %}
+                <a class="botao botao-secundario botao-pequeno" href="{{ url_for('admin.ver_avaliacao', avaliacao_id=dados.avaliacao_auto.id) }}">Ver formulário completo</a>
+            {% endif %}
+        {% else %}
+            <p class="muted">Autoavaliação ainda não iniciada.</p>
+        {% endif %}
+    </div>
+    <div style="flex:1; min-width:280px;">
+        <h2>Comentários &mdash; Avaliação do gestor</h2>
+        {% if dados.avaliacao_gestor %}
+            <p class="muted">
+                Status: {{ 'Concluída' if dados.avaliacao_gestor.status == 'concluida' else 'Em andamento' }}
+                &middot; Gestor: {{ dados.avaliador.nome if dados.avaliador else '-' }}
+            </p>
+            <p><strong>Pontos fortes:</strong><br>{{ dados.avaliacao_gestor.pontos_fortes or '-' }}</p>
+            <p><strong>Oportunidades de desenvolvimento:</strong><br>{{ dados.avaliacao_gestor.oportunidades_desenvolvimento or '-' }}</p>
+            <p><strong>Plano de ação:</strong><br>{{ dados.avaliacao_gestor.plano_acao or '-' }}</p>
+            <p><strong>Resultados alcançados:</strong><br>{{ dados.avaliacao_gestor.resultados_alcancados or '-' }}</p>
+            {% if dados.avaliacao_gestor.status == 'concluida' %}
+                <a class="botao botao-secundario botao-pequeno" href="{{ url_for('admin.ver_avaliacao', avaliacao_id=dados.avaliacao_gestor.id) }}">Ver formulário completo</a>
+            {% endif %}
+        {% elif not dados.avaliador %}
+            <p class="muted">Esse empregado ainda não tem um gestor vinculado neste ciclo.</p>
+        {% else %}
+            <p class="muted">Avaliação do gestor ainda não iniciada.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

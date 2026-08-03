@@ -1,0 +1,46 @@
+A COMISSÃO AGORA CONTROLA TODO O PROCESSO
+============================================
+
+O QUE MUDOU
+------------
+Antes, depois que o gestor respondia, o sistema mandava direto pro
+empregado (e quando o empregado aceitava, encerrava sozinho). Agora nada
+disso acontece sem a Comissão ver e agir:
+
+1. Empregado abre o recurso -> Comissão.
+2. Comissão manda mensagem ao gestor pedindo reavaliação -> Gestor.
+3. Gestor responde (mantém ou revisa) -> volta pra COMISSÃO (não vai
+   direto pro empregado).
+   - Se o gestor REVISOU a nota: a Comissão só precisa confirmar e
+     encerrar (o recurso já foi atendido).
+   - Se o gestor MANTEVE: a Comissão repassa a resposta ao empregado.
+4. Empregado vê a resposta (só depois que a Comissão repassou) e decide:
+   aceitar ou recorrer.
+5. Se aceitar: NÃO encerra sozinho — vai pra Comissão confirmar o
+   encerramento.
+6. Se recorrer: vai pra Comissão encaminhar à presidência (como já era).
+7. Presidência decide (acata ou não) — isso já encerra direto, por ser a
+   última instância.
+
+A tela da Comissão agora tem 4 filas:
+  - Recursos recém-abertos — mandar mensagem ao gestor
+  - Gestor respondeu — revisar antes de repassar
+  - Empregado aceitou — confirmar encerramento
+  - Gestor manteve e empregado recorreu — encaminhar à presidência
+
+Importante: o empregado NÃO vê a resposta do gestor até a Comissão
+repassar — isso foi testado e confirmado.
+
+COMO APLICAR
+------------
+Substitua estes arquivos:
+  - app/models.py
+  - app/routes/recursos.py
+  - app/templates/recurso_comissao.html
+  - app/templates/recurso_funcionario.html
+  - app/templates/recurso_gestor_detalhe.html
+  - app/templates/recurso_presidencia_detalhe.html
+
+Reinicie o servidor. NÃO precisa rodar SQL — só foram adicionados dois
+status novos ao mesmo campo que já existia, nenhum dado antigo precisa
+ser corrigido.

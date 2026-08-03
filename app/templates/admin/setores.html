@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Setores{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Setores</h1>
+
+<h2>Cadastrar setor</h2>
+<form method="post" class="form-inline">
+    <input type="text" name="nome" placeholder="Nome do setor (ex: Coordenação de RH)" required>
+    <button type="submit" class="botao">Cadastrar</button>
+</form>
+
+<h2>Cadastrados</h2>
+<table class="tabela">
+    <thead><tr><th>Setor</th><th>Funcionários ativos</th><th style="width:220px;"></th></tr></thead>
+    <tbody>
+        {% for s in lista %}
+            <tr id="linha-setor-{{ s.id }}">
+                <td>
+                    <a href="{{ url_for('admin.funcionarios', setor_id=s.id) }}" class="setor-nome-exibicao">{{ s.nome }}</a>
+                    <form method="post" action="{{ url_for('admin.editar_setor', setor_id=s.id) }}"
+                          class="setor-form-editar" style="display:none;">
+                        <input type="text" name="nome" value="{{ s.nome }}" required>
+                        <button type="submit" class="botao botao-pequeno">Salvar</button>
+                        <button type="button" class="botao botao-secundario botao-pequeno botao-cancelar-edicao">Cancelar</button>
+                    </form>
+                </td>
+                <td>
+                    <a href="{{ url_for('admin.funcionarios', setor_id=s.id) }}">{{ contagem.get(s.id, 0) }}</a>
+                </td>
+                <td>
+                    <button type="button" class="botao botao-secundario botao-pequeno botao-editar-setor">Editar</button>
+                    <form method="post" action="{{ url_for('admin.excluir_setor', setor_id=s.id) }}"
+                          style="display:inline;" onsubmit="return confirm('Excluir o setor {{ s.nome }}?');">
+                        <button type="submit" class="botao botao-secundario botao-pequeno">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="3">Nenhum setor cadastrado ainda.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+document.querySelectorAll('.botao-editar-setor').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+        var linha = botao.closest('tr');
+        linha.querySelector('.setor-nome-exibicao').style.display = 'none';
+        var form = linha.querySelector('.setor-form-editar');
+        form.style.display = 'inline-flex';
+        form.querySelector('input[name="nome"]').focus();
+    });
+});
+document.querySelectorAll('.botao-cancelar-edicao').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+        var linha = botao.closest('tr');
+        linha.querySelector('.setor-form-editar').style.display = 'none';
+        linha.querySelector('.setor-nome-exibicao').style.display = 'inline';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Vínculos de avaliação{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Vínculos avaliador × avaliado</h1>
+
+{% if ciclos %}
+    <form method="get" class="form-inline" style="margin-bottom:16px;">
+        <select name="ciclo_id" onchange="this.form.submit()">
+            {% for c in ciclos %}
+                <option value="{{ c.id }}" {% if ciclo and c.id == ciclo.id %}selected{% endif %}>
+                    Exercício {{ c.exercicio }} ({{ c.status }})
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+{% endif %}
+
+{% if ciclo %}
+    <p class="muted">Editando vínculos do ciclo: exercício {{ ciclo.exercicio }} ({{ ciclo.status }})</p>
+    {% if ciclo.status == 'encerrado' %}
+        <p class="flash flash-warning">Este ciclo está encerrado. Reabra-o em Administração para poder adicionar, editar, remover ou importar vínculos.</p>
+    {% endif %}
+
+    {% if ciclo.status == 'aberto' %}
+    <h2>Adicionar vínculo</h2>
+    <form method="post" class="form-grid">
+        <select name="avaliado_id" required>
+            <option value="">Empregado avaliado...</option>
+            {% for f in funcionarios %}
+                <option value="{{ f.id }}">{{ f.nome }}</option>
+            {% endfor %}
+        </select>
+        <select name="avaliador_id" required>
+            <option value="">Gestor avaliador...</option>
+            {% for f in funcionarios %}
+                <option value="{{ f.id }}">{{ f.nome }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="botao">Adicionar</button>
+    </form>
+
+    <h2 style="margin-bottom:6px;">
+        Importar em lote (.xlsx ou .csv)
+        <span class="muted" style="font-size:0.78rem; font-weight:normal;">
+            &mdash; colunas esperadas: <code>avaliado</code>, <code>avaliador</code> (nomes exatamente como cadastrados).
+        </span>
+    </h2>
+    <form method="post" action="{{ url_for('admin.importar_vinculos', ciclo_id=ciclo.id) }}" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="arquivo" accept=".xlsx,.csv" required style="width:auto; flex:1;">
+        <button type="submit" class="botao">Importar</button>
+    </form>
+    {% endif %}
+
+    <h2>Vínculos cadastrados neste ciclo</h2>
+    <form method="get" class="form-inline" id="form-busca-avaliador">
+        <input
+            type="text"
+            name="q"
+            id="busca-avaliador"
+            placeholder="Digite o nome do avaliador para pesquisar..."
+            value="{{ busca }}"
+            autocomplete="off"
+            style="min-width: 320px;"
+        >
+        <button type="submit" class="botao">Pesquisar</button>
+        <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+        {% if busca %}
+            <a href="{{ url_for('admin.vinculos', ciclo_id=ciclo.id) }}" class="botao botao-secundario" id="link-limpar-busca">Limpar filtro</a>
+        {% endif %}
+        <a href="{{ url_for('admin.exportar_vinculos', q=busca, ciclo_id=ciclo.id) }}" class="botao" id="link-exportar-vinculos">Exportar para Excel</a>
+    </form>
+    <table class="tabela tabela-vinculos" id="tabela-vinculos">
+        <thead><tr><th>Avaliado</th><th>Avaliador</th><th></th></tr></thead>
+        <tbody>
+            {% for v in lista %}
+                <tr data-avaliador="{{ v.avaliador.nome|lower }}" data-linha-vinculo="{{ v.id }}">
+                    <td>{{ v.avaliado.nome }}</td>
+                    <td>{{ v.avaliador.nome }}</td>
+                    <td>
+                        {% if ciclo.status == 'aberto' %}
+                        <div class="acoes-vinculo">
+                            <button type="button" class="botao-icone botao-icone-secundario botao-editar-vinculo" data-vinculo-id="{{ v.id }}" title="Editar" aria-label="Editar vínculo de {{ v.avaliado.nome }}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            </button>
+                            <form method="post" action="{{ url_for('admin.excluir_vinculo', vinculo_id=v.id) }}" onsubmit="return confirm('Remover este vínculo?');" style="display:inline;">
+                                <button type="submit" class="botao-icone botao-icone-perigo" title="Remover" aria-label="Remover vínculo de {{ v.avaliado.nome }}">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr class="linha-edicao-vinculo" data-avaliador="{{ v.avaliador.nome|lower }}" data-edicao-vinculo="{{ v.id }}" style="display:none;">
+                    <td colspan="3">
+                        <form method="post" action="{{ url_for('admin.editar_vinculo', vinculo_id=v.id) }}" class="form-inline">
+                            <input type="hidden" name="q" value="{{ busca }}">
+                            <select name="avaliado_id" required>
+                                {% for f in funcionarios %}
+                                    <option value="{{ f.id }}" {% if f.id == v.avaliado_id %}selected{% endif %}>{{ f.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="avaliador_id" required>
+                                {% for f in funcionarios %}
+                                    <option value="{{ f.id }}" {% if f.id == v.avaliador_id %}selected{% endif %}>{{ f.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="botao botao-pequeno">Salvar</button>
+                            <button type="button" class="botao botao-secundario botao-pequeno botao-cancelar-edicao" data-vinculo-id="{{ v.id }}">Cancelar</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        (function () {
+            var input = document.getElementById('busca-avaliador');
+            var linkExportar = document.getElementById('link-exportar-vinculos');
+            var baseExportar = "{{ url_for('admin.exportar_vinculos', ciclo_id=ciclo.id) }}";
+
+            function filtrarLinhas(termo) {
+                var linhas = document.querySelectorAll('#tabela-vinculos tbody tr[data-avaliador]');
+                linhas.forEach(function (linha) {
+                    var nome = linha.getAttribute('data-avaliador') || '';
+                    var visivel = nome.indexOf(termo) !== -1;
+                    if (linha.classList.contains('linha-edicao-vinculo')) {
+                        // linhas de edição ficam ocultas até o usuário clicar em "Editar"
+                        if (!visivel) linha.style.display = 'none';
+                    } else {
+                        linha.style.display = visivel ? '' : 'none';
+                    }
+                });
+            }
+
+            if (input) {
+                input.addEventListener('input', function () {
+                    var termo = input.value.trim().toLowerCase();
+                    filtrarLinhas(termo);
+                    if (linkExportar) {
+                        linkExportar.href = termo
+                            ? baseExportar + '&q=' + encodeURIComponent(input.value.trim())
+                            : baseExportar;
+                    }
+                });
+            }
+
+            document.querySelectorAll('.botao-editar-vinculo').forEach(function (botao) {
+                botao.addEventListener('click', function () {
+                    var id = botao.getAttribute('data-vinculo-id');
+                    var linha = document.querySelector('.linha-edicao-vinculo[data-edicao-vinculo="' + id + '"]');
+                    if (linha) linha.style.display = linha.style.display === 'none' ? '' : 'none';
+                });
+            });
+
+            document.querySelectorAll('.botao-cancelar-edicao').forEach(function (botao) {
+                botao.addEventListener('click', function () {
+                    var id = botao.getAttribute('data-vinculo-id');
+                    var linha = document.querySelector('.linha-edicao-vinculo[data-edicao-vinculo="' + id + '"]');
+                    if (linha) linha.style.display = 'none';
+                });
+            });
+        })();
+    </script>
+{% else %}
+    <p>Crie um ciclo de avaliação aberto em <a href="{{ url_for('admin.painel') }}">Administração</a> antes de cadastrar vínculos.</p>
+{% endif %}
+{% endblock %}

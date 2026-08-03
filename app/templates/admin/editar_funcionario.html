@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Editar {{ f.nome }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.funcionarios') }}" class="back-link">&larr; Funcionários</a>
+<h1>Editar {{ f.nome }}</h1>
+
+<form method="post" class="form-grid">
+    <input type="text" name="nome" placeholder="Nome completo" value="{{ f.nome }}" required>
+    <input type="text" name="cargo_nome" placeholder="Cargo (ex: Assistente Administrativo)" value="{{ f.cargo.nome if f.cargo else '' }}" list="lista-cargos">
+    <datalist id="lista-cargos">
+        {% for cargo in cargos %}
+            <option value="{{ cargo.nome }}">
+        {% endfor %}
+    </datalist>
+    <select name="setor_id">
+        <option value="">Setor (opcional)...</option>
+        {% for setor in setores %}
+            <option value="{{ setor.id }}" {% if f.setor_id == setor.id %}selected{% endif %}>{{ setor.nome }}</option>
+        {% endfor %}
+    </select>
+    <select name="nivel_hierarquico" required>
+        <option value="">Nível hierárquico (define o formulário)...</option>
+        {% for nivel in niveis %}
+            <option value="{{ nivel }}" {% if f.nivel_hierarquico == nivel %}selected{% endif %}>{{ nivel }}</option>
+        {% endfor %}
+    </select>
+    <input type="email" name="email" placeholder="E-mail (necessário para login)" value="{{ f.email or '' }}">
+    <input type="text" name="matricula" placeholder="Matrícula (opcional)" value="{{ f.matricula or '' }}">
+    <input type="text" name="cpf" placeholder="CPF (opcional)" value="{{ f.cpf or '' }}">
+    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
+        Data de nascimento
+        <input type="date" name="data_nascimento" value="{{ f.data_nascimento.isoformat() if f.data_nascimento else '' }}">
+    </label>
+    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
+        Data de admissão
+        <input type="date" name="data_admissao" value="{{ f.data_admissao.isoformat() if f.data_admissao else '' }}">
+    </label>
+    <select name="sexo">
+        <option value="">Sexo (opcional)...</option>
+        {% for opcao in opcoes_sexo %}
+            <option value="{{ opcao }}" {% if f.sexo == opcao %}selected{% endif %}>{{ opcao }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="salario" placeholder="Salário (opcional)" value="{{ f.salario if f.salario is not none else '' }}">
+    <select name="elegivel_avaliacao">
+        <option value="auto" {% if elegivel_atual == 'auto' %}selected{% endif %}>Elegível p/ avaliação: Automático (pela data de admissão)</option>
+        <option value="sim" {% if elegivel_atual == 'sim' %}selected{% endif %}>Elegível p/ avaliação: Forçar Sim</option>
+        <option value="nao" {% if elegivel_atual == 'nao' %}selected{% endif %}>Elegível p/ avaliação: Forçar Não</option>
+    </select>
+    <label style="display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" name="ativo" {% if f.ativo %}checked{% endif %}>
+        Ativo
+    </label>
+    <button type="submit" class="botao">Salvar alterações</button>
+</form>
+{% endblock %}

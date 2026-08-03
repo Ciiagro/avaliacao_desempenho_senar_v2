@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Avaliação de {{ avaliado.nome }}{% endblock %}
+
+{% block content %}
+{% if tipo == 'gestor' %}
+    <a href="{{ url_for('main.minha_area') }}" class="back-link">&larr; Voltar à lista</a>
+{% else %}
+    <a href="{{ url_for('main.minha_area') }}" class="back-link">&larr; Voltar</a>
+{% endif %}
+
+<h1>{{ formulario.nome }}</h1>
+<p class="muted">
+    Avaliado: <strong>{{ avaliado.nome }}</strong> ({{ avaliado.cargo.nome if avaliado.cargo else '' }})
+    {% if tipo == 'auto' %}&mdash; Autoavaliação{% else %}&mdash; Avaliador: {{ avaliador.nome }}{% endif %}
+</p>
+
+{% if ja_concluida %}
+    <div class="flash flash-warning" style="margin-bottom:16px;">
+        ✅ Esta {{ 'autoavaliação' if tipo == 'auto' else 'avaliação do gestor' }} já foi <strong>concluída e assinada</strong>.
+        Os campos abaixo ficam somente para consulta; não é mais possível editar.
+    </div>
+{% elif prazo_encerrado %}
+    <div class="flash flash-danger" style="margin-bottom:16px;">
+        ⚠️ O prazo para preencher esta {{ 'autoavaliação' if tipo == 'auto' else 'avaliação do gestor' }}
+        encerrou em <strong>{{ prazo.strftime('%d/%m/%Y') }}</strong>. Os campos abaixo ficam somente
+        para consulta; não é mais possível salvar alterações.
+    </div>
+{% elif prazo %}
+    <p class="muted">Prazo para concluir esta avaliação: <strong>{{ prazo.strftime('%d/%m/%Y') }}</strong>.</p>
+{% endif %}
+
+<form method="post">
+    <fieldset {% if prazo_encerrado or ja_concluida %}disabled{% endif %} style="border:none; padding:0; margin:0;">
+    <h2>Parte I &mdash; Fatores de desempenho</h2>
+    <table class="tabela tabela-formulario">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>Conceito</th>
+                <th>10<br><span class="escala">Supera</span></th>
+                <th>8<br><span class="escala">Desenv. Pleno</span></th>
+                <th>6<br><span class="escala">Em Desenv.</span></th>
+                <th>4<br><span class="escala">A Desenvolver</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in formulario.fatores %}
+                <tr>
+                    <td>{{ '%02d' % fator.ordem }}</td>
+                    <td class="fator-nome">{{ fator.nome }}</td>
+                    <td class="fator-descricao">{{ fator.descricao }}</td>
+                    {% for valor in [10, 8, 6, 4] %}
+                        <td class="celula-radio">
+                            <input type="radio"
+                                   name="fator_{{ fator.id }}"
+                                   value="{{ valor }}"
+                                   {% if respostas_salvas.get(fator.id) == valor %}checked{% endif %}>
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Parte II</h2>
+
+    <label for="pontos_fortes">Pontos fortes</label>
+    <textarea id="pontos_fortes" name="pontos_fortes" rows="3">{{ avaliacao.pontos_fortes if avaliacao else '' }}</textarea>
+
+    <label for="oportunidades_desenvolvimento">Oportunidade de desenvolvimento</label>
+    <textarea id="oportunidades_desenvolvimento" name="oportunidades_desenvolvimento" rows="3">{{ avaliacao.oportunidades_desenvolvimento if avaliacao else '' }}</textarea>
+
+    <div class="grid-2">
+        <div>
+            <label for="plano_acao">Plano de desenvolvimento &mdash; Ação</label>
+            <textarea id="plano_acao" name="plano_acao" rows="4"
+                      placeholder="Descreva o(s) plano(s) de ação. Para cada um, especifique o prazo (ex: 15 dias, 1 mês, semestral, anual, ou uma data específica).">{{ avaliacao.plano_acao if avaliacao else '' }}</textarea>
+            <p class="muted" style="margin-top:4px; font-size:0.85em;">
+                Se houver mais de um plano de ação, descreva cada um com o respectivo prazo (dias, mês, semestral, anual etc).
+            </p>
+        </div>
+    </div>
+
+    <label for="resultados_alcancados">Resultados alcançados durante o ano</label>
+    <textarea id="resultados_alcancados" name="resultados_alcancados" rows="3">{{ avaliacao.resultados_alcancados if avaliacao else '' }}</textarea>
+
+    {% if avaliacao and avaliacao.status == 'concluida' and avaliacao.assinado_por %}
+        <p class="muted" style="margin-top:20px;">
+            ✅ Assinado eletronicamente por <strong>{{ avaliacao.assinado_por }}</strong>
+            em {{ (avaliacao.assinado_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if avaliacao.assinado_em else '' }}.
+            Se salvar novamente, a assinatura é atualizada.
+        </p>
+        <a class="botao botao-secundario" href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=avaliacao.id) }}">Baixar PDF</a>
+    {% endif %}
+
+    <label style="display:flex; align-items:flex-start; gap:8px; font-weight:normal; text-transform:none; margin-top:20px;">
+        <input type="checkbox" name="confirmo_assinatura" value="1" style="width:auto; margin-top:3px;">
+        <span>
+            Confirmo que li e revisei todas as informações acima e que elas são verdadeiras.
+            Esta confirmação funciona como minha <strong>assinatura eletrônica</strong> nesta avaliação
+            (será registrado meu nome e a data/hora).
+        </span>
+    </label>
+
+    <div class="acoes-formulario">
+        <button type="submit" name="acao" value="rascunho" class="botao botao-secundario">Salvar rascunho</button>
+        <button type="submit" name="acao" value="concluir" id="botao-concluir" class="botao">Concluir e assinar avaliação</button>
+    </div>
+
+    <script>
+        (function () {
+            var botaoConcluir = document.getElementById('botao-concluir');
+            if (!botaoConcluir) return;
+            botaoConcluir.addEventListener('click', function () {
+                // Só exige tudo preenchido quando o clique é pra CONCLUIR.
+                // Salvar rascunho continua livre, sem exigir nada.
+                document.querySelectorAll('input[type="radio"][name^="fator_"]').forEach(function (input) {
+                    input.required = true;
+                });
+                ['pontos_fortes', 'oportunidades_desenvolvimento', 'plano_acao', 'resultados_alcancados'].forEach(function (id) {
+                    var campo = document.getElementById(id);
+                    if (campo) campo.required = true;
+                });
+            });
+        })();
+    </script>
+    </fieldset>
+</form>
+{% endblock %}

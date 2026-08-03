@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Avaliação de {{ avaliacao.avaliado.nome }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.andamento') }}" class="back-link">&larr; Andamento das avaliações</a>
+
+<h1>{{ formulario.nome }}</h1>
+<p class="muted">
+    Avaliado: <strong>{{ avaliacao.avaliado.nome }}</strong>
+    ({{ avaliacao.avaliado.cargo.nome if avaliacao.avaliado.cargo else '' }})
+    &mdash;
+    {% if avaliacao.tipo == 'auto' %}
+        Autoavaliação
+    {% else %}
+        Avaliador: {{ avaliacao.avaliador.nome }}
+    {% endif %}
+    <span class="badge {% if avaliacao.status == 'concluida' %}badge-ok{% else %}badge-pending{% endif %}">
+        {% if avaliacao.status == 'concluida' %}Concluída{% else %}Em andamento{% endif %}
+    </span>
+</p>
+
+<h2>Parte I &mdash; Fatores de desempenho</h2>
+<table class="tabela tabela-formulario">
+    <thead>
+        <tr>
+            <th>Nº</th>
+            <th>Fator</th>
+            <th>Conceito</th>
+            <th>Nota</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for fator in formulario.fatores %}
+            <tr>
+                <td>{{ '%02d' % fator.ordem }}</td>
+                <td class="fator-nome">{{ fator.nome }}</td>
+                <td class="fator-descricao">{{ fator.descricao }}</td>
+                <td><strong>{{ respostas_salvas.get(fator.id, '-') }}</strong></td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Parte II</h2>
+
+<p><strong>Pontos fortes</strong></p>
+<p>{{ avaliacao.pontos_fortes or '-' }}</p>
+
+<p><strong>Oportunidade de desenvolvimento</strong></p>
+<p>{{ avaliacao.oportunidades_desenvolvimento or '-' }}</p>
+
+<div class="grid-2">
+    <div>
+        <p><strong>Plano de desenvolvimento &mdash; Ação</strong></p>
+        <p>{{ avaliacao.plano_acao or '-' }}</p>
+    </div>
+</div>
+
+<p><strong>Resultados alcançados durante o ano</strong></p>
+<p>{{ avaliacao.resultados_alcancados or '-' }}</p>
+
+{% if avaliacao.assinado_por %}
+    <p class="muted" style="margin-top:20px;">
+        ✅ Assinado eletronicamente por <strong>{{ avaliacao.assinado_por }}</strong>
+        em {{ (avaliacao.assinado_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if avaliacao.assinado_em else '' }}.
+    </p>
+{% endif %}
+<a class="botao botao-secundario" href="{{ url_for('admin.baixar_pdf_avaliacao', avaliacao_id=avaliacao.id) }}">Baixar PDF</a>
+{% endblock %}

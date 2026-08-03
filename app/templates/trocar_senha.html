@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Trocar senha{% endblock %}
+
+{% block content %}
+<h1>Trocar senha</h1>
+
+{% if forcado %}
+    <p class="flash flash-warning">Você está usando uma senha temporária. Defina uma senha nova antes de continuar.</p>
+{% endif %}
+
+<form method="post" class="form-grid" style="max-width:360px;">
+    <input type="password" name="senha_atual" placeholder="Senha atual" required autofocus>
+    <input type="password" name="senha_nova" placeholder="Nova senha (mín. 6 caracteres)" required minlength="6">
+    <input type="password" name="senha_confirmar" placeholder="Confirme a nova senha" required minlength="6">
+    <button type="submit" class="botao">Salvar nova senha</button>
+</form>
+{% endblock %}

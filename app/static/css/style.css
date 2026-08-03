@@ -1,0 +1,702 @@
+/* ===================================================================
+   Avaliação de Desempenho — tema visual
+   Paleta: azul-marinho corporativo + dourado envelhecido (accent)
+   Tipografia: Manrope (títulos) + Inter (texto/dados)
+   Assinatura: o "tick" de 4 barras da escala de conceito (10/8/6/4)
+   reaparece como marca d'água discreta na topbar e nos títulos.
+   =================================================================== */
+
+:root {
+    /* cores de marca */
+    --navy-900: #002f30;
+    --navy-800: #004546;
+    --navy-700: #0d5859;
+    --navy-600: #237072;
+    --gold: #b9852f;
+    --gold-dark: #93691f;
+
+    /* neutros */
+    --bg: #f3f5f8;
+    --surface: #ffffff;
+    --border: #e2e6ee;
+    --border-strong: #cdd4e0;
+    --texto: #1c2536;
+    --texto-muted: #626c7e;
+
+    /* estado */
+    --sucesso: #1f8a4c;
+    --sucesso-bg: #e5f5ea;
+    --aviso: #a5720f;
+    --aviso-bg: #fbf1dc;
+    --perigo: #c23b3b;
+    --perigo-bg: #fbe9e9;
+    --info: #3f6fb0;
+    --info-bg: #eaf1fb;
+
+    /* compat (mantidos para não quebrar referências antigas) */
+    --verde: var(--navy-800);
+    --verde-escuro: var(--navy-900);
+    --cinza: var(--bg);
+    --borda: var(--border);
+
+    --radius: 10px;
+    --shadow-sm: 0 1px 2px rgba(16, 27, 45, 0.06);
+    --shadow-md: 0 6px 20px rgba(16, 27, 45, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--texto);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+    font-family: "Manrope", "Segoe UI", Arial, sans-serif;
+    color: var(--navy-900);
+    letter-spacing: -0.01em;
+}
+
+h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 4px 0 6px;
+    padding-bottom: 14px;
+    position: relative;
+}
+
+/* assinatura: 4 barras evocando a escala 10/8/6/4 do formulário */
+h1::after {
+    content: "";
+    position: absolute;
+    left: 1px;
+    bottom: 0;
+    width: 76px;
+    height: 4px;
+    background: linear-gradient(90deg,
+        var(--gold) 0 16px, transparent 16px 22px,
+        var(--gold) 22px 38px, transparent 38px 44px,
+        var(--navy-600) 44px 58px, transparent 58px 64px,
+        var(--navy-600) 64px 76px);
+    border-radius: 2px;
+    opacity: 0.9;
+}
+
+/* ---------------- Hero (título da página inicial) ---------------- */
+
+.hero {
+    text-align: center;
+    padding: 18px 0 30px;
+}
+
+.hero-logo-box {
+    display: flex;
+    justify-content: center;
+    background: var(--surface);
+    padding: 8px 16px;
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    width: fit-content;
+    margin: 0 auto 16px;
+}
+
+.hero-logo {
+    height: 34px;
+    width: auto;
+    display: block;
+}
+
+.hero h1 {
+    font-size: 2.1rem;
+    line-height: 1.25;
+    display: inline-block;
+    margin: 0;
+    padding-bottom: 18px;
+}
+
+.hero h1 .destaque {
+    display: block;
+    color: var(--gold-dark);
+    font-size: 0.6em;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    margin-top: 2px;
+}
+
+.hero h1::after {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.hero .subtitulo {
+    color: var(--texto-muted);
+    font-size: 0.95rem;
+    margin: 4px 0 0;
+}
+
+@media (max-width: 640px) {
+    .hero h1 { font-size: 1.6rem; }
+}
+
+h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 30px 0 12px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+}
+
+main.container > h2:first-of-type { border-top: none; padding-top: 0; }
+
+h3 { font-size: 0.95rem; font-weight: 700; margin: 18px 0 8px; }
+
+a { color: var(--navy-700); }
+
+/* ---------------- Topbar ---------------- */
+
+.topbar {
+    background: linear-gradient(180deg, var(--navy-800), var(--navy-900));
+    color: #fff;
+    padding: 14px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(16, 27, 45, 0.22);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.topbar .brand {
+    color: #fff;
+    font-family: "Manrope", "Segoe UI", Arial, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    font-size: 1.05rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topbar .brand-logo {
+    height: 34px;
+    width: auto;
+    flex: none;
+    display: block;
+}
+
+@media (max-width: 640px) {
+    .topbar .brand-logo { height: 26px; }
+}
+
+.topbar nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.topbar nav a {
+    color: rgba(255,255,255,0.82);
+    text-decoration: none;
+    margin-left: 6px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 7px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.topbar nav a:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    text-decoration: none;
+}
+
+.topbar .muted {
+    color: rgba(255,255,255,0.55);
+    font-size: 0.86rem;
+    margin-left: 10px;
+    padding: 7px 4px;
+}
+
+/* ---------------- Layout ---------------- */
+
+.container {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+}
+
+.footer {
+    text-align: center;
+    color: #9aa2b1;
+    padding: 24px;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+}
+
+.muted { color: var(--texto-muted); }
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 18px;
+    color: var(--texto-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: color 0.15s ease;
+}
+.back-link:hover { color: var(--navy-800); }
+
+/* ---------------- Cards (home) ---------------- */
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    margin: 20px 0;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--navy-800);
+    border-radius: var(--radius);
+    padding: 22px;
+    text-decoration: none;
+    color: var(--texto);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-top-color: var(--gold);
+}
+.card h2 { margin: 0 0 8px; color: var(--navy-900); border: none; padding: 0; font-size: 1.05rem; }
+.card p { margin: 0; color: var(--texto-muted); font-size: 0.9rem; }
+
+/* ---------------- Listas de pessoas ---------------- */
+
+.lista-pessoas { list-style: none; padding: 0; }
+.lista-pessoas li {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 18px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.15s ease;
+}
+.lista-pessoas li:hover { border-color: var(--border-strong); }
+.lista-pessoas a { color: var(--navy-800); text-decoration: none; font-weight: 600; }
+.lista-pessoas a:hover { color: var(--gold-dark); }
+.lista-pessoas .tag { color: var(--texto-muted); font-size: 0.82rem; }
+
+/* ---------------- Tabelas ---------------- */
+
+.tabela {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+}
+
+.tabela th, .tabela td {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.tabela th {
+    background: var(--navy-900);
+    color: rgba(255,255,255,0.92);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.tabela tbody tr:nth-child(even) { background: #f8f9fb; }
+.tabela tbody tr:hover { background: var(--info-bg); }
+
+.tabela-formulario { font-size: 0.85rem; }
+.tabela-formulario th { background: var(--navy-800); }
+.tabela-formulario .celula-radio { text-align: center; width: 60px; }
+.tabela-formulario .fator-nome { font-weight: 700; width: 190px; color: var(--navy-900); }
+.tabela-formulario .fator-descricao { color: var(--texto-muted); }
+.tabela-formulario input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--navy-800);
+    cursor: pointer;
+}
+.escala {
+    font-weight: 600;
+    font-size: 0.66rem;
+    color: rgba(255,255,255,0.65);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* ---------------- Badges ---------------- */
+
+.badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    display: inline-block;
+}
+.badge-ok        { background: var(--sucesso-bg); color: var(--sucesso); }
+.badge-pending   { background: var(--aviso-bg);   color: var(--aviso); }
+.badge-new       { background: #eef0f4;           color: #6b7385; }
+.badge-danger    { background: var(--perigo-bg);  color: var(--perigo); }
+
+.badge-nivel-empregado       { background: var(--info-bg); color: var(--info); }
+.badge-nivel-gestor          { background: #efe9fb; color: #6a3fbd; }
+.badge-nivel-superintendente { background: #f8ecdf; color: #a15b21; }
+
+.centro,
+.tabela th.centro, .tabela td.centro { text-align: center; }
+.nota-alta  { color: var(--sucesso); font-weight: 600; }
+.nota-media { color: var(--info); font-weight: 600; }
+.nota-baixa { color: var(--perigo); font-weight: 600; }
+.badge-elegivel-sim { background: var(--sucesso-bg); color: var(--sucesso); }
+.badge-elegivel-nao { background: #eef0f4; color: #6b7385; }
+
+/* ---------------- Abas (ex: Comissão de recursos) ---------------- */
+
+.abas {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 24px;
+}
+
+.aba-botao {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    font-family: "Manrope", "Segoe UI", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--texto-muted);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.aba-botao:hover {
+    color: var(--navy-800);
+}
+
+.aba-botao.ativa {
+    color: var(--navy-900);
+    border-bottom-color: var(--gold);
+}
+
+.aba-contador {
+    background: var(--perigo);
+    color: #fff;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    padding: 1px 8px;
+    font-weight: 700;
+}
+
+.aba-contador-neutro {
+    background: #eef0f4;
+    color: #6b7385;
+}
+
+.aba-conteudo {
+    display: none;
+}
+
+.aba-conteudo.ativa {
+    display: block;
+}
+
+/* ---------------- Painéis de tabela (admin) ---------------- */
+
+.tabela-container {
+    max-height: 640px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+}
+.tabela-container .tabela { margin-bottom: 0; }
+.tabela-container .tabela th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.tabela-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+.tabela-toolbar input[type="search"] {
+    flex: 1;
+    min-width: 220px;
+    padding: 9px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    font-family: inherit;
+    background: var(--surface);
+}
+.tabela-toolbar input[type="search"]:focus {
+    outline: none;
+    border-color: var(--navy-700);
+    box-shadow: 0 0 0 3px rgba(34, 53, 84, 0.14);
+}
+.coluna-sensivel { display: none; }
+.mostrar-sensiveis .coluna-sensivel { display: table-cell; }
+
+/* Tabela de andamento das avaliações — layout mais compacto para caber sem rolagem horizontal */
+.tabela-andamento { table-layout: fixed; font-size: 0.8rem; }
+.tabela-andamento th, .tabela-andamento td { padding: 8px 10px; }
+.tabela-andamento .col-avaliador {
+    font-size: 0.76rem;
+    color: var(--texto-muted);
+    white-space: normal;
+    line-height: 1.25;
+}
+.tabela-andamento .col-acoes { white-space: nowrap; }
+.tabela-andamento .acoes-vinculo { flex-wrap: nowrap; align-items: center; }
+.tabela-andamento .botao-pequeno { padding: 4px 9px; font-size: 0.7rem; }
+.tabela-andamento .botao-icone { width: 26px; height: 26px; flex: 0 0 auto; }
+.tabela-andamento .botao-icone svg { width: 13px; height: 13px; }
+
+/* Tabela de resultado final — mesma lógica: layout fixo e mais compacto */
+.tabela-resultados { table-layout: fixed; font-size: 0.8rem; }
+.tabela-resultados th, .tabela-resultados td { padding: 8px 10px; }
+.tabela-resultados td { white-space: normal; }
+.tabela-resultados .funcionario-subinfo { white-space: normal; }
+.tabela-resultados .acoes-vinculo { flex-wrap: nowrap; }
+.tabela-resultados .botao-icone { width: 26px; height: 26px; flex: 0 0 auto; }
+.tabela-resultados .botao-icone svg { width: 13px; height: 13px; }
+
+.tabela-vinculos td { font-size: 0.85rem; }
+.tabela-vinculos .botao-icone { width: 26px; height: 26px; flex: 0 0 auto; }
+.tabela-vinculos .botao-icone svg { width: 13px; height: 13px; }
+
+/* ---------------- Botões ---------------- */
+
+.botao {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--navy-800);
+    color: #fff;
+    border: 1px solid var(--navy-800);
+    padding: 9px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-family: inherit;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+.botao:hover { background: var(--navy-900); }
+.botao:active { transform: translateY(1px); }
+.botao:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(34, 53, 84, 0.28); }
+
+.botao-secundario {
+    background: transparent;
+    color: var(--texto);
+    border: 1px solid var(--border-strong);
+}
+.botao-secundario:hover { background: #eef0f4; border-color: var(--border-strong); }
+
+.botao-perigo { background: var(--perigo); border-color: var(--perigo); }
+.botao-perigo:hover { background: #a12f2f; }
+
+.botao-pequeno {
+    padding: 5px 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border-radius: 6px;
+    opacity: 0.85;
+}
+.botao-pequeno:hover { opacity: 1; }
+.acoes-vinculo { display: inline-flex; gap: 6px; }
+
+/* botões de ação em ícone (ex: editar / redefinir senha em tabelas) */
+.botao-icone {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--navy-800);
+    color: #fff;
+    border: 1px solid var(--navy-800);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, transform 0.05s ease;
+}
+.botao-icone svg { width: 15px; height: 15px; }
+.botao-icone:hover { background: var(--navy-900); }
+.botao-icone:active { transform: translateY(1px); }
+.botao-icone-secundario {
+    background: transparent;
+    color: var(--texto);
+    border: 1px solid var(--border-strong);
+}
+.botao-icone-secundario:hover { background: #eef0f4; border-color: var(--border-strong); }
+.botao-icone-perigo { background: transparent; color: var(--perigo); border: 1px solid rgba(194,59,59,0.35); }
+.botao-icone-perigo:hover { background: var(--perigo-bg); border-color: var(--perigo); }
+.acoes-funcionario { display: inline-flex; gap: 6px; }
+
+/* nome + cargo/setor compactos na tabela de funcionários */
+.funcionario-nome { font-weight: 600; color: var(--texto); }
+.funcionario-subinfo {
+    font-size: 0.76rem;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+/* destaque dourado — usado por padrão só no botão de concluir avaliação */
+.acoes-formulario .botao:not(.botao-secundario):not(.botao-perigo) {
+    background: var(--gold-dark);
+    border-color: var(--gold-dark);
+}
+.acoes-formulario .botao:not(.botao-secundario):not(.botao-perigo):hover {
+    background: #7a5419;
+}
+
+/* ---------------- Formulários ---------------- */
+
+form label {
+    display: block;
+    margin: 16px 0 6px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+form textarea, form input[type=text], form input[type=email], form input[type=password],
+form input[type=number], form input[type=date], form select, form input[type=file] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    background: var(--surface);
+    color: var(--texto);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+form textarea:focus, form input:focus, form select:focus {
+    outline: none;
+    border-color: var(--navy-700);
+    box-shadow: 0 0 0 3px rgba(34, 53, 84, 0.14);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 22px;
+    background: var(--surface);
+    padding: 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.form-inline {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+}
+
+.acoes-formulario {
+    margin: 26px 0;
+    display: flex;
+    gap: 10px;
+}
+
+/* ---------------- Login (páginas centralizadas) ---------------- */
+
+body:has(.login-box) { background: var(--navy-900); }
+
+.login-box {
+    max-width: 380px;
+    margin: 8vh auto;
+    background: var(--surface);
+    padding: 34px 30px;
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+}
+.login-box h1 { text-align: left; }
+
+.login-logo {
+    display: block;
+    height: 56px;
+    width: auto;
+    margin: 0 auto 18px;
+}
+
+/* ---------------- Mensagens (flash) ---------------- */
+
+.flashes { margin-bottom: 18px; }
+.flash {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+}
+.flash-success { background: var(--sucesso-bg); color: var(--sucesso); border-color: rgba(31,138,76,0.18); }
+.flash-danger  { background: var(--perigo-bg);  color: var(--perigo);  border-color: rgba(194,59,59,0.18); }
+.flash-warning { background: var(--aviso-bg);   color: var(--aviso);   border-color: rgba(165,114,15,0.18); }
+
+/* ---------------- Responsivo ---------------- */
+
+@media (max-width: 640px) {
+    .topbar { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 18px; }
+    .topbar nav { flex-wrap: wrap; }
+    .container { padding: 22px 16px 40px; }
+    .grid-2 { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Recurso{% endblock %}
+
+{% block content %}
+<h1>Recurso da avaliação</h1>
+
+{% if ciclos_sem_recurso %}
+    <p class="muted">
+        Se você recebeu o resultado final e não concorda, pode abrir um recurso aqui.
+        O gestor vai rever a avaliação; se ele mantiver a nota e você continuar sem concordar,
+        a Comissão encaminha o caso pra presidência decidir.
+    </p>
+    <h2>Abrir recurso</h2>
+    {% for ciclo in ciclos_sem_recurso %}
+        <form method="post" action="{{ url_for('recursos.abrir_recurso') }}" style="margin-bottom:20px;">
+            <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+            <label>Exercício {{ ciclo.exercicio }} &mdash; motivo do recurso</label>
+            <textarea name="motivo" rows="4" placeholder="Explique por que você não concorda com o resultado final..." required></textarea>
+            <button type="submit" class="botao" style="margin-top:8px;">Abrir recurso</button>
+        </form>
+    {% endfor %}
+{% elif not meus_recursos %}
+    <p class="muted">
+        Você não tem nenhum resultado pendente de recurso no momento —
+        ou ainda não foi liberado, ou você já deu ciência aceitando o resultado.
+    </p>
+{% endif %}
+
+<h2>Meus recursos</h2>
+{% if not meus_recursos %}
+    <p class="muted">Nenhum recurso aberto ainda.</p>
+{% endif %}
+
+{% for r in meus_recursos %}
+    <div class="card" style="margin-bottom:16px; text-align:left;">
+        <h2 style="font-size:1.1rem;">Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">
+            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+            &middot;
+            {% if r.status == 'aguardando_comissao_inicial' %}
+                <span class="badge badge-pending">Aguardando a Comissão encaminhar ao gestor</span>
+            {% elif r.status == 'aguardando_gestor' %}
+                <span class="badge badge-pending">Aguardando o gestor</span>
+            {% elif r.status == 'aguardando_comissao_repasse' %}
+                <span class="badge badge-pending">Gestor já respondeu — aguardando a Comissão repassar</span>
+            {% elif r.status == 'aguardando_funcionario' %}
+                <span class="badge badge-pending">Aguardando sua decisão</span>
+            {% elif r.status == 'aguardando_comissao_fechamento' %}
+                <span class="badge badge-pending">Aguardando a Comissão confirmar o encerramento</span>
+            {% elif r.status == 'aguardando_comissao_recurso' %}
+                <span class="badge badge-pending">Aguardando a Comissão encaminhar à presidência</span>
+            {% elif r.status == 'aguardando_presidencia' %}
+                <span class="badge badge-pending">Aguardando decisão da presidência</span>
+            {% else %}
+                <span class="badge badge-ok">Encerrado</span>
+            {% endif %}
+        </p>
+
+        <div class="linha-tempo">
+            {% for e in r.eventos_visiveis %}
+                <p class="muted" style="margin:4px 0;">
+                    <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
+                    {% if e.tipo == 'abertura' %}
+                        Você abriu o recurso: "{{ e.texto }}"
+                    {% elif e.tipo == 'encaminhamento_comissao_gestor' %}
+                        A Comissão encaminhou seu recurso ao gestor.
+                    {% elif e.tipo == 'resposta_gestor' %}
+                        O gestor {{ 'revisou a avaliação' if e.decisao == 'revisou' else 'manteve a avaliação' }}: "{{ e.texto }}"
+                    {% elif e.tipo == 'repasse_comissao_funcionario' %}
+                        A Comissão repassou a resposta do gestor{% if e.texto %}: "{{ e.texto }}"{% endif %}
+                    {% elif e.tipo == 'fechamento_comissao' %}
+                        A Comissão confirmou o encerramento do recurso{% if e.texto %}: "{{ e.texto }}"{% endif %}
+                    {% elif e.tipo == 'pedido_recorrer' %}
+                        Você pediu pra recorrer novamente{% if e.texto %}: "{{ e.texto }}"{% endif %}
+                    {% elif e.tipo == 'encaminhamento_comissao' %}
+                        A Comissão encaminhou para a presidência: "{{ e.texto }}"
+                    {% elif e.tipo == 'decisao_presidencia' %}
+                        A presidência {{ 'acatou o recurso e revisou a avaliação' if e.decisao == 'acatado' else 'não acatou o recurso' }}: "{{ e.texto }}"
+                    {% elif e.tipo == 'aceite_funcionario' %}
+                        Você aceitou a decisão do gestor.
+                    {% endif %}
+                </p>
+            {% endfor %}
+        </div>
+
+        {% if r.status == 'aguardando_funcionario' %}
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+                <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=r.id) }}" onsubmit="return confirm('Confirmar que você aceita a decisão do gestor? Isso encerra o recurso.');">
+                    <button type="submit" class="botao botao-secundario">Aceitar a decisão do gestor</button>
+                </form>
+                <form method="post" action="{{ url_for('recursos.recorrer_recurso', recurso_id=r.id) }}" style="flex:1; min-width:260px;">
+                    <textarea name="justificativa" rows="2" placeholder="Por que você ainda não concorda? (opcional)"></textarea>
+                    <button type="submit" class="botao" style="margin-top:6px;">Ainda não concordo, quero recorrer</button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+{% endfor %}
+{% endblock %}

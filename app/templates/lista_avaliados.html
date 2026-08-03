@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Empregados de {{ gestor.nome }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('main.entrar', papel='gestor') }}" class="back-link">&larr; Trocar gestor</a>
+
+<h1>Empregados avaliados por {{ gestor.nome }}</h1>
+<p class="muted">Exercício {{ ciclo.exercicio }}</p>
+
+{% if linhas %}
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>Empregado</th>
+                <th>Cargo</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in linhas %}
+                <tr>
+                    <td>{{ linha.avaliado.nome }}</td>
+                    <td>{{ linha.avaliado.cargo.nome if linha.avaliado.cargo else '' }}</td>
+                    <td>
+                        {% if linha.status == 'concluida' %}
+                            <span class="badge badge-ok">Concluída</span>
+                        {% elif linha.status == 'em_andamento' %}
+                            <span class="badge badge-pending">Em andamento</span>
+                        {% else %}
+                            <span class="badge badge-new">Não iniciada</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a class="botao"
+                           href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=linha.avaliado.id, avaliador_id=gestor.id, tipo='gestor') }}">
+                            {% if linha.status == 'concluida' %}Ver / editar{% else %}Avaliar{% endif %}
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>Nenhum empregado vinculado a este gestor neste ciclo. Cadastre os vínculos em
+        <a href="{{ url_for('admin.vinculos') }}">Administração &gt; Vínculos</a>.</p>
+{% endif %}
+{% endblock %}

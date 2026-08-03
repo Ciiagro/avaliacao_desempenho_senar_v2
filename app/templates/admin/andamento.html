@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Andamento das avaliações{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Andamento das avaliações</h1>
+
+{% if not ciclo %}
+    <p class="flash flash-warning">Nenhum ciclo cadastrado ainda.</p>
+{% else %}
+    <form method="get" class="form-inline" style="margin-bottom:16px;">
+        <select name="ciclo_id" onchange="this.form.submit()">
+            {% for c in ciclos %}
+                <option value="{{ c.id }}" {% if c.id == ciclo.id %}selected{% endif %}>
+                    Exercício {{ c.exercicio }} ({{ c.status }})
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <div class="cards">
+        <div class="card">
+            <h2>{{ resumo.pct_auto }}%</h2>
+            <p>Autoavaliações concluídas ({{ resumo.auto_concluida }} de {{ resumo.total }})</p>
+        </div>
+        <div class="card">
+            <h2>{{ resumo.pct_gestor }}%</h2>
+            <p>Avaliações do gestor concluídas ({{ resumo.gestor_concluida }} de {{ resumo.total }})</p>
+        </div>
+        {% if resumo.sem_avaliador %}
+            <div class="card">
+                <h2>{{ resumo.sem_avaliador }}</h2>
+                <p>Pessoa(s) sem gestor/avaliador vinculado neste ciclo</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="tabela-toolbar">
+        <input type="search" id="busca-andamento" placeholder="Buscar por nome...">
+    </div>
+
+    <div class="tabela-container">
+        <table class="tabela tabela-andamento" id="tabela-andamento">
+            <thead>
+                <tr>
+                    <th style="width:26%;">Nome</th>
+                    <th style="width:13%;">Autoavaliação</th>
+                    <th style="width:17%;">Avaliador (gestor)</th>
+                    <th style="width:13%;">Avaliação do gestor</th>
+                    <th style="width:31%;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas %}
+                    <tr class="linha-andamento" data-busca="{{ linha.funcionario.nome|lower }}">
+                        <td>
+                            <div class="funcionario-nome">{{ linha.funcionario.nome }}</div>
+                            <div class="funcionario-subinfo muted">{{ linha.funcionario.setor.nome if linha.funcionario.setor else '-' }}</div>
+                        </td>
+                        <td>
+                            {% if linha.status_auto == 'concluida' %}
+                                <span class="badge badge-ok">Concluída</span>
+                            {% elif linha.status_auto == 'em_andamento' %}
+                                <span class="badge badge-pending">Em andamento</span>
+                            {% else %}
+                                <span class="badge badge-new">Não iniciada</span>
+                            {% endif %}
+                        </td>
+                        <td class="col-avaliador">{{ linha.avaliador.nome if linha.avaliador else '⚠️ sem vínculo' }}</td>
+                        <td>
+                            {% if linha.status_gestor is none %}-
+                            {% elif linha.status_gestor == 'concluida' %}
+                                <span class="badge badge-ok">Concluída</span>
+                            {% elif linha.status_gestor == 'em_andamento' %}
+                                <span class="badge badge-pending">Em andamento</span>
+                            {% else %}
+                                <span class="badge badge-new">Não iniciada</span>
+                            {% endif %}
+                        </td>
+                        <td class="col-acoes">
+                            <div class="acoes-vinculo">
+                                {% if linha.avaliacao_auto %}
+                                    <a class="botao botao-secundario botao-pequeno" href="{{ url_for('admin.ver_avaliacao', avaliacao_id=linha.avaliacao_auto.id) }}">Ver autoaval.</a>
+                                    {% if linha.avaliacao_auto.status == 'concluida' %}
+                                        <a class="botao-icone botao-icone-secundario" href="{{ url_for('admin.baixar_pdf_avaliacao', avaliacao_id=linha.avaliacao_auto.id) }}" title="Baixar PDF da autoavaliação" aria-label="Baixar PDF da autoavaliação de {{ linha.funcionario.nome }}">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                                {% if linha.avaliacao_gestor %}
+                                    <a class="botao botao-secundario botao-pequeno" href="{{ url_for('admin.ver_avaliacao', avaliacao_id=linha.avaliacao_gestor.id) }}">Ver aval. gestor</a>
+                                    {% if linha.avaliacao_gestor.status == 'concluida' %}
+                                        <a class="botao-icone botao-icone-secundario" href="{{ url_for('admin.baixar_pdf_avaliacao', avaliacao_id=linha.avaliacao_gestor.id) }}" title="Baixar PDF da avaliação do gestor" aria-label="Baixar PDF da avaliação do gestor de {{ linha.funcionario.nome }}">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    (function () {
+        var busca = document.getElementById('busca-andamento');
+        var linhas = document.querySelectorAll('#tabela-andamento .linha-andamento');
+        busca.addEventListener('input', function () {
+            var termo = busca.value.trim().toLowerCase();
+            linhas.forEach(function (linha) {
+                linha.style.display = (!termo || linha.dataset.busca.indexOf(termo) !== -1) ? '' : 'none';
+            });
+        });
+    })();
+    </script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Comissão de recursos{% endblock %}
+
+{% block content %}
+<h1>Comissão de recursos</h1>
+<p class="muted">Prazo pra Comissão agir: 5 dias corridos a partir da abertura do recurso. Nada passa entre gestor e empregado sem a Comissão ver e repassar.</p>
+
+{% if total_pendentes %}
+    <div class="flash {% if total_atrasados %}flash-danger{% else %}flash-warning{% endif %}" style="margin-bottom:16px;">
+        {{ total_pendentes }} recurso(s) aguardando a Comissão
+        {% if total_atrasados %} &mdash; <strong>{{ total_atrasados }} atrasado(s)</strong>{% endif %}.
+    </div>
+{% endif %}
+
+<div class="abas">
+    <button type="button" class="aba-botao ativa" data-aba="abertos">
+        Recursos abertos
+        {% if total_pendentes %}<span class="aba-contador">{{ total_pendentes }}</span>{% endif %}
+    </button>
+    <button type="button" class="aba-botao" data-aba="encerrados">
+        Recursos encerrados
+        <span class="aba-contador aba-contador-neutro">{{ encerrados|length }}</span>
+    </button>
+</div>
+
+<div class="aba-conteudo ativa" id="aba-abertos">
+
+{% if pendentes_iniciais %}
+<h2>Recursos recém-abertos &mdash; mandar mensagem ao gestor pedindo reavaliação</h2>
+{% for r in pendentes_iniciais %}
+    {% set limite = prazo_comissao(r)|fortaleza %}
+    <div class="card" style="margin-bottom:16px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">
+            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+            {% if limite %}
+                &middot; Prazo:
+                {% if limite < now %}
+                    <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
+                {% else %}
+                    <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
+            {% endif %}
+        </p>
+        <p><strong>Motivo do empregado:</strong> {{ r.motivo }}</p>
+        <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar_gestor', recurso_id=r.id) }}">
+            <label>Mensagem para o gestor, pedindo reavaliação</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button type="submit" class="botao" style="margin-top:8px;">Enviar ao gestor</button>
+        </form>
+    </div>
+{% endfor %}
+{% endif %}
+
+{% if pendentes_repasse %}
+<h2>Gestor respondeu &mdash; revisar antes de repassar</h2>
+{% for r in pendentes_repasse %}
+    {% set limite = prazo_comissao(r)|fortaleza %}
+    {% set resposta = r.eventos|selectattr('tipo', 'equalto', 'resposta_gestor')|list|last %}
+    <div class="card" style="margin-bottom:16px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">
+            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+            {% if limite %}
+                &middot; Prazo:
+                {% if limite < now %}
+                    <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
+                {% else %}
+                    <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
+            {% endif %}
+        </p>
+        {% if resposta %}
+            <p>
+                <strong>O gestor {{ 'REVISOU a nota' if resposta.decisao == 'revisou' else 'MANTEVE a nota' }}:</strong>
+                {{ resposta.texto }}
+            </p>
+        {% endif %}
+
+        {% if resposta and resposta.decisao == 'revisou' %}
+            <form method="post" action="{{ url_for('recursos.recurso_comissao_confirmar_revisao', recurso_id=r.id) }}">
+                <label>Comentário (opcional)</label>
+                <textarea name="comentario" rows="2"></textarea>
+                <button type="submit" class="botao" style="margin-top:8px;">Confirmar e encerrar (gestor já revisou)</button>
+            </form>
+        {% else %}
+            <form method="post" action="{{ url_for('recursos.recurso_comissao_repassar', recurso_id=r.id) }}">
+                <label>Comentário ao repassar pro empregado (opcional)</label>
+                <textarea name="comentario" rows="2"></textarea>
+                <button type="submit" class="botao" style="margin-top:8px;">Repassar ao empregado</button>
+            </form>
+        {% endif %}
+    </div>
+{% endfor %}
+{% endif %}
+
+{% if pendentes_fechamento %}
+<h2>Empregado aceitou &mdash; confirmar encerramento</h2>
+{% for r in pendentes_fechamento %}
+    <div class="card" style="margin-bottom:16px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">Resultado contestado: {{ r.resultado_final_em_texto or '-' }}</p>
+        <p class="muted">O empregado aceitou a resposta do gestor e não quer recorrer.</p>
+        <form method="post" action="{{ url_for('recursos.recurso_comissao_fechar', recurso_id=r.id) }}">
+            <label>Comentário (opcional)</label>
+            <textarea name="comentario" rows="2"></textarea>
+            <button type="submit" class="botao" style="margin-top:8px;">Confirmar encerramento</button>
+        </form>
+    </div>
+{% endfor %}
+{% endif %}
+
+{% if pendentes_recurso %}
+<h2>Gestor manteve e empregado recorreu &mdash; encaminhar à presidência</h2>
+{% for r in pendentes_recurso %}
+    {% set limite = prazo_comissao(r)|fortaleza %}
+    <div class="card" style="margin-bottom:16px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">
+            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+            {% if limite %}
+                &middot; Prazo:
+                {% if limite < now %}
+                    <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
+                {% else %}
+                    <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
+            {% endif %}
+        </p>
+        <p><strong>Motivo original:</strong> {{ r.motivo }}</p>
+        {% for e in r.eventos %}
+            {% if e.tipo == 'resposta_gestor' %}
+                <p><strong>O gestor manteve, justificativa:</strong> {{ e.texto }}</p>
+            {% elif e.tipo == 'pedido_recorrer' and e.texto %}
+                <p><strong>Empregado, ao recorrer:</strong> {{ e.texto }}</p>
+            {% endif %}
+        {% endfor %}
+        <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar', recurso_id=r.id) }}">
+            <label>Comentário/justificativa para a presidência</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button type="submit" class="botao" style="margin-top:8px;">Encaminhar para a presidência</button>
+        </form>
+    </div>
+{% endfor %}
+{% endif %}
+
+{% if not total_pendentes %}
+    <p class="muted" style="margin:8px 0 24px;">Tudo em dia — nenhum recurso aguardando ação da Comissão no momento.</p>
+{% endif %}
+
+{% if em_andamento %}
+<h2>Em andamento fora da Comissão agora</h2>
+<p class="muted">Recursos que já saíram das mãos da Comissão neste momento (esperando o empregado decidir, ou esperando a presidência). Clique para ver os detalhes.</p>
+{% for r in em_andamento %}
+    <a href="{{ url_for('recursos.recurso_comissao_detalhe', recurso_id=r.id) }}" class="card card-link" style="display:block; margin-bottom:12px; text-align:left;">
+        <strong>{{ r.avaliado.nome }}</strong> &mdash; Exercício {{ r.ciclo.exercicio }}
+        <p class="muted" style="margin:4px 0 0;">
+            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+            &middot;
+            {% if r.status == 'aguardando_funcionario' %}<span class="badge badge-pending">Aguardando decisão do empregado</span>
+            {% elif r.status == 'aguardando_presidencia' %}<span class="badge badge-pending">Aguardando decisão da presidência</span>
+            {% else %}{{ r.status }}
+            {% endif %}
+        </p>
+    </a>
+{% endfor %}
+{% endif %}
+
+</div>
+
+<div class="aba-conteudo" id="aba-encerrados">
+
+<h2>Recursos encerrados</h2>
+{% if not encerrados %}
+    <p class="muted">Nenhum recurso encerrado ainda.</p>
+{% endif %}
+{% for r in encerrados %}
+    {% set decisao_final = r.eventos|selectattr('tipo', 'in', ['decisao_presidencia', 'fechamento_comissao'])|list|last %}
+    <a href="{{ url_for('recursos.recurso_comissao_detalhe', recurso_id=r.id) }}" class="card card-link" style="display:block; margin-bottom:16px; text-align:left;">
+        <h2 style="font-size:1.05rem; margin:0;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">
+            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+            &middot; Aberto em {{ (r.criado_em|fortaleza).strftime('%d/%m/%Y') if r.criado_em else '-' }}
+        </p>
+        {% if decisao_final and decisao_final.tipo == 'decisao_presidencia' %}
+            <p>
+                <strong>Decisão da presidência:</strong>
+                {{ 'Recurso ACATADO' if decisao_final.decisao == 'acatado' else 'Recurso NÃO acatado' }}
+                &mdash; {{ decisao_final.texto }}
+            </p>
+        {% elif decisao_final %}
+            <p><strong>Encerrado pela Comissão:</strong> {{ decisao_final.texto or 'Sem comentário adicional.' }}</p>
+        {% endif %}
+    </a>
+{% endfor %}
+
+</div>
+
+<script>
+document.querySelectorAll('.aba-botao').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+        document.querySelectorAll('.aba-botao').forEach(function (b) { b.classList.remove('ativa'); });
+        document.querySelectorAll('.aba-conteudo').forEach(function (c) { c.classList.remove('ativa'); });
+        botao.classList.add('ativa');
+        document.getElementById('aba-' + botao.dataset.aba).classList.add('ativa');
+    });
+});
+</script>
+{% endblock %}

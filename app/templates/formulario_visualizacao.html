@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Autoavaliação de {{ avaliado.nome }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('main.minha_area') }}" class="back-link">&larr; Voltar</a>
+
+<h1>{{ formulario.nome }}</h1>
+<p class="muted">
+    Avaliado: <strong>{{ avaliado.nome }}</strong> ({{ avaliado.cargo.nome if avaliado.cargo else '' }})
+    &mdash; Autoavaliação <span class="badge badge-ok">Concluída</span>
+</p>
+
+<h2>Parte I &mdash; Fatores de desempenho</h2>
+<table class="tabela tabela-formulario">
+    <thead>
+        <tr>
+            <th>Nº</th>
+            <th>Fator</th>
+            <th>Conceito</th>
+            <th>Nota</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for fator in formulario.fatores %}
+            <tr>
+                <td>{{ '%02d' % fator.ordem }}</td>
+                <td class="fator-nome">{{ fator.nome }}</td>
+                <td class="fator-descricao">{{ fator.descricao }}</td>
+                <td><strong>{{ respostas_salvas.get(fator.id, '-') }}</strong></td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Parte II</h2>
+
+<p><strong>Pontos fortes</strong></p>
+<p>{{ avaliacao.pontos_fortes or '-' }}</p>
+
+<p><strong>Oportunidade de desenvolvimento</strong></p>
+<p>{{ avaliacao.oportunidades_desenvolvimento or '-' }}</p>
+
+<div class="grid-2">
+    <div>
+        <p><strong>Plano de desenvolvimento &mdash; Ação</strong></p>
+        <p>{{ avaliacao.plano_acao or '-' }}</p>
+    </div>
+</div>
+
+<p><strong>Resultados alcançados durante o ano</strong></p>
+<p>{{ avaliacao.resultados_alcancados or '-' }}</p>
+
+{% if avaliacao.assinado_por %}
+    <p class="muted" style="margin-top:20px;">
+        ✅ Assinado eletronicamente por <strong>{{ avaliacao.assinado_por }}</strong>
+        em {{ (avaliacao.assinado_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if avaliacao.assinado_em else '' }}.
+    </p>
+{% endif %}
+<a class="botao botao-secundario" href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=avaliacao.id) }}">Baixar PDF</a>
+{% endblock %}

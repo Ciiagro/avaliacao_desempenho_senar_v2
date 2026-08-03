@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+
+{% block content %}
+<div class="login-box">
+    <a href="{{ url_for('main.index') }}" class="back-link">&larr; Voltar</a>
+    <img src="{{ url_for('static', filename='img/logo_senar.png') }}" alt="SENAR" class="login-logo">
+    <h1>Entrar</h1>
+    <p class="muted">Use o e-mail cadastrado e a senha que o RH te passou.</p>
+
+    <form method="post" class="form-grid" style="max-width:360px;">
+        <input type="email" name="email" placeholder="Seu e-mail" required autofocus>
+        <input type="password" name="senha" placeholder="Senha" required>
+        <button type="submit" class="botao">Entrar</button>
+    </form>
+
+    <p class="muted">Esqueceu a senha ou nunca recebeu uma? Fale com o RH.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Meu resultado detalhado{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('main.minha_area') }}" class="back-link">&larr; Minha área</a>
+<h1>Meu resultado &mdash; exercício {{ ciclo.exercicio }}</h1>
+
+<div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>(I) Autoavaliação</th>
+                <th>(II) Avaliação do gestor</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in dados.fatores %}
+                <tr>
+                    <td>{{ fator.ordem }}</td>
+                    <td>{{ fator.nome }}</td>
+                    <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
+                    <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
+                </tr>
+            {% endfor %}
+            <tr>
+                <td></td>
+                <td><strong>SOMA</strong></td>
+                <td><strong>{{ dados.soma_auto if dados.soma_auto is not none else '-' }}</strong></td>
+                <td><strong>{{ dados.soma_gestor if dados.soma_gestor is not none else '-' }}</strong></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><strong>MÉDIA (SOMA/{{ dados.fatores|length }})</strong></td>
+                <td><strong>{{ '%.2f'|format(dados.media_auto) if dados.media_auto is not none else '-' }}</strong></td>
+                <td><strong>{{ '%.2f'|format(dados.media_gestor) if dados.media_gestor is not none else '-' }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="cards" style="margin-top:16px;">
+    <div class="card">
+        <h2>{{ '%.2f'|format(dados.resultado_final) }}</h2>
+        <p>Resultado final (Auto &times; 0,30 + Gestor &times; 0,70)</p>
+    </div>
+    <div class="card">
+        <h2>{{ dados.conceito }}</h2>
+        <p>Conceito</p>
+    </div>
+</div>
+
+{% if dados.resultado_registro and dados.resultado_registro.ciente_avaliado %}
+    {% if dados.resultado_registro.decisao_avaliado == 'recorreu' %}
+        <div class="flash flash-warning" style="margin-top:16px;">
+            <strong>Ciência registrada.</strong>
+            Você deu ciência em {{ (dados.resultado_registro.ciente_em|fortaleza).strftime('%d/%m/%Y às %H:%M') }}
+            e optou por recorrer. Acompanhe o andamento do seu recurso na
+            <a href="{{ url_for('recursos.recurso_area') }}">área de recursos</a>.
+        </div>
+    {% else %}
+        <div class="flash flash-success" style="margin-top:16px;">
+            <strong>Ciência registrada.</strong>
+            Você confirmou o recebimento e concordou com o resultado em
+            {{ (dados.resultado_registro.ciente_em|fortaleza).strftime('%d/%m/%Y às %H:%M') }}.
+        </div>
+    {% endif %}
+    <p style="margin-top:12px;">
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=ciclo.id) }}">Baixar PDF</a>
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=ciclo.id) }}">Baixar Excel</a>
+    </p>
+{% else %}
+    <div class="flash {% if prazo_ciencia and prazo_ciencia < agora %}flash-danger{% else %}flash-warning{% endif %}" style="margin-top:16px;">
+        <p style="margin:0 0 10px;">
+            {% if prazo_ciencia %}
+                {% if prazo_ciencia < agora %}
+                    <strong>Prazo vencido em {{ prazo_ciencia.strftime('%d/%m/%Y') }}.</strong>
+                {% else %}
+                    <strong>Prazo até {{ prazo_ciencia.strftime('%d/%m/%Y') }}</strong> (5 dias úteis a partir da liberação)
+                {% endif %}
+            {% endif %}
+            para você dar ciência do recebimento desta avaliação: informe se aceita o
+            resultado ou se quer recorrer.
+        </p>
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <form method="post" action="{{ url_for('main.meu_resultado_ciencia', ciclo_id=ciclo.id) }}">
+                <label style="display:flex; align-items:flex-start; gap:8px; font-weight:normal;">
+                    <input type="checkbox" name="ciencia" value="1" required style="margin-top:4px;">
+                    <span>
+                        Declaro ciência de que recebi o resultado desta avaliação de desempenho
+                        referente ao exercício {{ ciclo.exercicio }} e estou satisfeito(a) com o resultado.
+                    </span>
+                </label>
+                <button type="submit" class="botao botao-pequeno" style="margin-top:10px;">
+                    Estou satisfeito(a), aceito o resultado
+                </button>
+            </form>
+            <a class="botao botao-secundario botao-pequeno" style="height:fit-content;"
+               href="{{ url_for('recursos.recurso_area') }}">
+                Não concordo, quero recorrer
+            </a>
+        </div>
+    </div>
+    <p class="muted" style="margin-top:8px;">
+        O download do PDF e do Excel fica disponível depois que você der ciência acima
+        (aceitando ou abrindo um recurso).
+    </p>
+{% endif %}
+
+<div class="secoes-comentarios" style="display:flex; gap:24px; margin-top:24px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:280px;">
+        <h2>Comentários &mdash; Minha autoavaliação</h2>
+        {% if dados.avaliacao_auto %}
+            <p><strong>Pontos fortes:</strong><br>{{ dados.avaliacao_auto.pontos_fortes or '-' }}</p>
+            <p><strong>Oportunidades de desenvolvimento:</strong><br>{{ dados.avaliacao_auto.oportunidades_desenvolvimento or '-' }}</p>
+            <p><strong>Plano de ação:</strong><br>{{ dados.avaliacao_auto.plano_acao or '-' }}</p>
+            <p><strong>Resultados alcançados:</strong><br>{{ dados.avaliacao_auto.resultados_alcancados or '-' }}</p>
+        {% else %}
+            <p class="muted">Não encontrada.</p>
+        {% endif %}
+    </div>
+    <div style="flex:1; min-width:280px;">
+        <h2>Comentários &mdash; Avaliação do gestor</h2>
+        {% if dados.avaliacao_gestor %}
+            <p class="muted">Gestor: {{ dados.avaliador.nome if dados.avaliador else '-' }}</p>
+            <p><strong>Pontos fortes:</strong><br>{{ dados.avaliacao_gestor.pontos_fortes or '-' }}</p>
+            <p><strong>Oportunidades de desenvolvimento:</strong><br>{{ dados.avaliacao_gestor.oportunidades_desenvolvimento or '-' }}</p>
+            <p><strong>Plano de ação:</strong><br>{{ dados.avaliacao_gestor.plano_acao or '-' }}</p>
+            <p><strong>Resultados alcançados:</strong><br>{{ dados.avaliacao_gestor.resultados_alcancados or '-' }}</p>
+        {% else %}
+            <p class="muted">Não encontrada.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

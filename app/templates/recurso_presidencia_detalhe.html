@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Decidir recurso{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('recursos.recurso_presidencia_area') }}" class="back-link">&larr; Recursos</a>
+<h1>{{ recurso.avaliado.nome }} &mdash; Exercício {{ recurso.ciclo.exercicio }}</h1>
+<p class="muted">Resultado contestado: {{ recurso.resultado_final_em_texto or '-' }}</p>
+
+<h2>Linha do tempo</h2>
+{% for e in recurso.eventos %}
+    <p class="muted">
+        <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
+        {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
+        {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou ao gestor: "{{ e.texto }}"
+        {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }}: "{{ e.texto }}"
+        {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado.
+        {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou: "{{ e.texto }}"
+        {% elif e.tipo == 'conversa_comissao_presidencia' %}<strong>Conversa Comissão &harr; Presidência:</strong> "{{ e.texto }}"
+        {% endif %}
+    </p>
+{% endfor %}
+
+<div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>(I) Autoavaliação</th>
+                <th>(II) Avaliação do gestor (atual)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in dados.fatores %}
+                <tr>
+                    <td>{{ fator.ordem }}</td>
+                    <td>{{ fator.nome }}</td>
+                    <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
+                    <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<form method="post" style="margin-top:20px;">
+    <h2>Decisão da presidência</h2>
+    <label><input type="radio" name="decisao" value="nao_acatado" required> Não acatar (mantém a nota atual)</label><br>
+    <label><input type="radio" name="decisao" value="acatado" required> Acatar e revisar as notas abaixo</label>
+
+    <table class="tabela tabela-formulario" style="margin-top:12px;">
+        <thead>
+            <tr>
+                <th>Fator</th>
+                <th>10</th><th>8</th><th>6</th><th>4</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in dados.fatores %}
+                <tr>
+                    <td>{{ fator.nome }}</td>
+                    {% for valor in [10, 8, 6, 4] %}
+                        <td class="celula-radio">
+                            <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
+                                   {% if dados.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="muted">Só preencha as notas acima se escolher "Acatar". Se marcar "Não acatar", elas são ignoradas.</p>
+
+    <label for="justificativa">Justificativa (obrigatória nos dois casos)</label>
+    <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
+
+    <button type="submit" class="botao" style="margin-top:12px;">Registrar decisão</button>
+</form>
+{% endblock %}

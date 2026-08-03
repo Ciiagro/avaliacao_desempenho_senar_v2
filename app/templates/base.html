@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Avaliação de Desempenho{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=5">
+</head>
+<body>
+    <header class="topbar">
+        <a href="{{ url_for('main.index') }}" class="brand">
+            <img src="{{ url_for('static', filename='img/logo_senar_branca.png') }}" alt="SENAR" class="brand-logo">
+            <span>Avaliação de Desempenho</span>
+        </a>
+        <nav>
+            <a href="{{ url_for('main.index') }}">Início</a>
+            {% if funcionario_atual %}
+                <a href="{{ url_for('main.minha_area') }}">Minha área</a>
+                <a href="{{ url_for('recursos.recurso_area') }}">Recurso</a>
+                {% if funcionario_atual.eh_gestor_de_alguem() %}
+                    <a href="{{ url_for('recursos.recurso_gestor_area') }}">
+                        Recursos a responder{% if recursos_pendentes_gestor %} <span class="badge badge-pending">{{ recursos_pendentes_gestor }}</span>{% endif %}
+                    </a>
+                {% endif %}
+                {% if funcionario_atual.eh_presidencia %}
+                    <a href="{{ url_for('recursos.recurso_presidencia_area') }}">Presidência</a>
+                {% endif %}
+                <span class="muted">{{ funcionario_atual.nome.split(' ')[0] }}</span>
+                <a href="{{ url_for('main.logout') }}">Sair</a>
+            {% else %}
+                <a href="{{ url_for('main.login') }}">Entrar</a>
+            {% endif %}
+            {% if not funcionario_atual or funcionario_atual.eh_membro_comissao() %}
+                <a href="{{ url_for('recursos.recurso_comissao_area') }}">
+                    Comissão{% if recursos_pendentes_comissao %} <span class="badge badge-pending">{{ recursos_pendentes_comissao }}</span>{% endif %}
+                </a>
+                {% if session.get('comissao_logueada') %}
+                    <a href="{{ url_for('recursos.recurso_comissao_logout') }}">Sair da Comissão</a>
+                {% endif %}
+            {% endif %}
+            {% if session.get('admin_logueado') %}
+                <a href="{{ url_for('admin.logout') }}">Sair da Administração</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flashes">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <span>Sistema interno de Avaliação de Desempenho</span>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Senhas geradas{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.funcionarios') }}" class="back-link">&larr; Funcionários</a>
+<h1>{{ criados }} funcionário(s) importado(s)</h1>
+
+<p class="flash flash-warning">
+    Estas senhas temporárias só aparecem <strong>uma vez, agora</strong>. Copie e repasse
+    para cada pessoa antes de sair desta tela — depois não será possível recuperá-las
+    (só redefinir uma nova, na tela de Funcionários).
+</p>
+
+<table class="tabela">
+    <thead><tr><th>Nome</th><th>E-mail</th><th>Senha temporária</th></tr></thead>
+    <tbody>
+        {% for s in senhas %}
+            <tr>
+                <td>{{ s.nome }}</td>
+                <td>{{ s.email or '⚠️ sem e-mail cadastrado' }}</td>
+                <td><code>{{ s.senha }}</code></td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p class="muted">A pessoa deve entrar em <a href="{{ url_for('main.login') }}">{{ url_for('main.login', _external=True) }}</a>,
+usar essa senha e vai ser obrigada a trocar por uma nova no primeiro acesso.</p>
+{% endblock %}

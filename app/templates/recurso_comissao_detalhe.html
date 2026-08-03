@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Detalhe do recurso{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('recursos.recurso_comissao_area') }}" class="back-link">&larr; Comissão de recursos</a>
+<h1>{{ recurso.avaliado.nome }} &mdash; Exercício {{ recurso.ciclo.exercicio }}</h1>
+<p class="muted">
+    Resultado contestado: {{ recurso.resultado_final_em_texto or '-' }}
+    &middot; Aberto em {{ (recurso.criado_em|fortaleza).strftime('%d/%m/%Y') if recurso.criado_em else '-' }}
+    &middot; Status atual:
+    {% if recurso.status == 'aguardando_gestor' %}Aguardando resposta do gestor
+    {% elif recurso.status == 'aguardando_funcionario' %}Aguardando decisão do empregado
+    {% elif recurso.status == 'aguardando_presidencia' %}Aguardando decisão da presidência
+    {% elif recurso.status == 'encerrado' %}Encerrado
+    {% else %}{{ recurso.status }}
+    {% endif %}
+</p>
+
+<h2>Linha do tempo</h2>
+{% for e in recurso.eventos %}
+    <p class="muted">
+        <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') if e.criado_em else '-' }}</strong> &mdash;
+        {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
+        {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou ao gestor: "{{ e.texto }}"
+        {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'REVISOU a nota' if e.decisao == 'revisou' else 'MANTEVE a nota' }}: "{{ e.texto }}"
+        {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% elif e.tipo == 'aceite_funcionario' %}Empregado aceitou a resposta e não quis recorrer.
+        {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou à presidência: "{{ e.texto }}"
+        {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'ACATOU' if e.decisao == 'acatado' else 'NÃO acatou' }}: "{{ e.texto }}"
+        {% elif e.tipo == 'fechamento_comissao' %}Comissão confirmou o encerramento{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% elif e.tipo == 'conversa_comissao_presidencia' %}<strong>Conversa Comissão &harr; Presidência:</strong> "{{ e.texto }}"
+        {% else %}{{ e.tipo }}{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% endif %}
+    </p>
+{% endfor %}
+
+{% if recurso.eventos|selectattr('tipo', 'equalto', 'encaminhamento_comissao')|list %}
+    <div class="card" style="margin:16px 0; text-align:left;">
+        <h2 style="font-size:1.05rem;">Registrar conversa com a presidência</h2>
+        <p class="muted">
+            A decisão final costuma sair de uma conversa direta entre a Comissão e a
+            presidência. Registre aqui a data/hora e o motivo/resumo dessa conversa,
+            pra ficar documentado na linha do tempo do recurso.
+        </p>
+        <form method="post" action="{{ url_for('recursos.recurso_comissao_registrar_conversa', recurso_id=recurso.id) }}">
+            <label for="data_hora">Data/hora da conversa (deixe em branco para usar agora)</label>
+            <input type="datetime-local" id="data_hora" name="data_hora">
+
+            <label for="resumo" style="margin-top:8px; display:block;">Motivo/resumo da conversa</label>
+            <textarea id="resumo" name="resumo" rows="3" required></textarea>
+
+            <button type="submit" class="botao" style="margin-top:8px;">Registrar conversa</button>
+        </form>
+    </div>
+{% endif %}
+
+<h2>Notas &mdash; Autoavaliação x Avaliação do gestor (atual)</h2>
+<div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>(I) Autoavaliação</th>
+                <th>(II) Avaliação do gestor</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in dados.fatores %}
+                <tr>
+                    <td>{{ fator.ordem }}</td>
+                    <td>{{ fator.nome }}</td>
+                    <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
+                    <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Login Administração{% endblock %}
+
+{% block content %}
+<div class="login-box">
+    <img src="{{ url_for('static', filename='img/logo_senar.png') }}" alt="SENAR" class="login-logo">
+    <h1>Área de Administração</h1>
+    <p class="muted">Acesso restrito ao gestor de Recursos Humanos.</p>
+
+    <form method="post" class="form-grid" style="max-width:320px;">
+        <input type="hidden" name="proximo" value="{{ proximo }}">
+        <input type="password" name="senha" placeholder="Senha" required autofocus>
+        <button type="submit" class="botao">Entrar</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Comissão de recursos{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Comissão de recursos</h1>
+<p class="muted">
+    A Comissão é o grupo fixo de pessoas que recebe os recursos e, quando o gestor mantém a nota
+    e o empregado ainda não concorda, encaminha o caso pra presidência decidir.
+</p>
+
+<h2>Membros da Comissão</h2>
+<form method="post" class="form-inline" style="margin-bottom:16px;">
+    <input type="hidden" name="acao" value="adicionar_membro">
+    <select name="funcionario_id" required>
+        <option value="">Adicionar pessoa...</option>
+        {% for f in funcionarios %}
+            <option value="{{ f.id }}">{{ f.nome }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="botao">Adicionar</button>
+</form>
+
+<div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr><th>Nome</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for membro in membros %}
+                <tr>
+                    <td>{{ membro.funcionario.nome }}</td>
+                    <td>
+                        <form method="post" onsubmit="return confirm('Remover {{ membro.funcionario.nome }} da Comissão?');">
+                            <input type="hidden" name="acao" value="remover_membro">
+                            <input type="hidden" name="membro_id" value="{{ membro.id }}">
+                            <button type="submit" class="botao botao-perigo botao-pequeno">Remover</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="2" class="muted">Nenhum membro cadastrado ainda.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<h2>Presidência</h2>
+<p class="muted">Quem decide o recurso quando a Comissão encaminha (só uma pessoa por vez).</p>
+<form method="post" class="form-inline" onsubmit="return confirm('Confirmar essa pessoa como presidência? Isso substitui quem estava antes.');">
+    <input type="hidden" name="acao" value="definir_presidencia">
+    <select name="funcionario_id">
+        <option value="">Ninguém definido</option>
+        {% for f in funcionarios %}
+            <option value="{{ f.id }}" {% if presidencia_atual and presidencia_atual.id == f.id %}selected{% endif %}>{{ f.nome }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="botao">Salvar</button>
+</form>
+{% if presidencia_atual %}
+    <p class="muted">Atualmente: <strong>{{ presidencia_atual.nome }}</strong></p>
+{% endif %}
+{% endblock %}

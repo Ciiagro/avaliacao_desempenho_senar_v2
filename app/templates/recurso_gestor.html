@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Recursos a responder{% endblock %}
+
+{% block content %}
+<h1>Recursos a responder</h1>
+<p class="muted">Recursos de pessoas que você avalia, quando elas não concordam com o resultado final.</p>
+
+<h2>Pendentes</h2>
+{% if not recursos_pendentes %}
+    <p class="muted">Nenhum recurso pendente.</p>
+{% endif %}
+{% for r in recursos_pendentes %}
+    <div class="card" style="margin-bottom:12px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">Resultado contestado: {{ r.resultado_final_em_texto or '-' }}</p>
+        <p><strong>Motivo do recurso:</strong> {{ r.motivo }}</p>
+        <a class="botao botao-pequeno" href="{{ url_for('recursos.recurso_gestor_detalhe', recurso_id=r.id) }}">Responder</a>
+    </div>
+{% endfor %}
+
+<h2>Já respondidos</h2>
+{% if not recursos_respondidos %}
+    <p class="muted">Nenhum ainda.</p>
+{% endif %}
+{% for r in recursos_respondidos %}
+    <div class="card" style="margin-bottom:12px; text-align:left;">
+        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
+        <p class="muted">Status: {{ r.status }}</p>
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('recursos.recurso_gestor_detalhe', recurso_id=r.id) }}">Ver</a>
+    </div>
+{% endfor %}
+{% endblock %}

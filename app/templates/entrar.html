@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Selecionar pessoa{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('main.index') }}" class="back-link">&larr; Voltar</a>
+
+{% if papel == 'gestor' %}
+    <h1>Quem é você? (Gestor)</h1>
+    <p class="muted">Selecione seu nome para ver os empregados que você avalia no exercício {{ ciclo.exercicio }}.</p>
+{% else %}
+    <h1>Quem é você?</h1>
+    <p class="muted">Selecione seu nome para preencher sua autoavaliação do exercício {{ ciclo.exercicio }}.</p>
+{% endif %}
+
+{% if pessoas %}
+    <ul class="lista-pessoas">
+        {% for pessoa in pessoas %}
+            <li>
+                {% if papel == 'gestor' %}
+                    <a href="{{ url_for('main.lista_avaliados', gestor_id=pessoa.id) }}">{{ pessoa.nome }}</a>
+                {% else %}
+                    <a href="{{ url_for('avaliacoes.iniciar_autoavaliacao', funcionario_id=pessoa.id) }}">{{ pessoa.nome }}</a>
+                {% endif %}
+                <span class="tag">{{ pessoa.cargo.nome if pessoa.cargo else '' }}</span>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>Nenhuma pessoa encontrada. Verifique os cadastros em <a href="{{ url_for('admin.painel') }}">Administração</a>.</p>
+{% endif %}
+{% endblock %}

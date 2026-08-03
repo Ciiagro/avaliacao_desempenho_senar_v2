@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Progressão de Nível{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Progressão de Nível</h1>
+<p class="muted">
+    Notas de 2023, 2024 e 2025. A coluna "Par" mostra os dois anos que valem pra decisão de cada
+    pessoa — nem todo mundo usa os mesmos anos (depende de quando a pessoa habilitou). Marque a
+    decisão de cada linha e clique em "Salvar decisões" no final pra aplicar tudo de uma vez.
+</p>
+
+<div style="display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin:16px 0;">
+    <form method="post" action="{{ url_for('admin.importar_progressao_nivel') }}"
+          enctype="multipart/form-data" class="form-inline" style="margin:0;">
+        <input type="file" name="arquivo" accept=".xlsx,.csv" required>
+        <button type="submit" class="botao">Importar histórico</button>
+    </form>
+    <input type="text" id="busca-nome" placeholder="Buscar por nome..."
+           style="width:320px; padding:10px 14px; font-size:1rem;"
+           oninput="
+             var termo = this.value.toLowerCase();
+             document.querySelectorAll('#tabela-progressao tbody tr').forEach(function(linha) {
+                 var nome = linha.getAttribute('data-nome');
+                 linha.style.display = nome.indexOf(termo) === -1 ? 'none' : '';
+             });
+           ">
+</div>
+
+{% macro opcoes_exclusao() %}
+    <option value="excluido_tabela">Não se aplica (fora da tabela salarial)</option>
+    <option value="excluido_recente">Não se aplica (admissão recente)</option>
+{% endmacro %}
+
+<form method="post" action="{{ url_for('admin.salvar_decisoes_2026') }}">
+<table class="tabela" id="tabela-progressao">
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Nota 2023</th>
+            <th>Nota 2024</th>
+            <th>Nota 2025</th>
+            <th>Par</th>
+            <th>Decisão</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for linha in linhas %}
+            <tr data-nome="{{ linha.funcionario.nome|lower }}">
+                <td>{{ linha.funcionario.nome }}</td>
+                <td>{{ "%.2f"|format(linha.nota_2023) if linha.nota_2023 is not none else "—" }}</td>
+                <td>{{ "%.2f"|format(linha.nota_2024) if linha.nota_2024 is not none else "—" }}</td>
+                <td>{{ "%.2f"|format(linha.nota_2025) if linha.nota_2025 is not none else "—" }}</td>
+                <td>
+                    {% if linha.par_inicio and linha.par_fim %}
+                        {{ linha.par_inicio }}–{{ linha.par_fim }}
+                    {% elif linha.precisa_confirmacao %}
+                        <span class="muted">confirmar</span>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if linha.rotulo_bloqueado %}
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <select id="sel-{{ linha.funcionario.id }}" name="decisao_{{ linha.funcionario.id }}" disabled style="font-size:0.85em;">
+                                <option value="a_decidir" {% if not linha.excluido %}selected{% endif %}>{{ linha.rotulo_bloqueado }}</option>
+                                <option value="excluido_tabela" {% if linha.motivo_exclusao == 'Fora da tabela salarial' %}selected{% endif %}>Não se aplica (fora da tabela salarial)</option>
+                                <option value="excluido_recente" {% if linha.motivo_exclusao == 'Admissão recente / ainda não avaliado' %}selected{% endif %}>Não se aplica (admissão recente)</option>
+                            </select>
+                            <input type="hidden" name="decisao_{{ linha.funcionario.id }}"
+                                   value="{{ 'excluido_tabela' if linha.motivo_exclusao == 'Fora da tabela salarial' else ('excluido_recente' if linha.excluido else 'a_decidir') }}"
+                                   id="hid-{{ linha.funcionario.id }}">
+                            <a href="#" title="Editar esta decisão" onclick="
+                                document.getElementById('sel-{{ linha.funcionario.id }}').disabled = false;
+                                document.getElementById('hid-{{ linha.funcionario.id }}').disabled = true;
+                                this.style.display='none';
+                                return false;
+                              " style="cursor:pointer; font-size:0.95em;">✏️</a>
+                        </div>
+                    {% else %}
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <select name="decisao_{{ linha.funcionario.id }}" style="font-size:0.85em;">
+                                {% if not linha.par_inicio %}
+                                    <option value="a_decidir" selected>Ainda sem par definido</option>
+                                    {{ opcoes_exclusao() }}
+                                {% else %}
+                                    {% if linha.par_ainda_nao_fechou %}
+                                        <option value="a_decidir" selected>Sem progressão (aguardando avaliação de {{ linha.par_fim }})</option>
+                                    {% elif linha.par_nao_fechou_com_a %}
+                                        <option value="a_decidir" selected>Não elegível (automático)</option>
+                                    {% else %}
+                                        <option value="a_decidir" {% if linha.decisao_atual == 'a_decidir' %}selected{% endif %}>A decidir</option>
+                                    {% endif %}
+                                    <option value="sim" {% if linha.decisao_atual == 'sim' %}selected{% endif %}>Progressão em {{ linha.ano_decisao }}</option>
+                                    <option value="nao" {% if linha.decisao_atual == 'nao' %}selected{% endif %}>Não elegível</option>
+                                    {{ opcoes_exclusao() }}
+                                {% endif %}
+                            </select>
+                        </div>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('admin.progressao_nivel_detalhe', funcionario_id=linha.funcionario.id) }}"
+                       class="botao botao-secundario" style="padding:4px 10px; font-size:0.8em;"
+                       title="Ver notas detalhadas, histórico de decisões e opções avançadas desta pessoa">Ver detalhe</a>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<button type="submit" class="botao" style="margin-top:16px;">Salvar decisões</button>
+</form>
+{% endblock %}
