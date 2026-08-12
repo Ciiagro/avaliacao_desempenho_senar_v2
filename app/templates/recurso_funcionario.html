@@ -88,10 +88,17 @@
                 <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=r.id) }}" onsubmit="return confirm('Confirmar que você aceita a decisão do gestor? Isso encerra o recurso.');">
                     <button type="submit" class="botao botao-secundario">Aceitar a decisão do gestor</button>
                 </form>
-                <form method="post" action="{{ url_for('recursos.recorrer_recurso', recurso_id=r.id) }}" style="flex:1; min-width:260px;">
-                    <textarea name="justificativa" rows="2" placeholder="Por que você ainda não concorda? (opcional)"></textarea>
-                    <button type="submit" class="botao" style="margin-top:6px;">Ainda não concordo, quero recorrer</button>
-                </form>
+                {% if r.pode_recorrer %}
+                    <form method="post" action="{{ url_for('recursos.recorrer_recurso', recurso_id=r.id) }}" style="flex:1; min-width:260px;">
+                        <textarea name="justificativa" rows="2" placeholder="Por que você ainda não concorda? (opcional)"></textarea>
+                        <button type="submit" class="botao" style="margin-top:6px;">Ainda não concordo, quero recorrer</button>
+                    </form>
+                {% else %}
+                    <p class="muted" style="flex:1; min-width:260px; margin:0;">
+                        Seu gestor imediato é a presidência — essa resposta já é a decisão final,
+                        não existe mais nenhuma instância pra recorrer.
+                    </p>
+                {% endif %}
             </div>
         {% endif %}
     </div>

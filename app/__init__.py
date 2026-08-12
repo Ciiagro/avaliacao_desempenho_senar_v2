@@ -31,6 +31,7 @@ def create_app():
         from .routes.recursos import (
             contar_recursos_pendentes_comissao,
             contar_recursos_pendentes_gestor,
+            resultado_pendente_ciencia_do_funcionario,
         )
 
         funcionario = funcionario_logado()
@@ -38,6 +39,9 @@ def create_app():
             "funcionario_atual": funcionario,
             "recursos_pendentes_comissao": contar_recursos_pendentes_comissao(),
             "recursos_pendentes_gestor": contar_recursos_pendentes_gestor(
+                funcionario.id if funcionario else None
+            ),
+            "resultado_pendente_ciencia": resultado_pendente_ciencia_do_funcionario(
                 funcionario.id if funcionario else None
             ),
         }

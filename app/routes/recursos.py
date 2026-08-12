@@ -59,6 +59,18 @@ def prazo_comissao(recurso):
     return recurso.criado_em + timedelta(days=PRAZO_COMISSAO_DIAS)
 
 
+def resultado_pendente_ciencia_do_funcionario(funcionario_id):
+    """Resultado final já liberado que o funcionário ainda não deu ciência
+    (nem aceitou, nem abriu recurso). Enquanto existir um assim, o menu
+    "Recurso" do topo não deve levar direto pra área de recursos — precisa
+    passar primeiro pela tela do resultado e escolher aceitar ou recorrer."""
+    if not funcionario_id:
+        return None
+    return ResultadoFinal.query.filter_by(
+        avaliado_id=funcionario_id, liberado=True, ciente_avaliado=False
+    ).first()
+
+
 def contar_recursos_pendentes_comissao():
     return RecursoAvaliacao.query.filter(
         RecursoAvaliacao.status.in_(
@@ -108,6 +120,16 @@ def _gestor_do_recurso(recurso):
         ciclo_id=recurso.ciclo_id, avaliado_id=recurso.avaliado_id
     ).first()
     return vinculo.avaliador if vinculo else None
+
+
+def _recurso_pode_recorrer_a_presidencia(recurso):
+    """Se o gestor imediato do avaliado É a própria presidência, não tem
+    mais ninguém acima pra recorrer — a resposta do gestor já é a última
+    instância nesse caso. Pra todo mundo cujo gestor não é a presidência,
+    o caminho normal continua valendo (gestor -> se não concordar,
+    presidência decide em última instância)."""
+    gestor = _gestor_do_recurso(recurso)
+    return not (gestor and gestor.eh_presidencia)
 
 
 def _avaliacao_gestor_do_recurso(recurso):
@@ -162,27 +184,15 @@ def _aplicar_revisao_notas(recurso, avaliacao_gestor, form, autor_id):
 
 
 def _pode_abrir_novo_recurso(ciclo_id, avaliado_id):
-    """Diz se o empregado pode abrir um novo recurso pra esse ciclo.
+    """Diz se o empregado pode abrir um recurso pra esse ciclo.
 
-    Só existe recurso "em aberto" por vez pro mesmo ciclo — mas depois que
-    um recurso é encerrado porque a PRESIDÊNCIA NÃO ACATOU, o empregado
-    ainda pode discordar de novo e abrir outro recurso (não é a palavra
-    final). Já se o recurso anterior terminou porque o empregado aceitou,
-    ou porque a Comissão confirmou a revisão do gestor, não faz sentido
-    abrir outro — considera resolvido."""
-    ultimo = (
-        RecursoAvaliacao.query.filter_by(ciclo_id=ciclo_id, avaliado_id=avaliado_id)
-        .order_by(RecursoAvaliacao.criado_em.desc())
-        .first()
-    )
-    if not ultimo:
-        return True
-    if ultimo.status != RECURSO_STATUS_ENCERRADO:
-        return False
-    decisao_presidencia = next(
-        (e for e in ultimo.eventos if e.tipo == "decisao_presidencia"), None
-    )
-    return bool(decisao_presidencia and decisao_presidencia.decisao == "nao_acatado")
+    A decisão da presidência é a última instância — depois que ela decide
+    (acata ou não), o recurso encerra e não tem mais como reabrir. Só é
+    possível abrir um recurso novo se nunca existiu nenhum pra esse ciclo."""
+    ja_existe = RecursoAvaliacao.query.filter_by(
+        ciclo_id=ciclo_id, avaliado_id=avaliado_id
+    ).first()
+    return ja_existe is None
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +235,7 @@ def recurso_area():
         r.eventos_visiveis = [
             e for e in r.eventos if not (e.tipo == "resposta_gestor" and not liberado)
         ]
+        r.pode_recorrer = _recurso_pode_recorrer_a_presidencia(r)
 
     return render_template(
         "recurso_funcionario.html",
@@ -328,6 +339,10 @@ def recorrer_recurso(recurso_id):
     recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
     if str(recurso.avaliado_id) != str(funcionario.id) or recurso.status != RECURSO_STATUS_AGUARDANDO_FUNCIONARIO:
         flash("Essa ação não está disponível para esse recurso.", "danger")
+        return redirect(url_for("recursos.recurso_area"))
+
+    if not _recurso_pode_recorrer_a_presidencia(recurso):
+        flash("Seu gestor imediato é a presidência — a resposta dele já é a decisão final, não há como recorrer.", "warning")
         return redirect(url_for("recursos.recurso_area"))
 
     justificativa = request.form.get("justificativa", "").strip()

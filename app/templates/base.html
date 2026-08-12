@@ -19,7 +19,14 @@
             <a href="{{ url_for('main.index') }}">Início</a>
             {% if funcionario_atual %}
                 <a href="{{ url_for('main.minha_area') }}">Minha área</a>
-                <a href="{{ url_for('recursos.recurso_area') }}">Recurso</a>
+                {% if resultado_pendente_ciencia %}
+                    <a href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=resultado_pendente_ciencia.ciclo_id) }}"
+                       title="Dê ciência do seu resultado (aceite ou recorra) antes de acessar a área de recursos">
+                        Recurso <span class="badge badge-pending">!</span>
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('recursos.recurso_area') }}">Recurso</a>
+                {% endif %}
                 {% if funcionario_atual.eh_gestor_de_alguem() %}
                     <a href="{{ url_for('recursos.recurso_gestor_area') }}">
                         Recursos a responder{% if recursos_pendentes_gestor %} <span class="badge badge-pending">{{ recursos_pendentes_gestor }}</span>{% endif %}
