@@ -36,23 +36,52 @@
 {% endfor %}
 
 {% if recurso.eventos|selectattr('tipo', 'equalto', 'encaminhamento_comissao')|list %}
-    <div class="card" style="margin:16px 0; text-align:left;">
+    {% set ja_encerrado = recurso.status == 'encerrado' %}
+    <div class="card" style="margin:16px 0; text-align:left;" id="card-conversa-presidencia">
         <h2 style="font-size:1.05rem;">Registrar conversa com a presidência</h2>
-        <p class="muted">
-            A decisão final costuma sair de uma conversa direta entre a Comissão e a
-            presidência. Registre aqui a data/hora e o motivo/resumo dessa conversa,
-            pra ficar documentado na linha do tempo do recurso.
-        </p>
-        <form method="post" action="{{ url_for('recursos.recurso_comissao_registrar_conversa', recurso_id=recurso.id) }}">
-            <label for="data_hora">Data/hora da conversa (deixe em branco para usar agora)</label>
-            <input type="datetime-local" id="data_hora" name="data_hora">
+        {% if ja_encerrado %}
+            <p class="muted">
+                Esse recurso já foi encerrado com uma decisão final da presidência — o
+                registro de conversas fica travado por padrão pra não parecer que ainda
+                dá pra alterar algo à toa.
+            </p>
+            <button type="button" class="botao botao-secundario botao-pequeno" id="botao-liberar-conversa">
+                Preciso registrar uma correção mesmo assim
+            </button>
+            <div id="form-conversa-presidencia" style="display:none; margin-top:12px;">
+        {% else %}
+            <p class="muted">
+                A decisão final costuma sair de uma conversa direta entre a Comissão e a
+                presidência. Registre aqui a data/hora e o motivo/resumo dessa conversa,
+                pra ficar documentado na linha do tempo do recurso.
+            </p>
+            <div id="form-conversa-presidencia">
+        {% endif %}
+                <form method="post" action="{{ url_for('recursos.recurso_comissao_registrar_conversa', recurso_id=recurso.id) }}">
+                    <label for="data_hora">Data/hora da conversa (deixe em branco para usar agora)</label>
+                    <input type="datetime-local" id="data_hora" name="data_hora">
 
-            <label for="resumo" style="margin-top:8px; display:block;">Motivo/resumo da conversa</label>
-            <textarea id="resumo" name="resumo" rows="3" required></textarea>
+                    <label for="resumo" style="margin-top:8px; display:block;">Motivo/resumo da conversa</label>
+                    <textarea id="resumo" name="resumo" rows="3" required></textarea>
 
-            <button type="submit" class="botao" style="margin-top:8px;">Registrar conversa</button>
-        </form>
+                    <button type="submit" class="botao" style="margin-top:8px;">Registrar conversa</button>
+                </form>
+            </div>
     </div>
+    {% if ja_encerrado %}
+        <script>
+        (function () {
+            var botao = document.getElementById('botao-liberar-conversa');
+            var form = document.getElementById('form-conversa-presidencia');
+            if (botao && form) {
+                botao.addEventListener('click', function () {
+                    form.style.display = 'block';
+                    botao.style.display = 'none';
+                });
+            }
+        })();
+        </script>
+    {% endif %}
 {% endif %}
 
 {% if recurso.revisoes_notas %}
