@@ -18,9 +18,11 @@ PONTUACOES_VALIDAS = {4, 6, 8, 10}
 
 
 def _ciclo_ativo():
+    """Ciclo "aberto" marcado como padrão; se nenhum estiver marcado, cai
+    pro aberto mais recente (fallback do comportamento antigo)."""
     return (
         CicloAvaliacao.query.filter_by(status="aberto")
-        .order_by(CicloAvaliacao.exercicio.desc())
+        .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
         .first()
     )
 

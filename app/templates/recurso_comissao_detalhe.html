@@ -55,6 +55,34 @@
     </div>
 {% endif %}
 
+{% if recurso.revisoes_notas %}
+    <h2>Notas alteradas durante o recurso</h2>
+    <div class="tabela-container">
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th>Fator</th>
+                    <th class="centro">Nota anterior</th>
+                    <th class="centro">Nota nova</th>
+                    <th>Alterado por</th>
+                    <th>Quando</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rev in recurso.revisoes_notas %}
+                    <tr>
+                        <td>{{ rev.fator.nome }}</td>
+                        <td class="centro">{{ rev.nota_anterior if rev.nota_anterior is not none else '-' }}</td>
+                        <td class="centro"><strong>{{ rev.nota_nova }}</strong></td>
+                        <td>{{ rev.alterado_por.nome if rev.alterado_por else '-' }}</td>
+                        <td>{{ (rev.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') if rev.criado_em else '-' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+
 <h2>Notas &mdash; Autoavaliação x Avaliação do gestor (atual)</h2>
 <div class="tabela-container">
     <table class="tabela">

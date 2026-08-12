@@ -78,18 +78,32 @@
         {% endif %}
 
         {% if resposta and resposta.decisao == 'revisou' %}
-            <form method="post" action="{{ url_for('recursos.recurso_comissao_confirmar_revisao', recurso_id=r.id) }}">
-                <label>Comentário (opcional)</label>
-                <textarea name="comentario" rows="2"></textarea>
-                <button type="submit" class="botao" style="margin-top:8px;">Confirmar e encerrar (gestor já revisou)</button>
-            </form>
-        {% else %}
-            <form method="post" action="{{ url_for('recursos.recurso_comissao_repassar', recurso_id=r.id) }}">
-                <label>Comentário ao repassar pro empregado (opcional)</label>
-                <textarea name="comentario" rows="2"></textarea>
-                <button type="submit" class="botao" style="margin-top:8px;">Repassar ao empregado</button>
-            </form>
+            {% if r.revisoes_notas %}
+                <p class="muted" style="margin-bottom:4px;"><strong>O que o gestor alterou:</strong></p>
+                <table class="tabela" style="margin-bottom:12px;">
+                    <thead>
+                        <tr><th>Fator</th><th class="centro">Nota anterior</th><th class="centro">Nota nova</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for rev in r.revisoes_notas %}
+                            <tr>
+                                <td>{{ rev.fator.nome }}</td>
+                                <td class="centro">{{ rev.nota_anterior if rev.nota_anterior is not none else '-' }}</td>
+                                <td class="centro"><strong>{{ rev.nota_nova }}</strong></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted" style="margin-bottom:12px;">O gestor marcou "revisar", mas não alterou nenhuma nota — só a justificativa.</p>
+            {% endif %}
         {% endif %}
+
+        <form method="post" action="{{ url_for('recursos.recurso_comissao_repassar', recurso_id=r.id) }}">
+            <label>Comentário ao repassar pro empregado (opcional)</label>
+            <textarea name="comentario" rows="2"></textarea>
+            <button type="submit" class="botao" style="margin-top:8px;">Repassar ao empregado</button>
+        </form>
     </div>
 {% endfor %}
 {% endif %}

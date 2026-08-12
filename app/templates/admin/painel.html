@@ -49,7 +49,7 @@
     <button type="submit" class="botao">Criar ciclo</button>
 </form>
 
-<table class="tabela">
+<table class="tabela tabela-ciclos">
     <thead>
         <tr>
             <th>Exercício</th>
@@ -58,6 +58,7 @@
             <th>Prazo autoavaliação</th>
             <th>Prazo avaliação gestor</th>
             <th>Status</th>
+            <th>Padrão</th>
             <th></th>
         </tr>
     </thead>
@@ -70,23 +71,35 @@
                 <td>{{ ciclo.data_limite_autoavaliacao.strftime('%d/%m/%Y') if ciclo.data_limite_autoavaliacao else '-' }}</td>
                 <td>{{ ciclo.data_limite_gestor.strftime('%d/%m/%Y') if ciclo.data_limite_gestor else '-' }}</td>
                 <td>{{ ciclo.status }}</td>
+                <td class="col-padrao">
+                    {% if ciclo.padrao %}
+                        <span class="badge-padrao">✔ Padrão</span>
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </td>
                 <td>
-                    <div class="acoes-vinculo">
-                        <button type="button" class="botao botao-secundario botao-pequeno botao-editar-prazos" data-ciclo-id="{{ ciclo.id }}">Editar</button>
+                    <div class="acoes-vinculo acoes-ciclo">
+                        <button type="button" class="botao botao-secundario botao-pequeno botao-ciclo botao-editar-prazos" data-ciclo-id="{{ ciclo.id }}">Editar</button>
+                        {% if not ciclo.padrao %}
+                            <form method="post" action="{{ url_for('admin.definir_ciclo_padrao', ciclo_id=ciclo.id) }}" style="display:inline;">
+                                <button type="submit" class="botao botao-secundario botao-pequeno botao-ciclo">Definir padrão</button>
+                            </form>
+                        {% endif %}
                         {% if ciclo.status == 'aberto' %}
                             <form method="post" action="{{ url_for('admin.encerrar_ciclo', ciclo_id=ciclo.id) }}" style="display:inline;">
-                                <button type="submit" class="botao botao-secundario botao-pequeno">Encerrar</button>
+                                <button type="submit" class="botao botao-secundario botao-pequeno botao-ciclo">Encerrar</button>
                             </form>
                         {% else %}
                             <form method="post" action="{{ url_for('admin.reabrir_ciclo', ciclo_id=ciclo.id) }}" style="display:inline;">
-                                <button type="submit" class="botao botao-secundario botao-pequeno">Reabrir</button>
+                                <button type="submit" class="botao botao-secundario botao-pequeno botao-ciclo">Reabrir</button>
                             </form>
                         {% endif %}
                     </div>
                 </td>
             </tr>
             <tr class="linha-edicao-prazos" data-edicao-prazos="{{ ciclo.id }}" style="display:none;">
-                <td colspan="7">
+                <td colspan="8">
                     <form method="post" action="{{ url_for('admin.editar_prazos_ciclo', ciclo_id=ciclo.id) }}" class="form-inline">
                         <label class="muted" style="margin:0;">Exercício
                             <input type="number" name="exercicio" value="{{ ciclo.exercicio }}" style="width:90px;">

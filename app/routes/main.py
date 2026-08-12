@@ -17,10 +17,12 @@ PRAZO_CIENCIA_DIAS_UTEIS = 5
 
 
 def ciclo_ativo():
-    """Retorna o ciclo de avaliação mais recente com status 'aberto'."""
+    """Retorna o ciclo de avaliação "aberto" a usar quando ninguém escolhe
+    o ciclo explicitamente: o marcado como padrão, se houver; senão, o
+    aberto mais recente (comportamento antigo, usado como fallback)."""
     return (
         CicloAvaliacao.query.filter_by(status="aberto")
-        .order_by(CicloAvaliacao.exercicio.desc())
+        .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
         .first()
     )
 
@@ -182,8 +184,14 @@ def minha_area():
         .order_by(Funcionario.nome)
         .all()
     )
+    referencia = ciclo.referencia_elegibilidade()
     linhas = []
     for v in vinculos:
+        # Não mostra quem não era elegível (ex: menos de 1 ano de casa) na
+        # data do próprio ciclo — mesmo que um vínculo tenha sido criado
+        # por engano pra essa pessoa nesse ciclo.
+        if v.avaliado.is_elegivel_avaliacao(referencia=referencia) is False:
+            continue
         avaliacao = Avaliacao.query.filter_by(
             ciclo_id=ciclo.id,
             avaliado_id=v.avaliado_id,

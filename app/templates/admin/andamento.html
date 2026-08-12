@@ -37,6 +37,13 @@
 
     <div class="tabela-toolbar">
         <input type="search" id="busca-andamento" placeholder="Buscar por nome...">
+        <div class="filtros-andamento" role="group" aria-label="Filtrar por status">
+            <button type="button" class="botao-filtro ativo" data-filtro="todos">Todos</button>
+            <button type="button" class="botao-filtro" data-filtro="ambas">Ambas concluídas</button>
+            <button type="button" class="botao-filtro" data-filtro="auto">Autoaval. concluída</button>
+            <button type="button" class="botao-filtro" data-filtro="gestor">Aval. gestor concluída</button>
+            <button type="button" class="botao-filtro" data-filtro="pendentes">Alguma pendente</button>
+        </div>
     </div>
 
     <div class="tabela-container">
@@ -52,7 +59,10 @@
             </thead>
             <tbody>
                 {% for linha in linhas %}
-                    <tr class="linha-andamento" data-busca="{{ linha.funcionario.nome|lower }}">
+                    <tr class="linha-andamento"
+                        data-busca="{{ linha.funcionario.nome|lower }}"
+                        data-status-auto="{{ linha.status_auto }}"
+                        data-status-gestor="{{ linha.status_gestor or 'sem_avaliador' }}">
                         <td>
                             <div class="funcionario-nome">{{ linha.funcionario.nome }}</div>
                             <div class="funcionario-subinfo muted">{{ linha.funcionario.setor.nome if linha.funcionario.setor else '-' }}</div>
@@ -107,10 +117,42 @@
     (function () {
         var busca = document.getElementById('busca-andamento');
         var linhas = document.querySelectorAll('#tabela-andamento .linha-andamento');
-        busca.addEventListener('input', function () {
+        var botoesFiltro = document.querySelectorAll('.botao-filtro');
+        var filtroAtivo = 'todos';
+
+        function passaNoFiltro(linha) {
+            var auto = linha.dataset.statusAuto;
+            var gestor = linha.dataset.statusGestor;
+            switch (filtroAtivo) {
+                case 'ambas':
+                    return auto === 'concluida' && gestor === 'concluida';
+                case 'auto':
+                    return auto === 'concluida';
+                case 'gestor':
+                    return gestor === 'concluida';
+                case 'pendentes':
+                    return auto !== 'concluida' || gestor !== 'concluida';
+                default:
+                    return true;
+            }
+        }
+
+        function aplicarFiltros() {
             var termo = busca.value.trim().toLowerCase();
             linhas.forEach(function (linha) {
-                linha.style.display = (!termo || linha.dataset.busca.indexOf(termo) !== -1) ? '' : 'none';
+                var passaBusca = !termo || linha.dataset.busca.indexOf(termo) !== -1;
+                linha.style.display = (passaBusca && passaNoFiltro(linha)) ? '' : 'none';
+            });
+        }
+
+        busca.addEventListener('input', aplicarFiltros);
+
+        botoesFiltro.forEach(function (botao) {
+            botao.addEventListener('click', function () {
+                botoesFiltro.forEach(function (b) { b.classList.remove('ativo'); });
+                botao.classList.add('ativo');
+                filtroAtivo = botao.dataset.filtro;
+                aplicarFiltros();
             });
         });
     })();

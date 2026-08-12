@@ -127,7 +127,12 @@ def _avaliacao_gestor_do_recurso(recurso):
 def _aplicar_revisao_notas(recurso, avaliacao_gestor, form, autor_id):
     """Aplica as novas notas enviadas no formulário à avaliação do gestor,
     registrando o valor antigo e o novo em RecursoRevisaoNota. Nunca perde o
-    histórico do que era antes."""
+    histórico do que era antes.
+
+    Como o formulário chega com todos os fatores pré-marcados no valor
+    atual (pra facilitar o preenchimento), só grava um registro de revisão
+    pros fatores onde o valor novo é DE FATO diferente do antigo — senão a
+    Comissão veria "revisou" em fatores que o gestor nem mexeu."""
     respostas_atuais = {r.fator_id: r for r in avaliacao_gestor.respostas}
     for fator in avaliacao_gestor.formulario.fatores:
         valor_novo = form.get(f"fator_{fator.id}")
@@ -136,6 +141,8 @@ def _aplicar_revisao_notas(recurso, avaliacao_gestor, form, autor_id):
         valor_novo = int(valor_novo)
         resposta = respostas_atuais.get(fator.id)
         valor_antigo = resposta.pontuacao if resposta else None
+        if valor_novo == valor_antigo:
+            continue
         if resposta:
             resposta.pontuacao = valor_novo
         else:
@@ -154,6 +161,30 @@ def _aplicar_revisao_notas(recurso, avaliacao_gestor, form, autor_id):
         )
 
 
+def _pode_abrir_novo_recurso(ciclo_id, avaliado_id):
+    """Diz se o empregado pode abrir um novo recurso pra esse ciclo.
+
+    Só existe recurso "em aberto" por vez pro mesmo ciclo — mas depois que
+    um recurso é encerrado porque a PRESIDÊNCIA NÃO ACATOU, o empregado
+    ainda pode discordar de novo e abrir outro recurso (não é a palavra
+    final). Já se o recurso anterior terminou porque o empregado aceitou,
+    ou porque a Comissão confirmou a revisão do gestor, não faz sentido
+    abrir outro — considera resolvido."""
+    ultimo = (
+        RecursoAvaliacao.query.filter_by(ciclo_id=ciclo_id, avaliado_id=avaliado_id)
+        .order_by(RecursoAvaliacao.criado_em.desc())
+        .first()
+    )
+    if not ultimo:
+        return True
+    if ultimo.status != RECURSO_STATUS_ENCERRADO:
+        return False
+    decisao_presidencia = next(
+        (e for e in ultimo.eventos if e.tipo == "decisao_presidencia"), None
+    )
+    return bool(decisao_presidencia and decisao_presidencia.decisao == "nao_acatado")
+
+
 # ---------------------------------------------------------------------------
 # Empregado
 # ---------------------------------------------------------------------------
@@ -168,17 +199,12 @@ def recurso_area():
         avaliado_id=funcionario.id, liberado=True
     ).all()
 
-    recursos_existentes = {
-        r.ciclo_id: r
-        for r in RecursoAvaliacao.query.filter_by(avaliado_id=funcionario.id).all()
-    }
-
     ciclos_sem_recurso = []
     for registro in registros_liberados:
         if registro.decisao_avaliado == "aceito":
             # Já concordou com o resultado — não faz mais sentido abrir recurso.
             continue
-        if registro.ciclo_id not in recursos_existentes:
+        if _pode_abrir_novo_recurso(registro.ciclo_id, funcionario.id):
             ciclo = CicloAvaliacao.query.get(registro.ciclo_id)
             ciclos_sem_recurso.append(ciclo)
 
@@ -220,11 +246,9 @@ def abrir_recurso():
         flash("Conte o motivo do recurso antes de enviar.", "danger")
         return redirect(url_for("recursos.recurso_area"))
 
-    ja_existe = RecursoAvaliacao.query.filter_by(
-        ciclo_id=ciclo_id, avaliado_id=funcionario.id
-    ).first()
+    ja_existe = not _pode_abrir_novo_recurso(ciclo_id, funcionario.id)
     if ja_existe:
-        flash("Já existe um recurso aberto para esse ciclo.", "warning")
+        flash("Já existe um recurso aberto (ou já decidido definitivamente) para esse ciclo.", "warning")
         return redirect(url_for("recursos.recurso_area"))
 
     registro_existente = ResultadoFinal.query.filter_by(
@@ -524,27 +548,6 @@ def recurso_comissao_repassar(recurso_id):
     )
     db.session.commit()
     flash("Resposta do gestor repassada ao empregado.", "success")
-    return redirect(url_for("recursos.recurso_comissao_area"))
-
-
-@recursos_bp.route("/recurso/<int:recurso_id>/comissao-confirmar-revisao", methods=["POST"])
-def recurso_comissao_confirmar_revisao(recurso_id):
-    """A Comissão viu que o gestor revisou a nota e confirma o encerramento."""
-    recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
-    if recurso.status != RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE:
-        flash("Esse recurso não está aguardando a Comissão.", "warning")
-        return redirect(url_for("recursos.recurso_comissao_area"))
-
-    recurso.status = RECURSO_STATUS_ENCERRADO
-    db.session.add(
-        RecursoEvento(
-            recurso_id=recurso.id,
-            tipo="fechamento_comissao",
-            texto=request.form.get("comentario", "").strip() or None,
-        )
-    )
-    db.session.commit()
-    flash("Recurso encerrado — gestor revisou a nota.", "success")
     return redirect(url_for("recursos.recurso_comissao_area"))
 
 

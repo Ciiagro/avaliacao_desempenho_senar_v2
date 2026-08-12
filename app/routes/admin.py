@@ -131,7 +131,7 @@ def andamento():
     else:
         ciclo = (
             CicloAvaliacao.query.filter_by(status="aberto")
-            .order_by(CicloAvaliacao.exercicio.desc())
+            .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
             .first()
         ) or CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).first()
 
@@ -163,7 +163,7 @@ def andamento():
         "sem_avaliador": 0,
     }
     for f in funcionarios:
-        if f.is_elegivel_avaliacao() is False:
+        if f.is_elegivel_avaliacao(referencia=ciclo.referencia_elegibilidade()) is False:
             continue
 
         avaliacao_auto = avaliacao_por_chave.get((f.id, f.id, "auto"))
@@ -223,7 +223,7 @@ def resultados():
     else:
         ciclo = (
             CicloAvaliacao.query.filter_by(status="aberto")
-            .order_by(CicloAvaliacao.exercicio.desc())
+            .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
             .first()
         ) or CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).first()
 
@@ -272,7 +272,7 @@ def montar_linhas_resultado_final(ciclo):
 
     linhas = []
     for f in funcionarios:
-        if f.is_elegivel_avaliacao() is False:
+        if f.is_elegivel_avaliacao(referencia=ciclo.referencia_elegibilidade()) is False:
             continue
 
         avaliacao_auto = avaliacao_por_chave.get((f.id, f.id, "auto"))
@@ -347,7 +347,7 @@ def exportar_resultados_excel():
     else:
         ciclo = (
             CicloAvaliacao.query.filter_by(status="aberto")
-            .order_by(CicloAvaliacao.exercicio.desc())
+            .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
             .first()
         ) or CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).first()
 
@@ -378,7 +378,7 @@ def exportar_resultados_pdf():
     else:
         ciclo = (
             CicloAvaliacao.query.filter_by(status="aberto")
-            .order_by(CicloAvaliacao.exercicio.desc())
+            .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
             .first()
         ) or CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).first()
 
@@ -1738,7 +1738,7 @@ def _ciclo_selecionado_ou_aberto():
         return CicloAvaliacao.query.get_or_404(int(ciclo_id_param))
     return (
         CicloAvaliacao.query.filter_by(status="aberto")
-        .order_by(CicloAvaliacao.exercicio.desc())
+        .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
         .first()
     )
 
@@ -2046,6 +2046,21 @@ def reabrir_ciclo(ciclo_id):
     ciclo.status = "aberto"
     db.session.commit()
     flash(f"Ciclo {ciclo.exercicio} reaberto.", "success")
+    return redirect(url_for("admin.painel"))
+
+
+@admin_bp.route("/ciclos/<int:ciclo_id>/definir_padrao", methods=["POST"])
+def definir_ciclo_padrao(ciclo_id):
+    """Marca este ciclo como o padrão a ser usado nas telas (funcionário e
+    admin) quando ninguém escolhe o ciclo explicitamente via ?ciclo_id=.
+    Útil quando há mais de um ciclo "aberto" ao mesmo tempo (ex: o ano
+    anterior ainda em avaliação e o ano corrente já criado) — sem isso, o
+    sistema sempre assumia o exercício mais recente como padrão."""
+    ciclo = CicloAvaliacao.query.get_or_404(ciclo_id)
+    CicloAvaliacao.query.update({CicloAvaliacao.padrao: False})
+    ciclo.padrao = True
+    db.session.commit()
+    flash(f"Ciclo {ciclo.exercicio} definido como padrão.", "success")
     return redirect(url_for("admin.painel"))
 
 

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
 from sqlalchemy.dialects.postgresql import UUID
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -139,6 +139,21 @@ class CicloAvaliacao(db.Model):
     data_limite_autoavaliacao = db.Column(db.Date)
     data_limite_gestor = db.Column(db.Date)
     status = db.Column(db.Text, nullable=False, default="aberto")
+    # Quando existe mais de um ciclo com status "aberto" ao mesmo tempo (ex:
+    # o ciclo do ano anterior ainda em avaliação e o do ano corrente já
+    # criado), este campo diz qual deles deve ser considerado o padrão nas
+    # telas que não pedem pro usuário escolher o ciclo explicitamente.
+    # Só um ciclo por vez deve ter padrao=True (isso é garantido na rota
+    # que define o padrão, não por constraint no banco).
+    padrao = db.Column(db.Boolean, nullable=False, default=False, server_default="false")
+
+    def referencia_elegibilidade(self):
+        """Data a usar como 'hoje' pra calcular elegibilidade (1 ano de
+        casa) de um funcionário PARA ESTE ciclo — nunca a data atual, senão
+        um ciclo de anos passados (ex: 2025) ficaria calculando elegibilidade
+        com base em quanto tempo a pessoa tem de casa HOJE, e não em quanto
+        tempo ela tinha de casa durante o próprio ciclo."""
+        return self.data_fim or date(self.exercicio, 12, 31)
 
 
 class VinculoAvaliacao(db.Model):
@@ -279,6 +294,9 @@ class RecursoAvaliacao(db.Model):
     avaliado = db.relationship("Funcionario", foreign_keys=[avaliado_id])
     eventos = db.relationship(
         "RecursoEvento", back_populates="recurso", order_by="RecursoEvento.criado_em"
+    )
+    revisoes_notas = db.relationship(
+        "RecursoRevisaoNota", order_by="RecursoRevisaoNota.criado_em"
     )
 
 

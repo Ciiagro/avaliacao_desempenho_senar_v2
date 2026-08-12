@@ -474,6 +474,28 @@ a { color: var(--navy-700); }
     border-color: var(--navy-700);
     box-shadow: 0 0 0 3px rgba(34, 53, 84, 0.14);
 }
+
+/* Chips de filtro por status (ex: tela de Andamento das avaliações) */
+.filtros-andamento { display: flex; flex-wrap: wrap; gap: 6px; }
+.botao-filtro {
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--texto);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.botao-filtro:hover { background: #eef0f4; }
+.botao-filtro.ativo {
+    background: var(--navy-800);
+    border-color: var(--navy-800);
+    color: #fff;
+}
 .coluna-sensivel { display: none; }
 .mostrar-sensiveis .coluna-sensivel { display: table-cell; }
 
@@ -504,6 +526,33 @@ a { color: var(--navy-700); }
 .tabela-vinculos td { font-size: 0.85rem; }
 .tabela-vinculos .botao-icone { width: 26px; height: 26px; flex: 0 0 auto; }
 .tabela-vinculos .botao-icone svg { width: 13px; height: 13px; }
+
+/* Ciclos de avaliação (painel admin): todas as ações com a mesma largura/altura
+   e sem quebrar linha, pra ficar tudo alinhado independente do texto do botão. */
+.tabela-ciclos th, .tabela-ciclos td { white-space: nowrap; vertical-align: middle; }
+.tabela-ciclos .col-padrao { text-align: center; }
+.tabela-ciclos .acoes-ciclo {
+    flex-wrap: nowrap;
+}
+.tabela-ciclos .botao-ciclo {
+    min-width: 108px;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+}
+.badge-padrao {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--sucesso-bg, #e6f4ea);
+    color: var(--sucesso, #1e7e34);
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
 
 /* ---------------- Botões ---------------- */
 
