@@ -15,6 +15,13 @@
     {% else %}{{ recurso.status }}
     {% endif %}
 </p>
+{% set resultado_atual_em_texto = '%.2f (%s)'|format(dados.resultado_final, dados.conceito) if dados.resultado_final is not none else None %}
+{% if resultado_atual_em_texto and resultado_atual_em_texto != recurso.resultado_final_em_texto %}
+    <p class="flash flash-success" style="display:inline-block;">
+        <strong>Resultado final com as notas atuais:</strong> {{ resultado_atual_em_texto }}
+        <span class="muted">(era {{ recurso.resultado_final_em_texto or '-' }} na abertura do recurso)</span>
+    </p>
+{% endif %}
 
 <h2>Linha do tempo</h2>
 {% for e in recurso.eventos %}
@@ -34,6 +41,62 @@
         {% endif %}
     </p>
 {% endfor %}
+
+{% if recurso.status == 'aguardando_presidencia' %}
+    <div class="card" style="margin:16px 0; text-align:left;" id="card-decisao-presidencia">
+        <h2 style="font-size:1.05rem;">Registrar decisão da presidência</h2>
+        <p class="muted">
+            A decisão costuma sair de uma conversa direta entre a Comissão e a
+            presidência. Registre aqui o resultado dessa decisão &mdash; se
+            possível, ainda no dia em que ela foi tomada. Isso encerra o recurso.
+        </p>
+        <form method="post" action="{{ url_for('recursos.recurso_comissao_decidir_presidencia', recurso_id=recurso.id) }}">
+            <label for="presidente_id">Quem, da presidência, decidiu</label>
+            <select id="presidente_id" name="presidente_id" required>
+                <option value="">Selecione...</option>
+                {% for p in presidentes %}
+                    <option value="{{ p.id }}">{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="data_hora" style="margin-top:8px; display:block;">Data/hora da decisão (deixe em branco para usar agora)</label>
+            <input type="datetime-local" id="data_hora" name="data_hora">
+
+            <div style="margin-top:12px;">
+                <label><input type="radio" name="decisao" value="nao_acatado" required> Manter a decisão do gestor (não acatar)</label><br>
+                <label><input type="radio" name="decisao" value="acatado" required> Alterar a nota do colaborador (acatar)</label>
+            </div>
+
+            <table class="tabela tabela-formulario" style="margin-top:12px;">
+                <thead>
+                    <tr>
+                        <th>Fator</th>
+                        <th>10</th><th>8</th><th>6</th><th>4</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fator in dados.fatores %}
+                        <tr>
+                            <td>{{ fator.nome }}</td>
+                            {% for valor in [10, 8, 6, 4] %}
+                                <td class="celula-radio">
+                                    <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
+                                           {% if dados.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="muted">As notas acima só valem se marcar "Alterar a nota". Se marcar "Manter", elas são ignoradas.</p>
+
+            <label for="justificativa" style="margin-top:8px; display:block;">Justificativa (obrigatória nos dois casos)</label>
+            <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
+
+            <button type="submit" class="botao" style="margin-top:12px;">Registrar decisão e encerrar recurso</button>
+        </form>
+    </div>
+{% endif %}
 
 {% if recurso.eventos|selectattr('tipo', 'equalto', 'encaminhamento_comissao')|list %}
     {% set ja_encerrado = recurso.status == 'encerrado' %}

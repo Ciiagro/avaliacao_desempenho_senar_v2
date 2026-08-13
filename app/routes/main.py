@@ -275,7 +275,13 @@ def meu_resultado_ciencia(ciclo_id):
     """O próprio empregado marca a ciência de que recebeu o resultado final,
     dizendo se aceita (encerra por aí) ou se vai recorrer. Só pode ser feito
     depois que o resultado foi liberado, e fica registrado com data/hora
-    (é impresso no PDF como comprovante)."""
+    (é impresso no PDF como comprovante).
+
+    A caixa de ciência é obrigatória nos dois casos — tanto pra aceitar
+    quanto pra recorrer — porque os dois botões ficam dentro do mesmo
+    formulário. Escolher "recorrer" aqui não abre o recurso sozinho: só
+    registra a ciência e a intenção, e leva o empregado pra área de
+    recursos pra ele efetivamente abrir o recurso (com o motivo)."""
     funcionario = funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))
@@ -289,13 +295,22 @@ def meu_resultado_ciencia(ciclo_id):
         flash("Marque a caixa de ciência para confirmar o recebimento da sua avaliação.", "warning")
         return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
 
+    decisao = request.form.get("decisao")
+    if decisao not in ("aceito", "recorrer"):
+        flash("Escolha se aceita o resultado ou se quer recorrer.", "warning")
+        return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
+
     if not registro.ciente_avaliado:
         registro.ciente_avaliado = True
         registro.ciente_em = datetime.utcnow()
-        registro.decisao_avaliado = "aceito"
+        registro.decisao_avaliado = "recorreu" if decisao == "recorrer" else "aceito"
         db.session.commit()
-        flash("Ciência registrada. Obrigado por confirmar o recebimento.", "success")
 
+    if decisao == "recorrer":
+        flash("Ciência registrada. Agora conte o motivo e abra seu recurso abaixo.", "warning")
+        return redirect(url_for("recursos.recurso_area"))
+
+    flash("Ciência registrada. Obrigado por confirmar o recebimento.", "success")
     return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
 
 

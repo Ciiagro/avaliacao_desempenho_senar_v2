@@ -29,6 +29,9 @@ from ..email_service import (
     avisar_comissao_gestor_respondeu,
     avisar_comissao_empregado_aceitou,
     avisar_comissao_empregado_recorreu,
+    avisar_gestor_recurso_encaminhado,
+    avisar_empregado_resposta_disponivel,
+    avisar_empregado_recurso_encerrado,
 )
 
 recursos_bp = Blueprint("recursos", __name__)
@@ -480,6 +483,17 @@ def recurso_comissao_logout():
     return redirect(url_for("main.index"))
 
 
+def _resultado_atual_texto(recurso):
+    """Resultado final recalculado com as notas ATUAIS do gestor (já
+    refletindo qualquer revisão feita durante o recurso) — pra Comissão
+    saber, antes de repassar ou encaminhar, qual seria o resultado final
+    se as coisas ficarem como estão agora."""
+    dados = montar_dados_resultado_final(recurso.ciclo, recurso.avaliado)
+    if dados["resultado_final"] is None:
+        return None
+    return f"{dados['resultado_final']:.2f} ({dados['conceito']})"
+
+
 @recursos_bp.route("/recurso/comissao")
 def recurso_comissao_area():
     pendentes_iniciais = RecursoAvaliacao.query.filter_by(
@@ -510,6 +524,12 @@ def recurso_comissao_area():
         status=RECURSO_STATUS_ENCERRADO
     ).order_by(RecursoAvaliacao.criado_em.desc()).all()
 
+    # A Comissão precisa ver, antes de repassar ou encaminhar, qual seria
+    # o resultado final se as notas atuais do gestor (já revisadas ou não)
+    # ficarem valendo.
+    for r in pendentes_repasse + pendentes_recurso:
+        r.resultado_atual_em_texto = _resultado_atual_texto(r)
+
     todos_pendentes = pendentes_iniciais + pendentes_repasse + pendentes_recurso + pendentes_fechamento
 
     return render_template(
@@ -538,10 +558,12 @@ def recurso_comissao_detalhe(recurso_id):
     gestor/empregado/presidência, ou já encerrado."""
     recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
     dados = montar_dados_resultado_final(recurso.ciclo, recurso.avaliado)
+    presidentes = Funcionario.query.filter_by(eh_presidencia=True, ativo=True).order_by(Funcionario.nome).all()
     return render_template(
         "recurso_comissao_detalhe.html",
         recurso=recurso,
         dados=dados,
+        presidentes=presidentes,
     )
 
 
@@ -562,6 +584,7 @@ def recurso_comissao_repassar(recurso_id):
         )
     )
     db.session.commit()
+    avisar_empregado_resposta_disponivel(recurso, request.form.get("comentario", "").strip())
     flash("Resposta do gestor repassada ao empregado.", "success")
     return redirect(url_for("recursos.recurso_comissao_area"))
 
@@ -583,6 +606,9 @@ def recurso_comissao_fechar(recurso_id):
         )
     )
     db.session.commit()
+    avisar_empregado_recurso_encerrado(
+        recurso, "Você aceitou a resposta do gestor e a Comissão confirmou o encerramento."
+    )
     flash("Recurso encerrado.", "success")
     return redirect(url_for("recursos.recurso_comissao_area"))
 
@@ -613,6 +639,7 @@ def recurso_comissao_encaminhar_gestor(recurso_id):
         )
     )
     db.session.commit()
+    avisar_gestor_recurso_encaminhado(recurso, comentario)
     flash("Mensagem enviada ao gestor pedindo reavaliação.", "success")
     return redirect(url_for("recursos.recurso_comissao_area"))
 
@@ -682,6 +709,70 @@ def recurso_comissao_registrar_conversa(recurso_id):
     return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
 
 
+@recursos_bp.route("/recurso/<int:recurso_id>/comissao-decisao-presidencia", methods=["POST"])
+def recurso_comissao_decidir_presidencia(recurso_id):
+    """A Comissão registra, em nome da presidência, a decisão final do
+    recurso — normalmente tomada numa conversa informal com a presidência,
+    mas lançada aqui pra valer oficialmente. Duas situações: manter a
+    decisão do gestor (justificando) ou alterar a nota do colaborador
+    (também justificando). Nos dois casos fecha o recurso, exatamente como
+    aconteceria se a presidência decidisse logando ela mesma no sistema."""
+    recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
+    if recurso.status != RECURSO_STATUS_AGUARDANDO_PRESIDENCIA:
+        flash("Esse recurso não está aguardando decisão da presidência.", "warning")
+        return redirect(url_for("recursos.recurso_comissao_area"))
+
+    presidente_id = request.form.get("presidente_id", "")
+    presidente = (
+        Funcionario.query.filter_by(id=presidente_id, eh_presidencia=True).first()
+        if presidente_id
+        else None
+    )
+    decisao = request.form.get("decisao")
+    justificativa = request.form.get("justificativa", "").strip()
+
+    if not presidente:
+        flash("Selecione quem, da presidência, tomou a decisão.", "danger")
+        return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
+    if decisao not in ("acatado", "nao_acatado") or not justificativa:
+        flash("Escolha manter a decisão do gestor ou alterar a nota, e escreva a justificativa.", "danger")
+        return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
+
+    avaliacao_gestor = _avaliacao_gestor_do_recurso(recurso)
+    if decisao == "acatado":
+        _aplicar_revisao_notas(recurso, avaliacao_gestor, request.form, presidente.id)
+
+    quando = datetime.utcnow()
+    data_hora_bruta = request.form.get("data_hora", "").strip()
+    if data_hora_bruta:
+        try:
+            quando = datetime.strptime(data_hora_bruta, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("Data/hora da decisão inválida — usando o momento atual.", "warning")
+            quando = datetime.utcnow()
+
+    recurso.status = RECURSO_STATUS_ENCERRADO
+    db.session.add(
+        RecursoEvento(
+            recurso_id=recurso.id,
+            tipo="decisao_presidencia",
+            autor_id=presidente.id,
+            decisao=decisao,
+            texto=justificativa,
+            criado_em=quando,
+        )
+    )
+    db.session.commit()
+    resumo_decisao = (
+        "A presidência alterou a sua nota."
+        if decisao == "acatado"
+        else "A presidência manteve a decisão do gestor."
+    )
+    avisar_empregado_recurso_encerrado(recurso, f"{resumo_decisao}\n\nJustificativa:\n{justificativa}")
+    flash("Decisão da presidência registrada. Recurso encerrado.", "success")
+    return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
+
+
 # ---------------------------------------------------------------------------
 # Presidência
 # ---------------------------------------------------------------------------
@@ -745,6 +836,12 @@ def recurso_presidencia_detalhe(recurso_id):
             )
         )
         db.session.commit()
+        resumo_decisao = (
+            "A presidência alterou a sua nota."
+            if decisao == "acatado"
+            else "A presidência manteve a decisão do gestor."
+        )
+        avisar_empregado_recurso_encerrado(recurso, f"{resumo_decisao}\n\nJustificativa:\n{justificativa}")
         flash("Decisão registrada.", "success")
         return redirect(url_for("recursos.recurso_presidencia_area"))
 

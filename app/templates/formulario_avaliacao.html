@@ -94,14 +94,16 @@
         <a class="botao botao-secundario" href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=avaliacao.id) }}">Baixar PDF</a>
     {% endif %}
 
-    <label style="display:flex; align-items:flex-start; gap:8px; font-weight:normal; text-transform:none; margin-top:20px;">
-        <input type="checkbox" name="confirmo_assinatura" value="1" style="width:auto; margin-top:3px;">
-        <span>
-            Confirmo que li e revisei todas as informações acima e que elas são verdadeiras.
-            Esta confirmação funciona como minha <strong>assinatura eletrônica</strong> nesta avaliação
-            (será registrado meu nome e a data/hora).
-        </span>
-    </label>
+    {% if not ja_concluida %}
+        <label style="display:flex; align-items:flex-start; gap:8px; font-weight:normal; text-transform:none; margin-top:20px;">
+            <input type="checkbox" name="confirmo_assinatura" value="1" style="width:auto; margin-top:3px;">
+            <span>
+                Confirmo que li e revisei todas as informações acima e que elas são verdadeiras.
+                Esta confirmação funciona como minha <strong>assinatura eletrônica</strong> nesta avaliação
+                (será registrado meu nome e a data/hora).
+            </span>
+        </label>
+    {% endif %}
 
     <div class="acoes-formulario">
         <button type="submit" name="acao" value="rascunho" class="botao botao-secundario">Salvar rascunho</button>

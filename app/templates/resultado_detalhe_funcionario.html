@@ -83,28 +83,27 @@
             para você dar ciência do recebimento desta avaliação: informe se aceita o
             resultado ou se quer recorrer.
         </p>
-        <div style="display:flex; gap:16px; flex-wrap:wrap;">
-            <form method="post" action="{{ url_for('main.meu_resultado_ciencia', ciclo_id=ciclo.id) }}">
-                <label style="display:flex; align-items:flex-start; gap:8px; font-weight:normal;">
-                    <input type="checkbox" name="ciencia" value="1" required style="margin-top:4px;">
-                    <span>
-                        Declaro ciência de que recebi o resultado desta avaliação de desempenho
-                        referente ao exercício {{ ciclo.exercicio }} e estou satisfeito(a) com o resultado.
-                    </span>
-                </label>
-                <button type="submit" class="botao botao-pequeno" style="margin-top:10px;">
+        <form method="post" action="{{ url_for('main.meu_resultado_ciencia', ciclo_id=ciclo.id) }}">
+            <label style="display:flex; align-items:flex-start; gap:8px; font-weight:normal;">
+                <input type="checkbox" name="ciencia" value="1" required style="margin-top:4px;">
+                <span>
+                    Declaro ciência de que recebi o resultado desta avaliação de desempenho
+                    referente ao exercício {{ ciclo.exercicio }}.
+                </span>
+            </label>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:10px;">
+                <button type="submit" name="decisao" value="aceito" class="botao botao-pequeno">
                     Estou satisfeito(a), aceito o resultado
                 </button>
-            </form>
-            <a class="botao botao-secundario botao-pequeno" style="height:fit-content;"
-               href="{{ url_for('recursos.recurso_area') }}">
-                Não concordo, quero recorrer
-            </a>
-        </div>
+                <button type="submit" name="decisao" value="recorrer" class="botao botao-secundario botao-pequeno">
+                    Não concordo, quero recorrer
+                </button>
+            </div>
+        </form>
     </div>
     <p class="muted" style="margin-top:8px;">
-        O download do PDF e do Excel fica disponível depois que você der ciência acima
-        (aceitando ou abrindo um recurso).
+        O download do PDF e do Excel fica disponível depois que você marcar a ciência acima
+        e escolher uma das duas opções (aceitar ou recorrer).
     </p>
 {% endif %}
 

@@ -672,6 +672,19 @@ form textarea:focus, form input:focus, form select:focus {
     box-shadow: 0 0 0 3px rgba(34, 53, 84, 0.14);
 }
 
+fieldset[disabled] textarea, fieldset[disabled] input[type=text],
+fieldset[disabled] input[type=email], fieldset[disabled] input[type=number],
+fieldset[disabled] input[type=date], fieldset[disabled] select {
+    background: var(--bg);
+    color: var(--texto-muted);
+    cursor: not-allowed;
+}
+
+fieldset[disabled] .botao, fieldset[disabled] button {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

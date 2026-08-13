@@ -94,6 +94,12 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
+                    <p class="flash flash-success" style="display:inline-block; margin-bottom:12px;">
+                        <strong>Resultado final se repassar assim:</strong> {{ r.resultado_atual_em_texto }}
+                        <span class="muted">(era {{ r.resultado_final_em_texto or '-' }})</span>
+                    </p>
+                {% endif %}
             {% else %}
                 <p class="muted" style="margin-bottom:12px;">O gestor marcou "revisar", mas não alterou nenhuma nota — só a justificativa.</p>
             {% endif %}
@@ -144,11 +150,40 @@
         <p><strong>Motivo original:</strong> {{ r.motivo }}</p>
         {% for e in r.eventos %}
             {% if e.tipo == 'resposta_gestor' %}
-                <p><strong>O gestor manteve, justificativa:</strong> {{ e.texto }}</p>
+                <p><strong>O gestor {{ 'REVISOU a nota' if e.decisao == 'revisou' else 'manteve' }}, justificativa:</strong> {{ e.texto }}</p>
             {% elif e.tipo == 'pedido_recorrer' and e.texto %}
                 <p><strong>Empregado, ao recorrer:</strong> {{ e.texto }}</p>
             {% endif %}
         {% endfor %}
+
+        {% set resposta_gestor = r.eventos|selectattr('tipo', 'equalto', 'resposta_gestor')|list|last %}
+        {% if resposta_gestor and resposta_gestor.decisao == 'revisou' %}
+            {% if r.revisoes_notas %}
+                <p class="muted" style="margin-bottom:4px;"><strong>O que o gestor alterou:</strong></p>
+                <table class="tabela" style="margin-bottom:12px;">
+                    <thead>
+                        <tr><th>Fator</th><th class="centro">Nota anterior</th><th class="centro">Nota nova</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for rev in r.revisoes_notas %}
+                            <tr>
+                                <td>{{ rev.fator.nome }}</td>
+                                <td class="centro">{{ rev.nota_anterior if rev.nota_anterior is not none else '-' }}</td>
+                                <td class="centro"><strong>{{ rev.nota_nova }}</strong></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
+                    <p class="flash flash-success" style="display:inline-block; margin-bottom:12px;">
+                        <strong>Resultado final atual:</strong> {{ r.resultado_atual_em_texto }}
+                        <span class="muted">(era {{ r.resultado_final_em_texto or '-' }})</span>
+                    </p>
+                {% endif %}
+            {% else %}
+                <p class="muted" style="margin-bottom:12px;">O gestor marcou "revisar", mas não alterou nenhuma nota — só a justificativa.</p>
+            {% endif %}
+        {% endif %}
         <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar', recurso_id=r.id) }}">
             <label>Comentário/justificativa para a presidência</label>
             <textarea name="comentario" rows="3" required></textarea>
