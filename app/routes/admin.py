@@ -608,6 +608,13 @@ def _linhas_progressao_nivel():
                 decisao_atual = "sim"
             else:
                 decisao_atual = "nao"
+        elif par_fim and not par_ainda_nao_fechou and not par_nao_fechou_com_a:
+            # Par fechou com A nos dois anos e ainda não tem decisão salva —
+            # já vem pré-marcado como "Progressão em {ano}" (em vez de
+            # neutro em "A decidir"), pra reduzir clique manual. Mas só vira
+            # realidade se alguém clicar em "Salvar decisões" — nada muda
+            # sozinho antes disso.
+            decisao_atual = "sim"
         else:
             decisao_atual = "a_decidir"
 
