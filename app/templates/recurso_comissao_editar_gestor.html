@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Editar avaliação do gestor &mdash; recurso{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('recursos.recurso_comissao_detalhe', recurso_id=recurso.id) }}" class="back-link">&larr; Voltar ao recurso</a>
+<h1>Editar avaliação do gestor &mdash; {{ recurso.avaliado.nome }}</h1>
+<p class="muted">
+    Exercício {{ recurso.ciclo.exercicio }} &middot; Isso edita a <strong>avaliação do gestor</strong>
+    (não a autoavaliação do empregado). Ao salvar, o recurso é encerrado com a decisão
+    "presidência alterou a nota".
+</p>
+
+<div class="flash flash-warning" style="margin-bottom:16px;">
+    ⚠️ Essa alteração vale como a decisão final da presidência. Confira com atenção antes de salvar.
+</div>
+
+<form method="post">
+    <h2>Parte I &mdash; Fatores de desempenho</h2>
+    <table class="tabela tabela-formulario">
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Fator</th>
+                <th>Conceito</th>
+                <th>10<br><span class="escala">Supera</span></th>
+                <th>8<br><span class="escala">Desenv. Pleno</span></th>
+                <th>6<br><span class="escala">Em Desenv.</span></th>
+                <th>4<br><span class="escala">A Desenvolver</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fator in formulario.fatores %}
+                <tr>
+                    <td>{{ '%02d' % fator.ordem }}</td>
+                    <td class="fator-nome">{{ fator.nome }}</td>
+                    <td class="fator-descricao">{{ fator.descricao }}</td>
+                    {% for valor in [10, 8, 6, 4] %}
+                        <td class="celula-radio">
+                            <input type="radio"
+                                   name="fator_{{ fator.id }}"
+                                   value="{{ valor }}"
+                                   {% if respostas_salvas.get(fator.id) == valor %}checked{% endif %}
+                                   required>
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Parte II</h2>
+
+    <label for="pontos_fortes">Pontos fortes</label>
+    <textarea id="pontos_fortes" name="pontos_fortes" rows="3" required>{{ avaliacao.pontos_fortes or '' }}</textarea>
+
+    <label for="oportunidades_desenvolvimento">Oportunidade de desenvolvimento</label>
+    <textarea id="oportunidades_desenvolvimento" name="oportunidades_desenvolvimento" rows="3" required>{{ avaliacao.oportunidades_desenvolvimento or '' }}</textarea>
+
+    <div class="grid-2">
+        <div>
+            <label for="plano_acao">Plano de desenvolvimento &mdash; Ação</label>
+            <textarea id="plano_acao" name="plano_acao" rows="4" required
+                      placeholder="Descreva o(s) plano(s) de ação. Para cada um, especifique o prazo (ex: 15 dias, 1 mês, semestral, anual, ou uma data específica).">{{ avaliacao.plano_acao or '' }}</textarea>
+            <p class="muted" style="margin-top:4px; font-size:0.85em;">
+                Se houver mais de um plano de ação, descreva cada um com o respectivo prazo (dias, mês, semestral, anual etc).
+            </p>
+        </div>
+    </div>
+
+    <label for="resultados_alcancados">Resultados alcançados durante o ano</label>
+    <textarea id="resultados_alcancados" name="resultados_alcancados" rows="3" required>{{ avaliacao.resultados_alcancados or '' }}</textarea>
+
+    <h2 style="margin-top:24px;">Decisão da presidência</h2>
+    <label for="presidente_id">Quem, da presidência, decidiu</label>
+    <select id="presidente_id" name="presidente_id" required>
+        <option value="">Selecione...</option>
+        {% for p in presidentes %}
+            <option value="{{ p.id }}">{{ p.nome }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="data_hora" style="margin-top:8px; display:block;">Data/hora da decisão (em branco = agora)</label>
+    <input type="datetime-local" id="data_hora" name="data_hora">
+
+    <label for="justificativa" style="margin-top:8px; display:block;">Justificativa da alteração</label>
+    <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
+
+    <div class="acoes-formulario">
+        <button type="submit" class="botao">Salvar alterações e encerrar o recurso</button>
+    </div>
+</form>
+{% endblock %}

@@ -777,6 +777,84 @@ def recurso_comissao_decidir_presidencia(recurso_id):
     return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
 
 
+@recursos_bp.route("/recurso/<int:recurso_id>/comissao-editar-gestor", methods=["GET", "POST"])
+def recurso_comissao_editar_gestor(recurso_id):
+    """Quando a presidência decide ALTERAR a nota, a Comissão faz isso
+    abrindo o formulário completo da avaliação do GESTOR (não o do
+    empregado) — os mesmos fatores e o mesmo parecer (pontos fortes,
+    oportunidades, plano de ação, resultados alcançados) que o gestor
+    preencheu originalmente, agora editáveis. Ao salvar, registra a
+    justificativa e encerra o recurso."""
+    recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
+    if recurso.status != RECURSO_STATUS_AGUARDANDO_PRESIDENCIA:
+        flash("Esse recurso não está aguardando decisão da presidência.", "warning")
+        return redirect(url_for("recursos.recurso_comissao_area"))
+
+    avaliacao_gestor = _avaliacao_gestor_do_recurso(recurso)
+    if not avaliacao_gestor:
+        flash("Não encontrei a avaliação do gestor para esse recurso.", "danger")
+        return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
+
+    if request.method == "POST":
+        presidente_id = request.form.get("presidente_id", "")
+        presidente = (
+            Funcionario.query.filter_by(id=presidente_id, eh_presidencia=True).first()
+            if presidente_id
+            else None
+        )
+        justificativa = request.form.get("justificativa", "").strip()
+        if not presidente:
+            flash("Selecione quem, da presidência, tomou a decisão.", "danger")
+            return redirect(url_for("recursos.recurso_comissao_editar_gestor", recurso_id=recurso.id))
+        if not justificativa:
+            flash("Escreva a justificativa da alteração.", "danger")
+            return redirect(url_for("recursos.recurso_comissao_editar_gestor", recurso_id=recurso.id))
+
+        _aplicar_revisao_notas(recurso, avaliacao_gestor, request.form, presidente.id)
+        avaliacao_gestor.pontos_fortes = request.form.get("pontos_fortes", "").strip()
+        avaliacao_gestor.oportunidades_desenvolvimento = request.form.get("oportunidades_desenvolvimento", "").strip()
+        avaliacao_gestor.plano_acao = request.form.get("plano_acao", "").strip()
+        avaliacao_gestor.resultados_alcancados = request.form.get("resultados_alcancados", "").strip()
+
+        quando = datetime.utcnow()
+        data_hora_bruta = request.form.get("data_hora", "").strip()
+        if data_hora_bruta:
+            try:
+                quando = datetime.strptime(data_hora_bruta, "%Y-%m-%dT%H:%M")
+            except ValueError:
+                flash("Data/hora da decisão inválida — usando o momento atual.", "warning")
+                quando = datetime.utcnow()
+
+        recurso.status = RECURSO_STATUS_ENCERRADO
+        db.session.add(
+            RecursoEvento(
+                recurso_id=recurso.id,
+                tipo="decisao_presidencia",
+                autor_id=presidente.id,
+                decisao="acatado",
+                texto=justificativa,
+                criado_em=quando,
+            )
+        )
+        db.session.commit()
+        avisar_empregado_recurso_encerrado(
+            recurso, f"A presidência alterou a sua nota.\n\nJustificativa:\n{justificativa}"
+        )
+        flash("Avaliação do gestor atualizada e recurso encerrado.", "success")
+        return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
+
+    presidentes = Funcionario.query.filter_by(eh_presidencia=True, ativo=True).order_by(Funcionario.nome).all()
+    respostas_atuais = {r.fator_id: r.pontuacao for r in avaliacao_gestor.respostas}
+    return render_template(
+        "recurso_comissao_editar_gestor.html",
+        recurso=recurso,
+        avaliacao=avaliacao_gestor,
+        formulario=avaliacao_gestor.formulario,
+        respostas_salvas=respostas_atuais,
+        presidentes=presidentes,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Presidência
 # ---------------------------------------------------------------------------

@@ -47,54 +47,41 @@
         <h2 style="font-size:1.05rem;">Registrar decisão da presidência</h2>
         <p class="muted">
             A decisão costuma sair de uma conversa direta entre a Comissão e a
-            presidência. Registre aqui o resultado dessa decisão &mdash; se
-            possível, ainda no dia em que ela foi tomada. Isso encerra o recurso.
+            presidência. Registre aqui o resultado &mdash; se possível, ainda
+            no dia em que ela foi tomada. Isso encerra o recurso.
         </p>
-        <form method="post" action="{{ url_for('recursos.recurso_comissao_decidir_presidencia', recurso_id=recurso.id) }}">
-            <label for="presidente_id">Quem, da presidência, decidiu</label>
-            <select id="presidente_id" name="presidente_id" required>
-                <option value="">Selecione...</option>
-                {% for p in presidentes %}
-                    <option value="{{ p.id }}">{{ p.nome }}</option>
-                {% endfor %}
-            </select>
 
-            <label for="data_hora" style="margin-top:8px; display:block;">Data/hora da decisão (deixe em branco para usar agora)</label>
-            <input type="datetime-local" id="data_hora" name="data_hora">
-
-            <div style="margin-top:12px;">
-                <label><input type="radio" name="decisao" value="nao_acatado" required> Manter a decisão do gestor (não acatar)</label><br>
-                <label><input type="radio" name="decisao" value="acatado" required> Alterar a nota do colaborador (acatar)</label>
-            </div>
-
-            <table class="tabela tabela-formulario" style="margin-top:12px;">
-                <thead>
-                    <tr>
-                        <th>Fator</th>
-                        <th>10</th><th>8</th><th>6</th><th>4</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for fator in dados.fatores %}
-                        <tr>
-                            <td>{{ fator.nome }}</td>
-                            {% for valor in [10, 8, 6, 4] %}
-                                <td class="celula-radio">
-                                    <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
-                                           {% if dados.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
-                                </td>
-                            {% endfor %}
-                        </tr>
+        <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+            <form method="post" action="{{ url_for('recursos.recurso_comissao_decidir_presidencia', recurso_id=recurso.id) }}"
+                  style="flex:1; min-width:280px; border:1px solid var(--border); border-radius:10px; padding:16px;">
+                <input type="hidden" name="decisao" value="nao_acatado">
+                <p style="margin-top:0;"><strong>Manter a decisão do gestor</strong></p>
+                <label for="presidente_id_manter">Quem, da presidência, decidiu</label>
+                <select id="presidente_id_manter" name="presidente_id" required>
+                    <option value="">Selecione...</option>
+                    {% for p in presidentes %}
+                        <option value="{{ p.id }}">{{ p.nome }}</option>
                     {% endfor %}
-                </tbody>
-            </table>
-            <p class="muted">As notas acima só valem se marcar "Alterar a nota". Se marcar "Manter", elas são ignoradas.</p>
+                </select>
+                <label for="data_hora_manter" style="margin-top:8px; display:block;">Data/hora da decisão (em branco = agora)</label>
+                <input type="datetime-local" id="data_hora_manter" name="data_hora">
+                <label for="justificativa_manter" style="margin-top:8px; display:block;">Justificativa</label>
+                <textarea id="justificativa_manter" name="justificativa" rows="4" required></textarea>
+                <button type="submit" class="botao botao-secundario" style="margin-top:12px;">Manter e encerrar recurso</button>
+            </form>
 
-            <label for="justificativa" style="margin-top:8px; display:block;">Justificativa (obrigatória nos dois casos)</label>
-            <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
-
-            <button type="submit" class="botao" style="margin-top:12px;">Registrar decisão e encerrar recurso</button>
-        </form>
+            <div style="flex:1; min-width:280px; border:1px solid var(--border); border-radius:10px; padding:16px;">
+                <p style="margin-top:0;"><strong>Alterar a nota do colaborador</strong></p>
+                <p class="muted">
+                    Abre o formulário completo da avaliação do <strong>gestor</strong> (fatores e
+                    parecer), pra editar exatamente como ele foi preenchido originalmente.
+                    Depois de editar, você registra a justificativa e o recurso é encerrado.
+                </p>
+                <a class="botao" href="{{ url_for('recursos.recurso_comissao_editar_gestor', recurso_id=recurso.id) }}">
+                    Abrir avaliação do gestor para editar
+                </a>
+            </div>
+        </div>
     </div>
 {% endif %}
 
