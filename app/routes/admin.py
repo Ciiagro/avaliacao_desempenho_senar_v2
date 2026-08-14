@@ -1431,6 +1431,7 @@ def editar_funcionario(funcionario_id):
         sexo = request.form.get("sexo") or None
         data_nascimento_raw = request.form.get("data_nascimento") or None
         data_admissao_raw = request.form.get("data_admissao") or None
+        data_demissao_raw = request.form.get("data_demissao") or None
         salario_raw = request.form.get("salario", "").strip()
         elegivel_raw = request.form.get("elegivel_avaliacao", "auto")
         elegivel_avaliacao = {"sim": True, "nao": False}.get(elegivel_raw)  # None se "auto"
@@ -1450,6 +1451,14 @@ def editar_funcionario(funcionario_id):
                 data_admissao = datetime.strptime(data_admissao_raw, "%Y-%m-%d").date()
             except ValueError:
                 flash("Data de admissão inválida.", "danger")
+                return redirect(url_for("admin.editar_funcionario", funcionario_id=funcionario_id))
+
+        data_demissao = None
+        if data_demissao_raw:
+            try:
+                data_demissao = datetime.strptime(data_demissao_raw, "%Y-%m-%d").date()
+            except ValueError:
+                flash("Data de demissão inválida.", "danger")
                 return redirect(url_for("admin.editar_funcionario", funcionario_id=funcionario_id))
 
         salario = None
@@ -1482,6 +1491,7 @@ def editar_funcionario(funcionario_id):
         funcionario.cpf = cpf
         funcionario.data_nascimento = data_nascimento
         funcionario.data_admissao = data_admissao
+        funcionario.data_demissao = data_demissao
         funcionario.sexo = sexo
         funcionario.salario = salario
         funcionario.elegivel_avaliacao = elegivel_avaliacao

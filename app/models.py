@@ -40,6 +40,7 @@ class Funcionario(db.Model):
     cpf = db.Column(db.Text, unique=True)
     data_nascimento = db.Column(db.Date)
     data_admissao = db.Column(db.Date)
+    data_demissao = db.Column(db.Date)
     sexo = db.Column(db.Text)
     salario = db.Column(db.Numeric(12, 2))
     cargo_id = db.Column(db.Integer, db.ForeignKey("cargos.id"))
@@ -289,6 +290,8 @@ class RecursoAvaliacao(db.Model):
     status = db.Column(db.Text, nullable=False, default=RECURSO_STATUS_AGUARDANDO_GESTOR)
     resultado_final_em_texto = db.Column(db.Text)
     criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    ciente_funcionario = db.Column(db.Boolean, nullable=False, default=False)
+    ciente_funcionario_em = db.Column(db.DateTime(timezone=True))
 
     ciclo = db.relationship("CicloAvaliacao")
     avaliado = db.relationship("Funcionario", foreign_keys=[avaliado_id])

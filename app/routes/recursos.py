@@ -239,6 +239,10 @@ def recurso_area():
             e for e in r.eventos if not (e.tipo == "resposta_gestor" and not liberado)
         ]
         r.pode_recorrer = _recurso_pode_recorrer_a_presidencia(r)
+        # Só mostra a nota recalculada pro empregado depois que a resposta
+        # do gestor já foi liberada pra ele ver (mesma regra acima) — antes
+        # disso ele não deveria enxergar o que o gestor decidiu.
+        r.resultado_atual_em_texto = _resultado_atual_texto(r) if liberado else None
 
     return render_template(
         "recurso_funcionario.html",
@@ -365,6 +369,30 @@ def recorrer_recurso(recurso_id):
     db.session.commit()
     avisar_comissao_empregado_recorreu(recurso)
     flash("Pedido enviado para a Comissão encaminhar à presidência.", "success")
+    return redirect(url_for("recursos.recurso_area"))
+
+
+@recursos_bp.route("/recurso/<int:recurso_id>/ciencia", methods=["POST"])
+def recurso_dar_ciencia(recurso_id):
+    """Depois que o recurso é encerrado pela decisão da presidência (mantida
+    ou com a nota alterada), o empregado precisa dar ciência de que tomou
+    conhecimento — fica registrado com data/hora, igual à ciência do
+    resultado final."""
+    funcionario = _funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+
+    recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
+    if str(recurso.avaliado_id) != str(funcionario.id) or recurso.status != RECURSO_STATUS_ENCERRADO:
+        flash("Essa ação não está disponível para esse recurso.", "danger")
+        return redirect(url_for("recursos.recurso_area"))
+
+    if not recurso.ciente_funcionario:
+        recurso.ciente_funcionario = True
+        recurso.ciente_funcionario_em = datetime.utcnow()
+        db.session.commit()
+
+    flash("Ciência registrada.", "success")
     return redirect(url_for("recursos.recurso_area"))
 
 

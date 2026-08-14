@@ -5,3 +5,4 @@ __pycache__/
 .vercel
 email cadastrado.txt
 senha.txt
+*.dump

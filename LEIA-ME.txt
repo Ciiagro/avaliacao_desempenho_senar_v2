@@ -49,3 +49,7 @@ ser corrigido.
 git add .
 git commit -m "descrição da mudança"
 git push
+
+
+export PGPASSWORD="SUA_SENHA_AQUI"
+"/c/Program Files/PostgreSQL/17/bin/pg_dump.exe" -h aws-0-sa-east-1.pooler.supabase.com -p 5432 -U postgres.rtygcapxhlnikbuxsvpk -d postgres -F c -f backup_avaliacao_$(date +%Y%m%d).dump

@@ -56,6 +56,13 @@
             {% endif %}
         </p>
 
+        {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
+            <p class="flash flash-success" style="display:inline-block;">
+                <strong>Nota atual, com a resposta do gestor:</strong> {{ r.resultado_atual_em_texto }}
+                <span class="muted">(era {{ r.resultado_final_em_texto or '-' }} quando você abriu o recurso)</span>
+            </p>
+        {% endif %}
+
         <div class="linha-tempo">
             {% for e in r.eventos_visiveis %}
                 <p class="muted" style="margin:4px 0;">
@@ -100,6 +107,25 @@
                     </p>
                 {% endif %}
             </div>
+        {% endif %}
+
+        {% if r.status == 'encerrado' and r.eventos|selectattr('tipo', 'equalto', 'decisao_presidencia')|list %}
+            {% if r.ciente_funcionario %}
+                <p class="muted" style="margin-top:12px;">
+                    ✅ Você deu ciência dessa decisão em
+                    {{ (r.ciente_funcionario_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if r.ciente_funcionario_em else '' }}.
+                </p>
+            {% else %}
+                <div class="flash flash-warning" style="margin-top:12px;">
+                    <p style="margin:0 0 10px;">
+                        Seu recurso foi encerrado com a decisão final da presidência.
+                        Dê ciência de que você tomou conhecimento.
+                    </p>
+                    <form method="post" action="{{ url_for('recursos.recurso_dar_ciencia', recurso_id=r.id) }}">
+                        <button type="submit" class="botao">Dar ciência da decisão</button>
+                    </form>
+                </div>
+            {% endif %}
         {% endif %}
     </div>
 {% endfor %}
