@@ -5,6 +5,21 @@
 <a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
 <h1>Funcionários</h1>
 
+<div class="cards-resumo-funcionarios">
+    <div class="card-resumo">
+        <span class="card-resumo-numero">{{ total_ativos + total_inativos }}</span>
+        <span class="card-resumo-label">Total{% if setor_filtro %} em {{ setor_filtro.nome }}{% endif %}</span>
+    </div>
+    <div class="card-resumo card-resumo-ok">
+        <span class="card-resumo-numero">{{ total_ativos }}</span>
+        <span class="card-resumo-label">Ativos</span>
+    </div>
+    <div class="card-resumo card-resumo-danger">
+        <span class="card-resumo-numero">{{ total_inativos }}</span>
+        <span class="card-resumo-label">Inativos</span>
+    </div>
+</div>
+
 <h2>Cadastrar um funcionário</h2>
 {% if not setores %}
     <p class="flash flash-warning">

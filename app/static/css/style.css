@@ -627,6 +627,31 @@ a { color: var(--navy-700); }
 /* nome + cargo/setor compactos na tabela de funcionários */
 .funcionario-nome { font-weight: 600; color: var(--texto); display: flex; align-items: center; gap: 8px; }
 .linha-inativa { opacity: 0.6; }
+
+.cards-resumo-funcionarios {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 16px 0 24px;
+}
+.card-resumo {
+    flex: 1;
+    min-width: 130px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--navy-700);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.card-resumo-numero { font-size: 1.9rem; font-weight: 700; color: var(--texto); line-height: 1.1; }
+.card-resumo-label { font-size: 0.8rem; color: var(--texto-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.card-resumo-ok { border-left-color: var(--sucesso); }
+.card-resumo-ok .card-resumo-numero { color: var(--sucesso); }
+.card-resumo-danger { border-left-color: var(--perigo); }
+.card-resumo-danger .card-resumo-numero { color: var(--perigo); }
 .funcionario-subinfo {
     font-size: 0.76rem;
     margin-top: 2px;

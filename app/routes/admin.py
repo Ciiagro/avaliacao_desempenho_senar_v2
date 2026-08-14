@@ -1296,6 +1296,16 @@ def funcionarios():
     if setor_id_filtro:
         setor_filtro = Setor.query.get(int(setor_id_filtro))
         consulta = consulta.filter_by(setor_id=setor_id_filtro)
+
+    # Contagens pro card de resumo — respeitam o filtro de setor (se houver),
+    # mas mostram os três números lado a lado independente de qual status
+    # está selecionado no momento.
+    consulta_base_contagem = Funcionario.query
+    if setor_id_filtro:
+        consulta_base_contagem = consulta_base_contagem.filter_by(setor_id=setor_id_filtro)
+    total_ativos = consulta_base_contagem.filter_by(ativo=True).count()
+    total_inativos = consulta_base_contagem.filter_by(ativo=False).count()
+
     if status_filtro == "ativos":
         consulta = consulta.filter_by(ativo=True)
     elif status_filtro == "inativos":
@@ -1308,6 +1318,8 @@ def funcionarios():
     return render_template(
         "admin/funcionarios.html",
         lista=lista,
+        total_ativos=total_ativos,
+        total_inativos=total_inativos,
         cargos=cargos,
         setores=setores,
         niveis=NIVEIS_HIERARQUICOS,
