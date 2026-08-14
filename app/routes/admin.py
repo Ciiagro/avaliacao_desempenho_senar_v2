@@ -559,8 +559,9 @@ def proximo_nivel(nivel_atual):
     return nivel_atual
 
 
-@admin_bp.route("/progressao-nivel")
-def progressao_nivel():
+def _linhas_progressao_nivel():
+    """Monta as linhas de Progressão de Nível (mesmo cálculo usado na tela
+    e na exportação pra Excel, pra nunca ficarem divergentes)."""
     ano_atual = datetime.now().year
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     dados = carregar_dados_progressao()
@@ -653,7 +654,78 @@ def progressao_nivel():
                 "par_nao_fechou_com_a": par_nao_fechou_com_a,
             }
         )
+    return linhas
+
+
+@admin_bp.route("/progressao-nivel")
+def progressao_nivel():
+    linhas = _linhas_progressao_nivel()
     return render_template("admin/progressao_nivel.html", linhas=linhas)
+
+
+@admin_bp.route("/progressao-nivel/exportar")
+def exportar_progressao_nivel():
+    """Exporta a tabela de Progressão de Nível pra Excel: notas de 2023,
+    2024, 2025, o par de anos que vale pra cada pessoa, e a decisão/situação
+    atual — pra dar pra ver e conferir fora do sistema."""
+    linhas = _linhas_progressao_nivel()
+
+    rotulo_decisao = {
+        "sim": "Sim, sobe",
+        "nao": "Não sobe",
+        "a_decidir": "A decidir",
+    }
+
+    def par_texto(l):
+        if l["par_inicio"] and l["par_fim"]:
+            return f"{l['par_inicio']}-{l['par_fim']}"
+        return "-"
+
+    def decisao_texto(l):
+        if l["rotulo_bloqueado"]:
+            return l["rotulo_bloqueado"]
+        if l["par_ainda_nao_fechou"]:
+            return "Par ainda não fechou"
+        return rotulo_decisao.get(l["decisao_atual"], "-")
+
+    df = pd.DataFrame(
+        [
+            {
+                "nome": l["funcionario"].nome,
+                "nivel_hierarquico": l["funcionario"].nivel_hierarquico or "-",
+                "nota_2023": l["nota_2023"] if l["nota_2023"] is not None else "-",
+                "nota_2024": l["nota_2024"] if l["nota_2024"] is not None else "-",
+                "nota_2025": l["nota_2025"] if l["nota_2025"] is not None else "-",
+                "par": par_texto(l),
+                "ano_da_decisao": l["ano_decisao"] or "-",
+                "decisao_situacao": decisao_texto(l),
+            }
+            for l in linhas
+        ]
+    )
+    if df.empty:
+        df = pd.DataFrame(
+            columns=[
+                "nome", "nivel_hierarquico", "nota_2023", "nota_2024", "nota_2025",
+                "par", "ano_da_decisao", "decisao_situacao",
+            ]
+        )
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Progressao de Nivel")
+        planilha = writer.sheets["Progressao de Nivel"]
+        larguras = {"A": 34, "B": 18, "C": 11, "D": 11, "E": 11, "F": 11, "G": 15, "H": 26}
+        for coluna, largura in larguras.items():
+            planilha.column_dimensions[coluna].width = largura
+    buffer.seek(0)
+
+    nome_arquivo = f"progressao_nivel_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return Response(
+        buffer.read(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome_arquivo}"},
+    )
 
 
 @admin_bp.route("/progressao-nivel/decisoes-2026", methods=["POST"])

@@ -25,6 +25,7 @@
                  linha.style.display = nome.indexOf(termo) === -1 ? 'none' : '';
              });
            ">
+    <a href="{{ url_for('admin.exportar_progressao_nivel') }}" class="botao botao-secundario">Exportar para Excel</a>
 </div>
 
 {% macro opcoes_exclusao() %}
