@@ -652,6 +652,19 @@ a { color: var(--navy-700); }
 .card-resumo-ok .card-resumo-numero { color: var(--sucesso); }
 .card-resumo-danger { border-left-color: var(--perigo); }
 .card-resumo-danger .card-resumo-numero { color: var(--perigo); }
+
+.linha-chance-ano { background: var(--aviso-bg) !important; }
+.badge-destaque {
+    display: inline-block;
+    margin-left: 6px;
+    background: var(--gold);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    vertical-align: middle;
+}
 .funcionario-subinfo {
     font-size: 0.76rem;
     margin-top: 2px;

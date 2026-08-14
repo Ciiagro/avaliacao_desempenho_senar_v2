@@ -640,6 +640,17 @@ def _linhas_progressao_nivel():
         else:
             rotulo_bloqueado = None
 
+        # Chance real de subir NESTE ano — o par dela fecha (2º ano) neste
+        # ciclo, ainda não tem decisão registrada, e não está travada por
+        # nenhum motivo (topo, excluída etc). É diferente de "Sem
+        # progressão" genérico, que também cobre pares bem mais distantes.
+        decide_esse_ano = (
+            not rotulo_bloqueado
+            and not progressao_existente
+            and not par_nao_fechou_com_a
+            and ano_decisao == ano_atual
+        )
+
         linhas.append(
             {
                 "funcionario": funcionario,
@@ -659,6 +670,7 @@ def _linhas_progressao_nivel():
                 "decisao_atual": decisao_atual,
                 "par_ainda_nao_fechou": par_ainda_nao_fechou,
                 "par_nao_fechou_com_a": par_nao_fechou_com_a,
+                "decide_esse_ano": decide_esse_ano,
             }
         )
     return linhas
@@ -706,6 +718,7 @@ def exportar_progressao_nivel():
                 "par": par_texto(l),
                 "ano_da_decisao": l["ano_decisao"] or "-",
                 "decisao_situacao": decisao_texto(l),
+                "chance_de_subir_este_ano": "Sim" if l["decide_esse_ano"] else "-",
             }
             for l in linhas
         ]
@@ -714,7 +727,7 @@ def exportar_progressao_nivel():
         df = pd.DataFrame(
             columns=[
                 "nome", "nivel_hierarquico", "nota_2023", "nota_2024", "nota_2025",
-                "par", "ano_da_decisao", "decisao_situacao",
+                "par", "ano_da_decisao", "decisao_situacao", "chance_de_subir_este_ano",
             ]
         )
 
@@ -722,7 +735,7 @@ def exportar_progressao_nivel():
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Progressao de Nivel")
         planilha = writer.sheets["Progressao de Nivel"]
-        larguras = {"A": 34, "B": 18, "C": 11, "D": 11, "E": 11, "F": 11, "G": 15, "H": 26}
+        larguras = {"A": 34, "B": 18, "C": 11, "D": 11, "E": 11, "F": 11, "G": 15, "H": 26, "I": 22}
         for coluna, largura in larguras.items():
             planilha.column_dimensions[coluna].width = largura
     buffer.seek(0)

@@ -34,6 +34,13 @@
 {% endmacro %}
 
 <form method="post" action="{{ url_for('admin.salvar_decisoes_2026') }}">
+{% set total_chance_esse_ano = linhas|selectattr('decide_esse_ano')|list|length %}
+{% if total_chance_esse_ano %}
+    <p class="flash flash-warning" style="display:inline-block; margin-bottom:12px;">
+        ⭐ <strong>{{ total_chance_esse_ano }}</strong> pessoa{{ 's' if total_chance_esse_ano != 1 else '' }}
+        com chance real de progredir este ano — destacada{{ 's' if total_chance_esse_ano != 1 else '' }} na tabela abaixo.
+    </p>
+{% endif %}
 <table class="tabela" id="tabela-progressao">
     <thead>
         <tr>
@@ -48,8 +55,11 @@
     </thead>
     <tbody>
         {% for linha in linhas %}
-            <tr data-nome="{{ linha.funcionario.nome|lower }}">
-                <td>{{ linha.funcionario.nome }}</td>
+            <tr data-nome="{{ linha.funcionario.nome|lower }}" {% if linha.decide_esse_ano %}class="linha-chance-ano"{% endif %}>
+                <td>
+                    {{ linha.funcionario.nome }}
+                    {% if linha.decide_esse_ano %}<span class="badge badge-destaque" title="Decisão acontece este ano">⭐ Este ano</span>{% endif %}
+                </td>
                 <td>{{ "%.2f"|format(linha.nota_2023) if linha.nota_2023 is not none else "—" }}</td>
                 <td>{{ "%.2f"|format(linha.nota_2024) if linha.nota_2024 is not none else "—" }}</td>
                 <td>{{ "%.2f"|format(linha.nota_2025) if linha.nota_2025 is not none else "—" }}</td>
