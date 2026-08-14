@@ -1290,11 +1290,17 @@ def funcionarios():
         return redirect(url_for("admin.funcionarios"))
 
     setor_id_filtro = request.args.get("setor_id")
+    status_filtro = request.args.get("status", "ativos")  # ativos (padrão) | inativos | todos
     consulta = Funcionario.query
     setor_filtro = None
     if setor_id_filtro:
         setor_filtro = Setor.query.get(int(setor_id_filtro))
         consulta = consulta.filter_by(setor_id=setor_id_filtro)
+    if status_filtro == "ativos":
+        consulta = consulta.filter_by(ativo=True)
+    elif status_filtro == "inativos":
+        consulta = consulta.filter_by(ativo=False)
+    # "todos" não filtra por status
 
     lista = consulta.order_by(Funcionario.nome).all()
     cargos = Cargo.query.order_by(Cargo.nome).all()
@@ -1307,6 +1313,7 @@ def funcionarios():
         niveis=NIVEIS_HIERARQUICOS,
         opcoes_sexo=OPCOES_SEXO,
         setor_filtro=setor_filtro,
+        status_filtro=status_filtro,
     )
 
 

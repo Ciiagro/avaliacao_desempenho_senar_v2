@@ -80,6 +80,14 @@
 
 <div class="tabela-toolbar">
     <input type="search" id="busca-funcionario" placeholder="Buscar por nome, cargo ou setor...">
+    <div class="filtros-andamento">
+        <a href="{{ url_for('admin.funcionarios', status='ativos', setor_id=setor_filtro.id if setor_filtro else None) }}"
+           class="botao-filtro {% if status_filtro == 'ativos' %}ativo{% endif %}">Só ativos</a>
+        <a href="{{ url_for('admin.funcionarios', status='inativos', setor_id=setor_filtro.id if setor_filtro else None) }}"
+           class="botao-filtro {% if status_filtro == 'inativos' %}ativo{% endif %}">Inativos</a>
+        <a href="{{ url_for('admin.funcionarios', status='todos', setor_id=setor_filtro.id if setor_filtro else None) }}"
+           class="botao-filtro {% if status_filtro == 'todos' %}ativo{% endif %}">Todos</a>
+    </div>
     <button type="button" id="botao-sensiveis" class="botao botao-secundario">Mostrar dados sensíveis</button>
     <a href="{{ url_for('admin.exportar_funcionarios') }}" class="botao">Exportar para Excel</a>
 </div>
@@ -102,15 +110,21 @@
         </thead>
         <tbody>
             {% for f in lista %}
-                <tr class="linha-funcionario" data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else ''))|lower }}">
+                <tr class="linha-funcionario {% if not f.ativo %}linha-inativa{% endif %}" data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else ''))|lower }}">
                     <td>
-                        <div class="funcionario-nome">{{ f.nome }}</div>
+                        <div class="funcionario-nome">
+                            {{ f.nome }}
+                            {% if not f.ativo %}<span class="badge badge-danger">Inativo</span>{% endif %}
+                        </div>
                         <div class="funcionario-subinfo muted">
                             {{ f.cargo.nome if f.cargo else 'Sem cargo' }}
                             {% if f.matricula %} &middot; Mat.: {{ f.matricula }}{% endif %}
                         </div>
                         <div class="funcionario-subinfo muted">{{ f.setor.nome if f.setor else 'Sem setor' }}</div>
                         <div class="funcionario-subinfo muted">Adm.: {{ f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '-' }}</div>
+                        {% if not f.ativo and f.data_demissao %}
+                            <div class="funcionario-subinfo muted">Demissão: {{ f.data_demissao.strftime('%d/%m/%Y') }}</div>
+                        {% endif %}
                     </td>
                     <td>
                         {% if f.nivel_hierarquico %}
