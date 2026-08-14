@@ -685,7 +685,7 @@ def exportar_progressao_nivel():
         if l["rotulo_bloqueado"]:
             return l["rotulo_bloqueado"]
         if l["par_ainda_nao_fechou"]:
-            return "Par ainda não fechou"
+            return "Sem progressão"
         return rotulo_decisao.get(l["decisao_atual"], "-")
 
     df = pd.DataFrame(

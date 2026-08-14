@@ -88,7 +88,7 @@
                                     {{ opcoes_exclusao() }}
                                 {% else %}
                                     {% if linha.par_ainda_nao_fechou %}
-                                        <option value="a_decidir" selected>Sem progressão (aguardando avaliação de {{ linha.par_fim }})</option>
+                                        <option value="a_decidir" selected>Sem progressão</option>
                                     {% elif linha.par_nao_fechou_com_a %}
                                         <option value="a_decidir" selected>Não elegível (automático)</option>
                                     {% else %}
