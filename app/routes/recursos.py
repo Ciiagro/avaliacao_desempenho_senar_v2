@@ -349,13 +349,17 @@ def recorrer_recurso(recurso_id):
         return redirect(url_for("recursos.recurso_area"))
 
     justificativa = request.form.get("justificativa", "").strip()
+    if not justificativa:
+        flash("Escreva por que você ainda não concorda antes de recorrer à presidência.", "warning")
+        return redirect(url_for("recursos.recurso_area"))
+
     recurso.status = RECURSO_STATUS_AGUARDANDO_COMISSAO_RECURSO
     db.session.add(
         RecursoEvento(
             recurso_id=recurso.id,
             tipo="pedido_recorrer",
             autor_id=funcionario.id,
-            texto=justificativa or None,
+            texto=justificativa,
         )
     )
     db.session.commit()

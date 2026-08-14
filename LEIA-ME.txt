@@ -44,3 +44,8 @@ Substitua estes arquivos:
 Reinicie o servidor. NÃO precisa rodar SQL — só foram adicionados dois
 status novos ao mesmo campo que já existia, nenhum dado antigo precisa
 ser corrigido.
+
+
+git add .
+git commit -m "descrição da mudança"
+git push
