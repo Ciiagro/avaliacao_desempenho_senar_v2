@@ -416,6 +416,7 @@ class Progressao(db.Model):
     efetivada_em_exercicio = db.Column(db.Integer, nullable=False)
     nivel_anterior = db.Column(db.Text)
     nivel_novo = db.Column(db.Text)
+    subiu = db.Column(db.Boolean)
     decidido_por = db.Column(db.Text)
     decidido_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
 

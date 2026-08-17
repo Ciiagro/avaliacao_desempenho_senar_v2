@@ -142,7 +142,8 @@
                 <td>{{ p.nivel_anterior }}</td>
                 <td>{{ p.nivel_novo }}</td>
                 <td>
-                    {% if p.nivel_anterior != p.nivel_novo %}
+                    {% set subiu = p.subiu if p.subiu is not none else (p.nivel_anterior != p.nivel_novo) %}
+                    {% if subiu %}
                         <span class="badge badge-ok">Subiu</span>
                     {% else %}
                         <span class="badge badge-new">Não subiu</span>

@@ -547,10 +547,13 @@ def montar_resumo_progressao(situacao, no_topo, atrasada):
 
 
 def esta_no_nivel_maximo(funcionario):
-    """Quem já está no último nível hierárquico (Superintendente, hoje) não
-    tem pra onde progredir, mesmo que bata a régua do A/A — a régua não
-    sabe disso sozinha, então essa checagem fica aqui, fora dela."""
-    return funcionario.nivel_hierarquico == NIVEIS_HIERARQUICOS[-1]
+    """Decisão do cliente: 'Superintendente' NÃO trava progressão, mesmo
+    sendo o último nível_hierárquico cadastrado (usado só pra escolher o
+    formulário de avaliação). Existe cargo acima na empresa (Presidente),
+    mas ele não entra nessa lista de propósito — não é uma etapa que o
+    sistema formaliza. Por isso essa checagem sempre devolve False agora;
+    a função continua existindo só pra não precisar mudar quem já chama."""
+    return False
 
 
 def proximo_nivel(nivel_atual):
@@ -604,7 +607,9 @@ def _linhas_progressao_nivel():
         )
 
         if progressao_existente:
-            if progressao_existente.nivel_anterior != progressao_existente.nivel_novo:
+            if progressao_existente.subiu is not None:
+                decisao_atual = "sim" if progressao_existente.subiu else "nao"
+            elif progressao_existente.nivel_anterior != progressao_existente.nivel_novo:
                 decisao_atual = "sim"
             else:
                 decisao_atual = "nao"
@@ -806,12 +811,14 @@ def salvar_decisoes_2026():
             progressao.efetivada_em_exercicio = ano_decisao
             progressao.nivel_anterior = nivel_atual
             progressao.nivel_novo = proximo_nivel(nivel_atual)
+            progressao.subiu = True
             progressao.decidido_por = "Administração"
             funcionario.nivel_hierarquico = progressao.nivel_novo
         elif decisao == "nao":
             progressao.efetivada_em_exercicio = ano_decisao
             progressao.nivel_anterior = nivel_atual
             progressao.nivel_novo = nivel_atual
+            progressao.subiu = False
             progressao.decidido_por = "Administração"
         alterados += 1
 
@@ -1149,14 +1156,6 @@ def efetivar_progressao(funcionario_id):
         flash("Este funcionário não está elegível para progressão no momento.", "danger")
         return redirect(url_for("admin.progressao_nivel_detalhe", funcionario_id=funcionario.id))
 
-    if esta_no_nivel_maximo(funcionario):
-        flash(
-            f"{funcionario.nome} já está no nível hierárquico máximo "
-            f"({NIVEIS_HIERARQUICOS[-1]}) — não há próximo nível para progredir.",
-            "warning",
-        )
-        return redirect(url_for("admin.progressao_nivel_detalhe", funcionario_id=funcionario.id))
-
     nivel_anterior = funcionario.nivel_hierarquico
     nivel_novo = request.form.get("nivel_novo") or nivel_anterior
 
@@ -1167,6 +1166,7 @@ def efetivar_progressao(funcionario_id):
         efetivada_em_exercicio=situacao["exercicio_efetivacao"],
         nivel_anterior=nivel_anterior,
         nivel_novo=nivel_novo,
+        subiu=True,
         decidido_por="Administração",
     )
     db.session.add(progressao)
@@ -1197,6 +1197,7 @@ def marcar_nao_efetivada(funcionario_id):
         efetivada_em_exercicio=situacao["exercicio_efetivacao"],
         nivel_anterior=funcionario.nivel_hierarquico,
         nivel_novo=funcionario.nivel_hierarquico,
+        subiu=False,
         decidido_por="Administração (decidiu não promover)",
     )
     db.session.add(progressao)
@@ -1242,6 +1243,7 @@ def registrar_progressao_retroativa(funcionario_id):
         efetivada_em_exercicio=efetivada_em_exercicio,
         nivel_anterior=nivel_anterior,
         nivel_novo=nivel_novo,
+        subiu=(nivel_anterior != nivel_novo),
         decidido_por="Administração (registro retroativo)",
     )
     db.session.add(progressao)
