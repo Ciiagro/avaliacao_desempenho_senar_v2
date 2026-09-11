@@ -31,7 +31,11 @@ usado atualmente em papel/Word.
      aos funcionários; já vem com alguns setores de exemplo — edite/apague
      conforme a estrutura real da empresa)
 3. Vá em **Project Settings → Database → Connection string → URI** e copie
-   a connection string (prefira o modo "Session pooling").
+   a connection string. Como o projeto roda no Vercel (serverless), use o
+   modo **"Transaction Pooling"** (porta `6543`), não o "Session pooling" —
+   em serverless cada request pode subir uma função nova, então o modo
+   transaction evita abrir conexão nova toda hora e reduz o consumo de
+   egress/conexões no Supabase.
 
 ## 2. Configurar o projeto local
 

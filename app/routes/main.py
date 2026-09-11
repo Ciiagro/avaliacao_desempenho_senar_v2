@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, g
 
 from ..extensions import db
 from ..models import Funcionario, VinculoAvaliacao, CicloAvaliacao, Avaliacao, ResultadoFinal
@@ -28,11 +28,18 @@ def ciclo_ativo():
 
 
 def funcionario_logado():
-    """Retorna o Funcionario logado (via /login) ou None."""
-    funcionario_id = session.get("funcionario_id")
-    if not funcionario_id:
-        return None
-    return Funcionario.query.get(funcionario_id)
+    """Retorna o Funcionario logado (via /login) ou None.
+
+    Cacheado em `g` (memória do próprio request) porque isto é chamado
+    várias vezes na mesma página: uma vez pelo context_processor (que roda
+    em toda página do site) e de novo dentro de várias rotas. Sem o cache,
+    cada chamada repetia a mesma consulta ao banco dentro do mesmo request."""
+    if not hasattr(g, "_funcionario_logado_cache"):
+        funcionario_id = session.get("funcionario_id")
+        g._funcionario_logado_cache = (
+            Funcionario.query.get(funcionario_id) if funcionario_id else None
+        )
+    return g._funcionario_logado_cache
 
 
 @main_bp.route("/")

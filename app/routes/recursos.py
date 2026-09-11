@@ -88,34 +88,35 @@ def contar_recursos_pendentes_comissao():
 
 
 def contar_recursos_pendentes_gestor(funcionario_id):
-    """Quantos recursos estão esperando resposta desse gestor especificamente."""
+    """Quantos recursos estão esperando resposta desse gestor especificamente.
+
+    Antes isto rodava uma query extra por recurso candidato dentro de um loop
+    (N+1). Agora é uma única query: junta RecursoAvaliacao com o próprio
+    VinculoAvaliacao (ciclo_id + avaliado_id + avaliador_id), então o banco
+    já filtra e conta tudo de uma vez, sem idas e vindas repetidas."""
     if not funcionario_id:
         return 0
-    vinculos_meus = VinculoAvaliacao.query.filter_by(avaliador_id=funcionario_id).all()
-    if not vinculos_meus:
-        return 0
-    ciclo_ids = {v.ciclo_id for v in vinculos_meus}
-    avaliado_ids = {v.avaliado_id for v in vinculos_meus}
-
-    total = 0
-    candidatos = RecursoAvaliacao.query.filter(
-        RecursoAvaliacao.ciclo_id.in_(ciclo_ids),
-        RecursoAvaliacao.avaliado_id.in_(avaliado_ids),
-        RecursoAvaliacao.status == RECURSO_STATUS_AGUARDANDO_GESTOR,
-    ).all()
-    for r in candidatos:
-        if VinculoAvaliacao.query.filter_by(
-            ciclo_id=r.ciclo_id, avaliado_id=r.avaliado_id, avaliador_id=funcionario_id
-        ).first():
-            total += 1
-    return total
+    return (
+        RecursoAvaliacao.query.join(
+            VinculoAvaliacao,
+            db.and_(
+                VinculoAvaliacao.ciclo_id == RecursoAvaliacao.ciclo_id,
+                VinculoAvaliacao.avaliado_id == RecursoAvaliacao.avaliado_id,
+                VinculoAvaliacao.avaliador_id == funcionario_id,
+            ),
+        )
+        .filter(RecursoAvaliacao.status == RECURSO_STATUS_AGUARDANDO_GESTOR)
+        .count()
+    )
 
 
 def _funcionario_logado():
-    funcionario_id = session.get("funcionario_id")
-    if not funcionario_id:
-        return None
-    return Funcionario.query.get(funcionario_id)
+    """Mesmo funcionário logado de app/routes/main.py — reaproveita a
+    função de lá (que já cacheia em `g`) em vez de repetir a consulta ao
+    banco de novo aqui."""
+    from .main import funcionario_logado
+
+    return funcionario_logado()
 
 
 def _gestor_do_recurso(recurso):

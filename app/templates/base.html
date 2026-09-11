@@ -27,7 +27,7 @@
                 {% else %}
                     <a href="{{ url_for('recursos.recurso_area') }}">Recurso</a>
                 {% endif %}
-                {% if funcionario_atual.eh_gestor_de_alguem() %}
+                {% if funcionario_eh_gestor %}
                     <a href="{{ url_for('recursos.recurso_gestor_area') }}">
                         Recursos a responder{% if recursos_pendentes_gestor %} <span class="badge badge-pending">{{ recursos_pendentes_gestor }}</span>{% endif %}
                     </a>
@@ -40,7 +40,7 @@
             {% else %}
                 <a href="{{ url_for('main.login') }}">Entrar</a>
             {% endif %}
-            {% if not funcionario_atual or funcionario_atual.eh_membro_comissao() %}
+            {% if not funcionario_atual or funcionario_eh_comissao %}
                 <a href="{{ url_for('recursos.recurso_comissao_area') }}">
                     Comissão{% if recursos_pendentes_comissao %} <span class="badge badge-pending">{{ recursos_pendentes_comissao }}</span>{% endif %}
                 </a>

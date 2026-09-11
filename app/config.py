@@ -9,9 +9,19 @@ class Config:
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mude-esta-senha")
     COMISSAO_PASSWORD = os.environ.get("COMISSAO_PASSWORD", "mude-esta-senha-comissao")
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
+    # No Vercel (serverless) cada request pode rodar numa função nova, então
+    # o pool de conexões do SQLAlchemy não sobrevive de um request pro
+    # outro mesmo assim — por isso usamos NullPool (sem pool local) e
+    # deixamos o PgBouncer do Supabase (modo "Transaction Pooling", porta
+    # 6543 na DATABASE_URL) cuidar do pooling de verdade do lado do banco.
+    # pool_pre_ping/pool_recycle foram removidos porque só fazem sentido
+    # quando existe uma conexão persistida pra testar/reciclar — com
+    # NullPool não existe, então eram uma consulta extra (ping) desperdiçada
+    # a cada request.
+    from sqlalchemy.pool import NullPool
+
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_pre_ping": True,   # evita erro de conexão "caída" do Supabase
-        "pool_recycle": 280,
+        "poolclass": NullPool,
     }
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

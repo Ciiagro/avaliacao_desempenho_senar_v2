@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 import pandas as pd
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, joinedload
 from flask import (
     Blueprint,
     render_template,
@@ -262,7 +262,16 @@ def montar_linhas_resultado_final(ciclo):
         .all()
     }
 
-    avaliacoes = Avaliacao.query.filter_by(ciclo_id=ciclo.id).all()
+    # joinedload evita N+1: sem isso, cada chamada de media_avaliacao() no
+    # loop abaixo (uma por funcionário, x2: auto e gestor) disparava uma
+    # query nova pra buscar avaliacao.respostas — em produção isso já
+    # passou de 1.000 consultas extras nessa única tela (usada tanto na
+    # tela de resultados quanto nas exportações Excel/PDF).
+    avaliacoes = (
+        Avaliacao.query.options(joinedload(Avaliacao.respostas))
+        .filter_by(ciclo_id=ciclo.id)
+        .all()
+    )
     avaliacao_por_chave = {(a.avaliado_id, a.avaliador_id, a.tipo): a for a in avaliacoes}
 
     liberados_por_avaliado = {
