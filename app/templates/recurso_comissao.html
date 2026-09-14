@@ -1,6 +1,97 @@
 {% extends "base.html" %}
 {% block title %}Comissão de recursos{% endblock %}
 
+{% macro chip_chegada(dt) %}
+{% if dt %}
+    {% set dias = (now - dt).days %}
+    {% set dt_local = dt|fortaleza %}
+    <span class="badge badge-new" title="{{ dt_local.strftime('%d/%m/%Y %H:%M') }}">
+        Chegou {{ 'hoje' if dias <= 0 else ('há 1 dia' if dias == 1 else 'há ' ~ dias ~ ' dias') }}
+        &middot; {{ dt_local.strftime('%d/%m %H:%M') }}
+    </span>
+{% endif %}
+{% endmacro %}
+
+{% macro cabecalho_resumo(r, limite=None, extra=None) %}
+<span class="recurso-card-nome">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</span>
+<div class="muted recurso-card-linha">
+    Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+    &middot; {{ chip_chegada(r.chegada_comissao_em) }}
+    {% if limite %}
+        &middot; Prazo:
+        {% if limite < now %}
+            <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
+        {% else %}
+            <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
+        {% endif %}
+    {% endif %}
+    {% if extra %}
+        &middot; {{ extra }}
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro bloco_avaliacoes(dados) %}
+<details style="margin:12px 0 16px;">
+    <summary style="cursor:pointer; font-weight:600;">Ver as duas avaliações (autoavaliação e avaliação do gestor)</summary>
+    <div style="margin-top:12px;">
+        <div class="tabela-container">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th>Nº</th>
+                        <th>Fator</th>
+                        <th class="centro">(I) Autoavaliação</th>
+                        <th class="centro">(II) Avaliação do gestor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fator in dados.fatores %}
+                        <tr>
+                            <td>{{ fator.ordem }}</td>
+                            <td>{{ fator.nome }}</td>
+                            <td class="centro">{{ dados.respostas_auto.get(fator.id, '-') }}</td>
+                            <td class="centro">{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="grid-2" style="margin-top:12px;">
+            <div>
+                <h3 style="font-size:0.95rem;">Autoavaliação</h3>
+                {% if dados.avaliacao_auto %}
+                    <p><strong>Pontos fortes:</strong> {{ dados.avaliacao_auto.pontos_fortes or '-' }}</p>
+                    <p><strong>Oportunidades de desenvolvimento:</strong> {{ dados.avaliacao_auto.oportunidades_desenvolvimento or '-' }}</p>
+                    <p><strong>Plano de ação:</strong> {{ dados.avaliacao_auto.plano_acao or '-' }}</p>
+                    <p><strong>Resultados alcançados:</strong> {{ dados.avaliacao_auto.resultados_alcancados or '-' }}</p>
+                {% else %}
+                    <p class="muted">Autoavaliação não encontrada.</p>
+                {% endif %}
+            </div>
+            <div>
+                <h3 style="font-size:0.95rem;">Avaliação do gestor{% if dados.avaliador %} &mdash; {{ dados.avaliador.nome }}{% endif %}</h3>
+                {% if dados.avaliacao_gestor %}
+                    <p><strong>Pontos fortes:</strong> {{ dados.avaliacao_gestor.pontos_fortes or '-' }}</p>
+                    <p><strong>Oportunidades de desenvolvimento:</strong> {{ dados.avaliacao_gestor.oportunidades_desenvolvimento or '-' }}</p>
+                    <p><strong>Plano de ação:</strong> {{ dados.avaliacao_gestor.plano_acao or '-' }}</p>
+                    <p><strong>Resultados alcançados:</strong> {{ dados.avaliacao_gestor.resultados_alcancados or '-' }}</p>
+                {% else %}
+                    <p class="muted">Avaliação do gestor não encontrada.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if dados.resultado_final is not none %}
+            <p class="muted" style="margin-top:12px;">
+                Resultado final com as notas atuais: <strong>{{ '%.2f'|format(dados.resultado_final) }} ({{ dados.conceito }})</strong>
+            </p>
+        {% endif %}
+    </div>
+</details>
+{% endmacro %}
+
 {% block content %}
 <h1>Comissão de recursos</h1>
 <p class="muted">Prazo pra Comissão agir: 5 dias corridos a partir da abertura do recurso. Nada passa entre gestor e empregado sem a Comissão ver e repassar.</p>
@@ -29,26 +120,18 @@
 <h2>Recursos recém-abertos &mdash; mandar mensagem ao gestor pedindo reavaliação</h2>
 {% for r in pendentes_iniciais %}
     {% set limite = prazo_comissao(r)|fortaleza %}
-    <div class="card" style="margin-bottom:16px; text-align:left;">
-        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
-        <p class="muted">
-            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
-            {% if limite %}
-                &middot; Prazo:
-                {% if limite < now %}
-                    <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
-                {% else %}
-                    <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
-                {% endif %}
-            {% endif %}
-        </p>
+    <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
+        <summary>{{ cabecalho_resumo(r, limite) }}</summary>
+        <div class="recurso-card-corpo">
         <p><strong>Motivo do empregado:</strong> {{ r.motivo }}</p>
+        {{ bloco_avaliacoes(r.dados_avaliacoes) }}
         <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar_gestor', recurso_id=r.id) }}">
             <label>Mensagem para o gestor, pedindo reavaliação</label>
             <textarea name="comentario" rows="3" required></textarea>
             <button type="submit" class="botao" style="margin-top:8px;">Enviar ao gestor</button>
         </form>
-    </div>
+        </div>
+    </details>
 {% endfor %}
 {% endif %}
 
@@ -57,19 +140,16 @@
 {% for r in pendentes_repasse %}
     {% set limite = prazo_comissao(r)|fortaleza %}
     {% set resposta = r.eventos|selectattr('tipo', 'equalto', 'resposta_gestor')|list|last %}
-    <div class="card" style="margin-bottom:16px; text-align:left;">
-        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
-        <p class="muted">
-            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
-            {% if limite %}
-                &middot; Prazo:
-                {% if limite < now %}
-                    <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
-                {% else %}
-                    <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
-                {% endif %}
-            {% endif %}
-        </p>
+    {% set extra_gestor %}
+        {% if resposta %}
+            <span class="badge {{ 'badge-ok' if resposta.decisao == 'revisou' else 'badge-new' }}">
+                Gestor {{ 'REVISOU a nota' if resposta.decisao == 'revisou' else 'MANTEVE a nota' }}
+            </span>
+        {% endif %}
+    {% endset %}
+    <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
+        <summary>{{ cabecalho_resumo(r, limite, extra_gestor) }}</summary>
+        <div class="recurso-card-corpo">
         {% if resposta %}
             <p>
                 <strong>O gestor {{ 'REVISOU a nota' if resposta.decisao == 'revisou' else 'MANTEVE a nota' }}:</strong>
@@ -105,28 +185,32 @@
             {% endif %}
         {% endif %}
 
+        {{ bloco_avaliacoes(r.dados_avaliacoes) }}
+
         <form method="post" action="{{ url_for('recursos.recurso_comissao_repassar', recurso_id=r.id) }}">
             <label>Comentário ao repassar pro empregado (opcional)</label>
             <textarea name="comentario" rows="2"></textarea>
             <button type="submit" class="botao" style="margin-top:8px;">Repassar ao empregado</button>
         </form>
-    </div>
+        </div>
+    </details>
 {% endfor %}
 {% endif %}
 
 {% if pendentes_fechamento %}
 <h2>Empregado aceitou &mdash; confirmar encerramento</h2>
 {% for r in pendentes_fechamento %}
-    <div class="card" style="margin-bottom:16px; text-align:left;">
-        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
-        <p class="muted">Resultado contestado: {{ r.resultado_final_em_texto or '-' }}</p>
+    <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
+        <summary>{{ cabecalho_resumo(r) }}</summary>
+        <div class="recurso-card-corpo">
         <p class="muted">O empregado aceitou a resposta do gestor e não quer recorrer.</p>
         <form method="post" action="{{ url_for('recursos.recurso_comissao_fechar', recurso_id=r.id) }}">
             <label>Comentário (opcional)</label>
             <textarea name="comentario" rows="2"></textarea>
             <button type="submit" class="botao" style="margin-top:8px;">Confirmar encerramento</button>
         </form>
-    </div>
+        </div>
+    </details>
 {% endfor %}
 {% endif %}
 
@@ -134,19 +218,9 @@
 <h2>Empregado recorreu &mdash; encaminhar à presidência</h2>
 {% for r in pendentes_recurso %}
     {% set limite = prazo_comissao(r)|fortaleza %}
-    <div class="card" style="margin-bottom:16px; text-align:left;">
-        <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
-        <p class="muted">
-            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
-            {% if limite %}
-                &middot; Prazo:
-                {% if limite < now %}
-                    <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
-                {% else %}
-                    <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
-                {% endif %}
-            {% endif %}
-        </p>
+    <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
+        <summary>{{ cabecalho_resumo(r, limite) }}</summary>
+        <div class="recurso-card-corpo">
         <p><strong>Motivo original:</strong> {{ r.motivo }}</p>
         {% for e in r.eventos %}
             {% if e.tipo == 'resposta_gestor' %}
@@ -184,12 +258,16 @@
                 <p class="muted" style="margin-bottom:12px;">O gestor marcou "revisar", mas não alterou nenhuma nota — só a justificativa.</p>
             {% endif %}
         {% endif %}
+
+        {{ bloco_avaliacoes(r.dados_avaliacoes) }}
+
         <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar', recurso_id=r.id) }}">
             <label>Comentário/justificativa para a presidência</label>
             <textarea name="comentario" rows="3" required></textarea>
             <button type="submit" class="botao" style="margin-top:8px;">Encaminhar para a presidência</button>
         </form>
-    </div>
+        </div>
+    </details>
 {% endfor %}
 {% endif %}
 

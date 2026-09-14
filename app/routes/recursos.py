@@ -62,6 +62,30 @@ def prazo_comissao(recurso):
     return recurso.criado_em + timedelta(days=PRAZO_COMISSAO_DIAS)
 
 
+# Pra cada status "aguardando a Comissão", qual tipo de evento marca o
+# momento em que o recurso chegou nessa fila específica (não necessariamente
+# quando o recurso foi aberto — ex: "gestor respondeu" chegou pra Comissão
+# só quando o gestor respondeu, não na abertura).
+_EVENTO_CHEGADA_POR_STATUS = {
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_INICIAL: "abertura",
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE: "resposta_gestor",
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_RECURSO: "pedido_recorrer",
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_FECHAMENTO: "aceite_funcionario",
+}
+
+
+def chegada_comissao(recurso):
+    """Quando esse recurso chegou pra fila ATUAL da Comissão (não a
+    abertura do recurso, a não ser que seja esse o caso) — usado pra
+    ordenar (mais antigo primeiro) e mostrar pro usuário."""
+    tipo_evento = _EVENTO_CHEGADA_POR_STATUS.get(recurso.status)
+    if tipo_evento:
+        eventos_do_tipo = [e for e in recurso.eventos if e.tipo == tipo_evento]
+        if eventos_do_tipo:
+            return eventos_do_tipo[-1].criado_em
+    return recurso.criado_em
+
+
 def resultado_pendente_ciencia_do_funcionario(funcionario_id):
     """Resultado final já liberado que o funcionário ainda não deu ciência
     (nem aceitou, nem abriu recurso). Enquanto existir um assim, o menu
@@ -243,7 +267,10 @@ def recurso_area():
         # Só mostra a nota recalculada pro empregado depois que a resposta
         # do gestor já foi liberada pra ele ver (mesma regra acima) — antes
         # disso ele não deveria enxergar o que o gestor decidiu.
-        r.resultado_atual_em_texto = _resultado_atual_texto(r) if liberado else None
+        r.resultado_atual_em_texto = (
+            _resultado_atual_texto(montar_dados_resultado_final(r.ciclo, r.avaliado))
+            if liberado else None
+        )
 
     return render_template(
         "recurso_funcionario.html",
@@ -516,12 +543,11 @@ def recurso_comissao_logout():
     return redirect(url_for("main.index"))
 
 
-def _resultado_atual_texto(recurso):
+def _resultado_atual_texto(dados):
     """Resultado final recalculado com as notas ATUAIS do gestor (já
     refletindo qualquer revisão feita durante o recurso) — pra Comissão
     saber, antes de repassar ou encaminhar, qual seria o resultado final
     se as coisas ficarem como estão agora."""
-    dados = montar_dados_resultado_final(recurso.ciclo, recurso.avaliado)
     if dados["resultado_final"] is None:
         return None
     return f"{dados['resultado_final']:.2f} ({dados['conceito']})"
@@ -531,16 +557,16 @@ def _resultado_atual_texto(recurso):
 def recurso_comissao_area():
     pendentes_iniciais = RecursoAvaliacao.query.filter_by(
         status=RECURSO_STATUS_AGUARDANDO_COMISSAO_INICIAL
-    ).order_by(RecursoAvaliacao.criado_em).all()
+    ).all()
     pendentes_repasse = RecursoAvaliacao.query.filter_by(
         status=RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE
-    ).order_by(RecursoAvaliacao.criado_em).all()
+    ).all()
     pendentes_recurso = RecursoAvaliacao.query.filter_by(
         status=RECURSO_STATUS_AGUARDANDO_COMISSAO_RECURSO
-    ).order_by(RecursoAvaliacao.criado_em).all()
+    ).all()
     pendentes_fechamento = RecursoAvaliacao.query.filter_by(
         status=RECURSO_STATUS_AGUARDANDO_COMISSAO_FECHAMENTO
-    ).order_by(RecursoAvaliacao.criado_em).all()
+    ).all()
     em_andamento = RecursoAvaliacao.query.filter(
         RecursoAvaliacao.status.notin_(
             [
@@ -557,15 +583,31 @@ def recurso_comissao_area():
         status=RECURSO_STATUS_ENCERRADO
     ).order_by(RecursoAvaliacao.criado_em.desc()).all()
 
-    # A Comissão precisa ver, antes de repassar ou encaminhar, qual seria
-    # o resultado final se as notas atuais do gestor (já revisadas ou não)
-    # ficarem valendo.
+    # Cada recurso mostra a data/hora em que chegou pra fila ATUAL da
+    # Comissão (não necessariamente a abertura — ex: "gestor respondeu" só
+    # chegou pra Comissão quando o gestor respondeu). As listas ficam
+    # ordenadas pelo mais antigo primeiro, que é o mais urgente.
+    for lista in (pendentes_iniciais, pendentes_repasse, pendentes_recurso, pendentes_fechamento):
+        for r in lista:
+            r.chegada_comissao_em = chegada_comissao(r)
+        lista.sort(key=lambda r: r.chegada_comissao_em or r.criado_em)
+
+    # A Comissão precisa ver as duas avaliações (autoavaliação e avaliação
+    # do gestor, nota a nota) antes de agir em qualquer recurso — não só o
+    # motivo do empregado. Isso também já dá, de graça, o resultado final
+    # recalculado com as notas ATUAIS do gestor (já refletindo qualquer
+    # revisão feita durante o recurso), pra Comissão saber, antes de
+    # repassar ou encaminhar, qual seria o resultado se as coisas ficarem
+    # como estão agora.
+    for r in pendentes_iniciais + pendentes_repasse + pendentes_recurso:
+        r.dados_avaliacoes = montar_dados_resultado_final(r.ciclo, r.avaliado)
     for r in pendentes_repasse + pendentes_recurso:
-        r.resultado_atual_em_texto = _resultado_atual_texto(r)
+        r.resultado_atual_em_texto = _resultado_atual_texto(r.dados_avaliacoes)
 
     todos_pendentes = pendentes_iniciais + pendentes_repasse + pendentes_recurso + pendentes_fechamento
 
     return render_template(
+
         "recurso_comissao.html",
         pendentes_iniciais=pendentes_iniciais,
         pendentes_repasse=pendentes_repasse,

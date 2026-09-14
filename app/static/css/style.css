@@ -793,6 +793,25 @@ body:has(.login-box) { background: var(--navy-900); }
 .flash-danger  { background: var(--perigo-bg);  color: var(--perigo);  border-color: rgba(194,59,59,0.18); }
 .flash-warning { background: var(--aviso-bg);   color: var(--aviso);   border-color: rgba(165,114,15,0.18); }
 
+/* ---------------- Cards de recurso (Comissão) — colapsáveis ---------------- */
+
+.recurso-card { padding: 16px 22px; }
+.recurso-card > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 6px 0;
+}
+.recurso-card > summary::-webkit-details-marker { display: none; }
+.recurso-card > summary::before {
+    content: "▸ ";
+    color: var(--texto-muted);
+    font-size: 0.8rem;
+}
+.recurso-card[open] > summary::before { content: "▾ "; }
+.recurso-card-nome { font-weight: 700; color: var(--navy-900); font-size: 1.02rem; }
+.recurso-card-linha { margin-top: 4px; }
+.recurso-card-corpo { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+
 /* ---------------- Responsivo ---------------- */
 
 @media (max-width: 640px) {
