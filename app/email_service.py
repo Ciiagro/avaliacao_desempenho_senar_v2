@@ -16,6 +16,7 @@ Usa uma conta do Gmail via SMTP. Não depende de nenhuma biblioteca extra
 import html
 import smtplib
 import ssl
+import threading
 from email.message import EmailMessage
 
 from flask import current_app
@@ -185,17 +186,27 @@ def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, lin
     servidor = current_app.config.get("MAIL_SERVER", "smtp.gmail.com")
     porta = current_app.config.get("MAIL_PORT", 465)
 
-    try:
-        contexto = ssl.create_default_context()
-        with smtplib.SMTP_SSL(servidor, porta, context=contexto) as smtp:
-            smtp.login(usuario, senha)
-            smtp.send_message(msg)
-    except Exception:
-        # Problema de e-mail nunca deve derrubar a ação que o usuário
-        # estava fazendo (abrir recurso, responder etc) — só registra.
-        current_app.logger.exception(
-            "Falha ao enviar e-mail de aviso (assunto: %s).", assunto
-        )
+    # A conexão SMTP (handshake TLS + login + envio) pode levar vários
+    # segundos, e isso deixava quem abre/responde um recurso esperando
+    # a página carregar até o Gmail terminar de responder. Como o e-mail
+    # é só um aviso (não afeta o que foi salvo no banco), a gente manda
+    # de verdade numa thread em segundo plano e libera a resposta pro
+    # usuário na hora — quem clicou não fica esperando o e-mail sair.
+    app = current_app._get_current_object()
+
+    def _enviar_em_segundo_plano():
+        try:
+            contexto = ssl.create_default_context()
+            with smtplib.SMTP_SSL(servidor, porta, context=contexto) as smtp:
+                smtp.login(usuario, senha)
+                smtp.send_message(msg)
+        except Exception:
+            with app.app_context():
+                app.logger.exception(
+                    "Falha ao enviar e-mail de aviso (assunto: %s).", assunto
+                )
+
+    threading.Thread(target=_enviar_em_segundo_plano, daemon=True).start()
 
 
 # ---------------------------------------------------------------------------

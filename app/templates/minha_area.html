@@ -91,6 +91,14 @@
                                href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=linha.avaliado.id, avaliador_id=funcionario.id, tipo='gestor') }}">
                                 {% if linha.status == 'concluida' %}Ver{% else %}Avaliar{% endif %}
                             </a>
+                            {% if linha.status == 'concluida' and linha.avaliacao %}
+                                <a class="botao-icone botao-icone-secundario"
+                                   href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=linha.avaliacao.id) }}"
+                                   title="Baixar PDF"
+                                   aria-label="Baixar PDF da avaliação de {{ linha.avaliado.nome }}">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                </a>
+                            {% endif %}
                         </td>
                     </tr>
                 {% endfor %}

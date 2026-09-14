@@ -214,6 +214,7 @@ def minha_area():
         linhas.append(
             {
                 "avaliado": v.avaliado,
+                "avaliacao": avaliacao,
                 "status": avaliacao.status if avaliacao else "nao_iniciada",
                 "autoavaliacao_status": autoavaliacao_dele.status if autoavaliacao_dele else "nao_iniciada",
             }
