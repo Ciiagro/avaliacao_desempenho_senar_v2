@@ -86,7 +86,7 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
         return html.escape(str(s)).replace("\n", "<br>")
 
     paragrafos_html = "".join(
-        f'<p style="margin:0 0 14px; font-size:14px; line-height:1.55; color:{_COR_TEXTO};">{esc(p)}</p>'
+        f'<p style="margin:0 0 10px; font-size:13px; line-height:1.5; color:{_COR_TEXTO};">{esc(p)}</p>'
         for p in paragrafos
     )
 
@@ -94,45 +94,45 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
     if destaque:
         rotulo, conteudo = destaque
         destaque_html = f"""
-        <div style="margin:0 0 16px; padding:14px 16px; background:{_COR_DESTAQUE_BG};
-                    border-left:3px solid {_COR_DESTAQUE_TEXTO}; border-radius:6px;">
-            <p style="margin:0 0 4px; font-size:11px; font-weight:bold; letter-spacing:0.04em;
+        <div style="margin:0 0 12px; padding:10px 12px; background:{_COR_DESTAQUE_BG};
+                    border-left:3px solid {_COR_DESTAQUE_TEXTO}; border-radius:5px;">
+            <p style="margin:0 0 3px; font-size:10px; font-weight:bold; letter-spacing:0.04em;
                       text-transform:uppercase; color:{_COR_DESTAQUE_TEXTO};">{esc(rotulo)}</p>
-            <p style="margin:0; font-size:14px; line-height:1.5; color:{_COR_TEXTO};">{esc(conteudo)}</p>
+            <p style="margin:0; font-size:13px; line-height:1.45; color:{_COR_TEXTO};">{esc(conteudo)}</p>
         </div>"""
 
     botao_html = ""
     if link_url:
         botao_html = f"""
         <a href="{html.escape(link_url)}"
-           style="display:inline-block; margin-top:6px; padding:11px 22px; background:{_COR_NAVY_700};
-                  color:#ffffff; font-size:14px; font-weight:bold; text-decoration:none;
-                  border-radius:8px;">{esc(link_texto or 'Acessar o sistema')}</a>"""
+           style="display:inline-block; margin-top:4px; padding:8px 16px; background:{_COR_NAVY_700};
+                  color:#ffffff; font-size:13px; font-weight:bold; text-decoration:none;
+                  border-radius:6px;">{esc(link_texto or 'Acessar o sistema')}</a>"""
 
     corpo_html = f"""\
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="utf-8"></head>
-<body style="margin:0; padding:24px 12px; background:{_COR_FUNDO}; font-family:Arial, Helvetica, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; margin:0 auto;">
+<body style="margin:0; padding:20px 12px; background:{_COR_FUNDO}; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; margin:0 auto;">
         <tr>
-            <td style="background:{_COR_NAVY_900}; padding:20px 24px; border-radius:10px 10px 0 0;">
-                <p style="margin:0 0 4px; font-size:11px; font-weight:bold; letter-spacing:0.05em;
-                          text-transform:uppercase; color:rgba(255,255,255,0.65);">Avaliação de Desempenho</p>
-                <h1 style="margin:0; font-size:18px; color:#ffffff;">{esc(titulo)}</h1>
+            <td style="background:{_COR_NAVY_900}; padding:12px 18px; border-radius:8px 8px 0 0;">
+                <p style="margin:0 0 2px; font-size:10px; font-weight:bold; letter-spacing:0.05em;
+                          text-transform:uppercase; color:rgba(255,255,255,0.6);">Avaliação de Desempenho</p>
+                <h1 style="margin:0; font-size:15px; color:#ffffff;">{esc(titulo)}</h1>
             </td>
         </tr>
         <tr>
             <td style="background:#ffffff; border:1px solid {_COR_BORDA}; border-top:none;
-                       border-radius:0 0 10px 10px; padding:24px;">
+                       border-radius:0 0 8px 8px; padding:18px;">
                 {paragrafos_html}
                 {destaque_html}
                 {botao_html}
             </td>
         </tr>
         <tr>
-            <td style="padding:16px 6px 0; text-align:center;">
-                <p style="margin:0; font-size:11px; color:{_COR_TEXTO_MUTED};">
+            <td style="padding:12px 6px 0; text-align:center;">
+                <p style="margin:0; font-size:10px; color:{_COR_TEXTO_MUTED};">
                     Mensagem automática do sistema de Avaliação de Desempenho.
                 </p>
             </td>
