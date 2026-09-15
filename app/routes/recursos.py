@@ -22,7 +22,7 @@ from ..models import (
     RECURSO_STATUS_AGUARDANDO_PRESIDENCIA,
     RECURSO_STATUS_ENCERRADO,
 )
-from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado
+from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, prazo_dias_corridos
 from ..resultado_final_service import montar_dados_resultado_final
 from ..email_service import (
     avisar_comissao_novo_recurso,
@@ -38,6 +38,12 @@ recursos_bp = Blueprint("recursos", __name__)
 
 # Prazo pra Comissão agir num recurso: dias corridos a partir da abertura.
 PRAZO_COMISSAO_DIAS = 5
+
+# Depois que o resultado final é liberado pro empregado ver, ele tem esse
+# prazo (dias corridos, empurrando pro próximo dia útil se cair em fim de
+# semana) pra abrir um recurso — é só informativo (mostra a data-limite pro
+# empregado), o sistema não bloqueia a abertura depois que esse prazo passa.
+PRAZO_RECURSO_FUNCIONARIO_DIAS = 10
 
 
 @recursos_bp.before_request
@@ -244,6 +250,9 @@ def recurso_area():
             continue
         if _pode_abrir_novo_recurso(registro.ciclo_id, funcionario.id):
             ciclo = CicloAvaliacao.query.get(registro.ciclo_id)
+            ciclo.prazo_abrir_recurso = prazo_dias_corridos(
+                registro.liberado_em, PRAZO_RECURSO_FUNCIONARIO_DIAS
+            )
             ciclos_sem_recurso.append(ciclo)
 
     meus_recursos = (

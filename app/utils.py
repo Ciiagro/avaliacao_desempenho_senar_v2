@@ -142,3 +142,24 @@ def adicionar_dias_uteis(data_inicio, dias_uteis):
         if data.weekday() < 5:  # 0=segunda ... 4=sexta
             dias_somados += 1
     return data
+
+
+def prazo_dias_corridos(data_inicio, dias_corridos, empurrar_fim_de_semana=True):
+    """Soma dias CORRIDOS (conta sábado e domingo normalmente, diferente de
+    adicionar_dias_uteis) a partir de data_inicio, convertendo primeiro pro
+    horário de Fortaleza — é o calendário que a pessoa vê, não o UTC do banco.
+
+    Se empurrar_fim_de_semana=True (padrão) e o prazo cair num sábado ou
+    domingo, empurra pro próximo dia útil (segunda-feira): não faz sentido
+    um prazo vencer justamente no dia em que não tem ninguém trabalhando
+    pra receber o recurso.
+    """
+    if data_inicio is None:
+        return None
+    prazo = para_fortaleza(data_inicio) + timedelta(days=dias_corridos)
+    if empurrar_fim_de_semana:
+        if prazo.weekday() == 5:  # sábado
+            prazo += timedelta(days=2)
+        elif prazo.weekday() == 6:  # domingo
+            prazo += timedelta(days=1)
+    return prazo
