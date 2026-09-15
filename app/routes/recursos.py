@@ -369,13 +369,17 @@ def aceitar_recurso(recurso_id):
         flash("Essa ação não está disponível para esse recurso.", "danger")
         return redirect(url_for("recursos.recurso_area"))
 
-    recurso.status = RECURSO_STATUS_AGUARDANDO_COMISSAO_FECHAMENTO
+    # Se o empregado aceita, não tem mais nada esperando decisão de
+    # ninguém — encerra na hora. A Comissão só é avisada pra
+    # conhecimento, e pode acrescentar uma observação depois se quiser
+    # (não precisa mais confirmar o encerramento manualmente).
+    recurso.status = RECURSO_STATUS_ENCERRADO
     db.session.add(
         RecursoEvento(recurso_id=recurso.id, tipo="aceite_funcionario", autor_id=funcionario.id)
     )
     db.session.commit()
     avisar_comissao_empregado_aceitou(recurso)
-    flash("Ok, sua resposta foi registrada. A Comissão vai confirmar o encerramento.", "success")
+    flash("Ok, seu recurso foi encerrado.", "success")
     return redirect(url_for("recursos.recurso_area"))
 
 
@@ -701,25 +705,37 @@ def recurso_comissao_repassar(recurso_id):
 
 @recursos_bp.route("/recurso/<int:recurso_id>/comissao-fechar", methods=["POST"])
 def recurso_comissao_fechar(recurso_id):
-    """A Comissão confirma o encerramento depois que o empregado aceitou a resposta do gestor."""
+    """Confirma o encerramento (fluxo antigo, mantido só pra recursos que já
+    estavam nessa fila antes da mudança) OU, no fluxo atual, deixa a
+    Comissão acrescentar uma observação num recurso que o empregado já
+    encerrou sozinho ao aceitar — não muda status nenhum, é só registro."""
     recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
-    if recurso.status != RECURSO_STATUS_AGUARDANDO_COMISSAO_FECHAMENTO:
-        flash("Esse recurso não está aguardando a Comissão.", "warning")
+    comentario = request.form.get("comentario", "").strip()
+
+    if recurso.status == RECURSO_STATUS_AGUARDANDO_COMISSAO_FECHAMENTO:
+        recurso.status = RECURSO_STATUS_ENCERRADO
+        db.session.add(
+            RecursoEvento(recurso_id=recurso.id, tipo="fechamento_comissao", texto=comentario or None)
+        )
+        db.session.commit()
+        avisar_empregado_recurso_encerrado(
+            recurso, "Você aceitou a resposta do gestor e a Comissão confirmou o encerramento."
+        )
+        flash("Recurso encerrado.", "success")
         return redirect(url_for("recursos.recurso_comissao_area"))
 
-    recurso.status = RECURSO_STATUS_ENCERRADO
-    db.session.add(
-        RecursoEvento(
-            recurso_id=recurso.id,
-            tipo="fechamento_comissao",
-            texto=request.form.get("comentario", "").strip() or None,
+    if recurso.status == RECURSO_STATUS_ENCERRADO:
+        if not comentario:
+            flash("Escreva uma observação antes de salvar.", "warning")
+            return redirect(url_for("recursos.recurso_comissao_area"))
+        db.session.add(
+            RecursoEvento(recurso_id=recurso.id, tipo="observacao_comissao", texto=comentario)
         )
-    )
-    db.session.commit()
-    avisar_empregado_recurso_encerrado(
-        recurso, "Você aceitou a resposta do gestor e a Comissão confirmou o encerramento."
-    )
-    flash("Recurso encerrado.", "success")
+        db.session.commit()
+        flash("Observação registrada.", "success")
+        return redirect(url_for("recursos.recurso_comissao_area"))
+
+    flash("Esse recurso não está encerrado nem aguardando a Comissão.", "warning")
     return redirect(url_for("recursos.recurso_comissao_area"))
 
 

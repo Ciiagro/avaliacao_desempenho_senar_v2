@@ -302,23 +302,46 @@
     <p class="muted">Nenhum recurso encerrado ainda.</p>
 {% endif %}
 {% for r in encerrados %}
+    {% set aceite = r.eventos|selectattr('tipo', 'equalto', 'aceite_funcionario')|list|last %}
     {% set decisao_final = r.eventos|selectattr('tipo', 'in', ['decisao_presidencia', 'fechamento_comissao'])|list|last %}
-    <a href="{{ url_for('recursos.recurso_comissao_detalhe', recurso_id=r.id) }}" class="card card-link" style="display:block; margin-bottom:16px; text-align:left;">
-        <h2 style="font-size:1.05rem; margin:0;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
-        <p class="muted">
-            Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
-            &middot; Aberto em {{ (r.criado_em|fortaleza).strftime('%d/%m/%Y') if r.criado_em else '-' }}
-        </p>
-        {% if decisao_final and decisao_final.tipo == 'decisao_presidencia' %}
-            <p>
-                <strong>Decisão da presidência:</strong>
-                {{ 'Recurso ACATADO' if decisao_final.decisao == 'acatado' else 'Recurso NÃO acatado' }}
-                &mdash; {{ decisao_final.texto }}
-            </p>
-        {% elif decisao_final %}
-            <p><strong>Encerrado pela Comissão:</strong> {{ decisao_final.texto or 'Sem comentário adicional.' }}</p>
-        {% endif %}
-    </a>
+    {% set observacoes = r.eventos|selectattr('tipo', 'equalto', 'observacao_comissao')|list %}
+    <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
+        <summary>
+            <span class="recurso-card-nome">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</span>
+            <div class="muted recurso-card-linha">
+                Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
+                &middot; Aberto em {{ (r.criado_em|fortaleza).strftime('%d/%m/%Y') if r.criado_em else '-' }}
+                {% if aceite and not decisao_final %}
+                    &middot; <span class="badge badge-new">Encerrado automaticamente (empregado aceitou)</span>
+                {% endif %}
+            </div>
+        </summary>
+        <div class="recurso-card-corpo">
+            {% if decisao_final and decisao_final.tipo == 'decisao_presidencia' %}
+                <p>
+                    <strong>Decisão da presidência:</strong>
+                    {{ 'Recurso ACATADO' if decisao_final.decisao == 'acatado' else 'Recurso NÃO acatado' }}
+                    &mdash; {{ decisao_final.texto }}
+                </p>
+            {% elif decisao_final %}
+                <p><strong>Encerrado pela Comissão:</strong> {{ decisao_final.texto or 'Sem comentário adicional.' }}</p>
+            {% endif %}
+
+            {% for obs in observacoes %}
+                <p><strong>Observação da Comissão</strong>{% if obs.criado_em %} ({{ (obs.criado_em|fortaleza).strftime('%d/%m/%Y') }}){% endif %}: {{ obs.texto }}</p>
+            {% endfor %}
+
+            <a class="botao botao-secundario botao-pequeno" href="{{ url_for('recursos.recurso_comissao_detalhe', recurso_id=r.id) }}">Ver detalhe completo</a>
+
+            {% if aceite and not decisao_final %}
+                <form method="post" action="{{ url_for('recursos.recurso_comissao_fechar', recurso_id=r.id) }}" style="margin-top:12px;">
+                    <label>Observação (opcional &mdash; o recurso já está encerrado, isso é só registro)</label>
+                    <textarea name="comentario" rows="2" placeholder="Registrar algo sobre esse encerramento, se precisar..."></textarea>
+                    <button type="submit" class="botao botao-secundario botao-pequeno" style="margin-top:6px;">Salvar observação</button>
+                </form>
+            {% endif %}
+        </div>
+    </details>
 {% endfor %}
 
 </div>
