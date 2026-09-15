@@ -5,6 +5,12 @@
 <a href="{{ url_for('recursos.recurso_gestor_area') }}" class="back-link">&larr; Recursos a responder</a>
 <h1>{{ recurso.avaliado.nome }} &mdash; Exercício {{ recurso.ciclo.exercicio }}</h1>
 <p class="muted">Resultado contestado: {{ recurso.resultado_final_em_texto or '-' }}</p>
+{% if prazo_gestor_responder %}
+    <p class="muted">
+        Prazo para responder: <span class="badge badge-pending">até {{ prazo_gestor_responder.strftime('%d/%m/%Y') }}</span>
+        (10 dias corridos a partir do encaminhamento da Comissão)
+    </p>
+{% endif %}
 <p><strong>Motivo do recurso:</strong> {{ recurso.motivo }}</p>
 
 {% for e in recurso.eventos %}
