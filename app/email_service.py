@@ -21,8 +21,6 @@ from email.message import EmailMessage
 
 from flask import current_app
 
-from .models import MembroComissao
-
 # Mesmas cores usadas no style.css do sistema, pra manter a identidade visual.
 _COR_NAVY_900 = "#002f30"
 _COR_NAVY_700 = "#0d5859"
@@ -35,15 +33,16 @@ _COR_DESTAQUE_TEXTO = "#93691f"
 
 
 def _emails_comissao():
-    """E-mails dos membros da Comissão que têm e-mail cadastrado."""
-    membros = MembroComissao.query.all()
-    emails = []
-    for m in membros:
-        if m.funcionario and m.funcionario.email:
-            email = m.funcionario.email.strip()
-            if email:
-                emails.append(email)
-    return emails
+    """Pra onde vão os avisos da Comissão.
+
+    A Comissão usa uma caixa de e-mail compartilhada (a mesma conta que
+    envia os avisos, MAIL_USERNAME) em vez do e-mail pessoal de cada
+    membro cadastrado — assim qualquer um que tenha acesso a essa caixa
+    vê o aviso, sem depender de manter a lista de membros sempre em dia
+    com e-mail pessoal certo.
+    """
+    email = (current_app.config.get("MAIL_USERNAME") or "").strip()
+    return [email] if email else []
 
 
 def _email_funcionario(funcionario):
