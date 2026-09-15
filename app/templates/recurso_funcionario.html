@@ -18,7 +18,7 @@
             {% if ciclo.prazo_abrir_recurso %}
                 <p class="muted" style="margin:-2px 0 8px;">
                     Prazo para abrir recurso: <span class="badge badge-pending">até {{ ciclo.prazo_abrir_recurso.strftime('%d/%m/%Y') }}</span>
-                    (10 dias corridos a partir da liberação do resultado)
+                    (5 dias corridos a partir da liberação do resultado)
                 </p>
             {% endif %}
             <textarea name="motivo" rows="4" placeholder="Explique por que você não concorda com o resultado final..." required></textarea>

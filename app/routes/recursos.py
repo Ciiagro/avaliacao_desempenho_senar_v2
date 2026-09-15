@@ -43,7 +43,12 @@ PRAZO_COMISSAO_DIAS = 5
 # prazo (dias corridos, empurrando pro próximo dia útil se cair em fim de
 # semana) pra abrir um recurso — é só informativo (mostra a data-limite pro
 # empregado), o sistema não bloqueia a abertura depois que esse prazo passa.
-PRAZO_RECURSO_FUNCIONARIO_DIAS = 10
+PRAZO_RECURSO_FUNCIONARIO_DIAS = 5
+
+# Depois que a Comissão encaminha o recurso pro gestor reavaliar, ele tem
+# esse prazo (dias corridos, mesma regra de empurrar fim de semana) pra
+# responder à Comissão. Também só informativo.
+PRAZO_GESTOR_RESPONDER_DIAS = 10
 
 
 @recursos_bp.before_request
@@ -437,6 +442,20 @@ def recurso_dar_ciencia(recurso_id):
 # Gestor
 # ---------------------------------------------------------------------------
 
+def _calcular_prazo_gestor_responder(recurso):
+    """Prazo (10 dias corridos, empurrando fim de semana) pro gestor
+    responder, contado a partir de quando a Comissão encaminhou o recurso
+    pra ele — usado tanto na lista quanto na tela de resposta do gestor."""
+    evento_encaminhamento = next(
+        (e for e in reversed(recurso.eventos) if e.tipo == "encaminhamento_comissao_gestor"),
+        None,
+    )
+    momento_encaminhamento = (
+        evento_encaminhamento.criado_em if evento_encaminhamento else recurso.criado_em
+    )
+    return prazo_dias_corridos(momento_encaminhamento, PRAZO_GESTOR_RESPONDER_DIAS)
+
+
 @recursos_bp.route("/recurso/gestor")
 def recurso_gestor_area():
     funcionario = _funcionario_logado()
@@ -461,6 +480,7 @@ def recurso_gestor_area():
             ).first():
                 continue
             if r.status == RECURSO_STATUS_AGUARDANDO_GESTOR:
+                r.prazo_gestor_responder = _calcular_prazo_gestor_responder(r)
                 recursos_pendentes.append(r)
             else:
                 recursos_respondidos.append(r)
@@ -489,6 +509,11 @@ def recurso_gestor_detalhe(recurso_id):
 
     avaliacao_gestor = _avaliacao_gestor_do_recurso(recurso)
     dados = montar_dados_resultado_final(recurso.ciclo, recurso.avaliado)
+    prazo_gestor_responder = (
+        _calcular_prazo_gestor_responder(recurso)
+        if recurso.status == RECURSO_STATUS_AGUARDANDO_GESTOR
+        else None
+    )
 
     if request.method == "POST":
         if recurso.status != RECURSO_STATUS_AGUARDANDO_GESTOR:
@@ -525,6 +550,7 @@ def recurso_gestor_detalhe(recurso_id):
         funcionario=funcionario,
         recurso=recurso,
         dados=dados,
+        prazo_gestor_responder=prazo_gestor_responder,
     )
 
 

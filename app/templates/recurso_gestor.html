@@ -13,6 +13,12 @@
     <div class="card" style="margin-bottom:12px; text-align:left;">
         <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
         <p class="muted">Resultado contestado: {{ r.resultado_final_em_texto or '-' }}</p>
+        {% if r.prazo_gestor_responder %}
+            <p class="muted">
+                Prazo para responder: <span class="badge badge-pending">até {{ r.prazo_gestor_responder.strftime('%d/%m/%Y') }}</span>
+                (10 dias corridos a partir do encaminhamento da Comissão)
+            </p>
+        {% endif %}
         <p><strong>Motivo do recurso:</strong> {{ r.motivo }}</p>
         <a class="botao botao-pequeno" href="{{ url_for('recursos.recurso_gestor_detalhe', recurso_id=r.id) }}">Responder</a>
     </div>
