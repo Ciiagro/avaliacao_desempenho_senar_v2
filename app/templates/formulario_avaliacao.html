@@ -91,7 +91,6 @@
             em {{ (avaliacao.assinado_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if avaliacao.assinado_em else '' }}.
             Se salvar novamente, a assinatura é atualizada.
         </p>
-        <a class="botao botao-secundario" href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=avaliacao.id) }}">Baixar PDF</a>
     {% endif %}
 
     {% if not ja_concluida %}
@@ -128,5 +127,9 @@
         })();
     </script>
     </fieldset>
+
+    {% if avaliacao and avaliacao.status == 'concluida' and avaliacao.assinado_por %}
+        <a class="botao botao-secundario" href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=avaliacao.id) }}">Baixar PDF</a>
+    {% endif %}
 </form>
 {% endblock %}
