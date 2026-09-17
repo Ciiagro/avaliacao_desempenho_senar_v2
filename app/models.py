@@ -215,6 +215,22 @@ class RespostaFator(db.Model):
     fator = db.relationship("Fator")
 
 
+class NotificacaoPrazo(db.Model):
+    """Registro de um lembrete de prazo (5 dias / 2 dias / no dia) já
+    enviado por e-mail para um avaliador, num ciclo e tipo específicos —
+    evita mandar o mesmo lembrete de novo se a rotina rodar mais de uma
+    vez no mesmo dia."""
+
+    __tablename__ = "notificacoes_prazo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    ciclo_id = db.Column(db.Integer, db.ForeignKey("ciclos_avaliacao.id"), nullable=False)
+    tipo = db.Column(db.Text, nullable=False)  # 'auto' | 'gestor' | 'ciencia_resultado'
+    avaliador_id = db.Column(UUID(as_uuid=True), db.ForeignKey("funcionarios.id"), nullable=False)
+    dias_restantes = db.Column(db.Integer, nullable=False)  # 5, 2 ou 0
+    enviado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+
 # Pesos do resultado final (sem comissão, por enquanto): Auto 30% + Gestor 70%.
 PESO_AUTO = 0.30
 PESO_GESTOR = 0.70

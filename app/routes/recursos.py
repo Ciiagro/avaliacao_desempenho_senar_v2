@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, Response
 
 from ..extensions import db
 from ..models import (
@@ -24,11 +24,11 @@ from ..models import (
 )
 from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, prazo_dias_corridos
 from ..resultado_final_service import montar_dados_resultado_final
+from ..pdf_recurso import gerar_pdf_recurso
 from ..email_service import (
     avisar_comissao_novo_recurso,
     avisar_comissao_gestor_respondeu,
     avisar_comissao_empregado_aceitou,
-    avisar_comissao_empregado_recorreu,
     avisar_gestor_recurso_encaminhado,
     avisar_empregado_resposta_disponivel,
     avisar_empregado_recurso_encerrado,
@@ -161,16 +161,6 @@ def _gestor_do_recurso(recurso):
     return vinculo.avaliador if vinculo else None
 
 
-def _recurso_pode_recorrer_a_presidencia(recurso):
-    """Se o gestor imediato do avaliado É a própria presidência, não tem
-    mais ninguém acima pra recorrer — a resposta do gestor já é a última
-    instância nesse caso. Pra todo mundo cujo gestor não é a presidência,
-    o caminho normal continua valendo (gestor -> se não concordar,
-    presidência decide em última instância)."""
-    gestor = _gestor_do_recurso(recurso)
-    return not (gestor and gestor.eh_presidencia)
-
-
 def _avaliacao_gestor_do_recurso(recurso):
     vinculo = VinculoAvaliacao.query.filter_by(
         ciclo_id=recurso.ciclo_id, avaliado_id=recurso.avaliado_id
@@ -277,10 +267,6 @@ def recurso_area():
         r.eventos_visiveis = [
             e for e in r.eventos if not (e.tipo == "resposta_gestor" and not liberado)
         ]
-        r.pode_recorrer = _recurso_pode_recorrer_a_presidencia(r)
-        # Só mostra a nota recalculada pro empregado depois que a resposta
-        # do gestor já foi liberada pra ele ver (mesma regra acima) — antes
-        # disso ele não deveria enxergar o que o gestor decidiu.
         r.resultado_atual_em_texto = (
             _resultado_atual_texto(montar_dados_resultado_final(r.ciclo, r.avaliado))
             if liberado else None
@@ -360,6 +346,11 @@ def abrir_recurso():
 
 @recursos_bp.route("/recurso/<int:recurso_id>/aceitar", methods=["POST"])
 def aceitar_recurso(recurso_id):
+    """Único passo do empregado depois que a Comissão repassa a resposta
+    do gestor: confirmar recebimento e assinar eletronicamente. Isso
+    encerra o recurso na hora — não existe mais recorrer a uma instância
+    seguinte (presidência); a resposta do gestor, repassada pela Comissão,
+    já é a decisão final."""
     funcionario = _funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))
@@ -374,48 +365,57 @@ def aceitar_recurso(recurso_id):
     # conhecimento, e pode acrescentar uma observação depois se quiser
     # (não precisa mais confirmar o encerramento manualmente).
     recurso.status = RECURSO_STATUS_ENCERRADO
+    recurso.ciente_funcionario = True
+    recurso.ciente_funcionario_em = datetime.utcnow()
     db.session.add(
         RecursoEvento(recurso_id=recurso.id, tipo="aceite_funcionario", autor_id=funcionario.id)
     )
     db.session.commit()
     avisar_comissao_empregado_aceitou(recurso)
-    flash("Ok, seu recurso foi encerrado.", "success")
+    flash("Assinatura registrada. Seu recurso foi encerrado.", "success")
     return redirect(url_for("recursos.recurso_area"))
 
 
 @recursos_bp.route("/recurso/<int:recurso_id>/recorrer", methods=["POST"])
 def recorrer_recurso(recurso_id):
+    """Desativada: o empregado só recorre uma única vez (quando abre o
+    recurso). Depois que o gestor responde e a Comissão repassa, o
+    empregado só confirma recebimento (ver aceitar_recurso) — não existe
+    mais uma instância seguinte (presidência) pra recorrer de novo.
+
+    A rota continua existindo (em vez de ser removida) só como rede de
+    segurança, caso alguém acesse um link antigo/em cache do botão que
+    existia aqui antes."""
+    flash(
+        "Não é mais possível recorrer novamente: a resposta do gestor, repassada pela "
+        "Comissão, já é a decisão final. Confirme o recebimento para encerrar o recurso.",
+        "warning",
+    )
+    return redirect(url_for("recursos.recurso_area"))
+
+
+@recursos_bp.route("/recurso/<int:recurso_id>/pdf")
+def recurso_pdf(recurso_id):
+    """Comprovante em PDF do recurso encerrado: motivo, resposta do gestor,
+    resultado final e a assinatura eletrônica do empregado confirmando o
+    recebimento."""
     funcionario = _funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))
 
     recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
-    if str(recurso.avaliado_id) != str(funcionario.id) or recurso.status != RECURSO_STATUS_AGUARDANDO_FUNCIONARIO:
-        flash("Essa ação não está disponível para esse recurso.", "danger")
+    if str(recurso.avaliado_id) != str(funcionario.id):
+        flash("Você não tem permissão para baixar esse documento.", "danger")
         return redirect(url_for("recursos.recurso_area"))
 
-    if not _recurso_pode_recorrer_a_presidencia(recurso):
-        flash("Seu gestor imediato é a presidência — a resposta dele já é a decisão final, não há como recorrer.", "warning")
-        return redirect(url_for("recursos.recurso_area"))
-
-    justificativa = request.form.get("justificativa", "").strip()
-    if not justificativa:
-        flash("Escreva por que você ainda não concorda antes de recorrer à presidência.", "warning")
-        return redirect(url_for("recursos.recurso_area"))
-
-    recurso.status = RECURSO_STATUS_AGUARDANDO_COMISSAO_RECURSO
-    db.session.add(
-        RecursoEvento(
-            recurso_id=recurso.id,
-            tipo="pedido_recorrer",
-            autor_id=funcionario.id,
-            texto=justificativa,
-        )
+    dados = montar_dados_resultado_final(recurso.ciclo, recurso.avaliado)
+    pdf_buffer = gerar_pdf_recurso(recurso, dados)
+    nome_arquivo = f"recurso_{recurso.avaliado.nome.replace(' ', '_')}_{recurso.ciclo.exercicio}.pdf"
+    return Response(
+        pdf_buffer.read(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
     )
-    db.session.commit()
-    avisar_comissao_empregado_recorreu(recurso)
-    flash("Pedido enviado para a Comissão encaminhar à presidência.", "success")
-    return redirect(url_for("recursos.recurso_area"))
 
 
 @recursos_bp.route("/recurso/<int:recurso_id>/ciencia", methods=["POST"])
@@ -460,6 +460,18 @@ def _calcular_prazo_gestor_responder(recurso):
     return prazo_dias_corridos(momento_encaminhamento, PRAZO_GESTOR_RESPONDER_DIAS)
 
 
+STATUS_RECURSO_LABEL = {
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_INICIAL: "Aguardando a Comissão encaminhar",
+    RECURSO_STATUS_AGUARDANDO_GESTOR: "Aguardando sua resposta",
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE: "Você já respondeu — aguardando a Comissão repassar ao empregado",
+    RECURSO_STATUS_AGUARDANDO_FUNCIONARIO: "Repassado ao empregado — aguardando a assinatura dele",
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_FECHAMENTO: "Aguardando a Comissão confirmar o encerramento",
+    RECURSO_STATUS_AGUARDANDO_COMISSAO_RECURSO: "Aguardando a Comissão encaminhar à presidência",
+    RECURSO_STATUS_AGUARDANDO_PRESIDENCIA: "Aguardando decisão da presidência",
+    RECURSO_STATUS_ENCERRADO: "Encerrado",
+}
+
+
 @recursos_bp.route("/recurso/gestor")
 def recurso_gestor_area():
     funcionario = _funcionario_logado()
@@ -487,6 +499,12 @@ def recurso_gestor_area():
                 r.prazo_gestor_responder = _calcular_prazo_gestor_responder(r)
                 recursos_pendentes.append(r)
             else:
+                # Uma vez que o gestor responde, não sobra mais nenhuma ação
+                # pra ele nesse recurso — o que vem depois (Comissão repassar,
+                # empregado assinar) não depende mais dele. Por isso essa
+                # lista é tratada como "finalizada" do ponto de vista do
+                # gestor, mesmo que o recurso em si ainda não esteja encerrado.
+                r.status_legivel = STATUS_RECURSO_LABEL.get(r.status, r.status)
                 recursos_respondidos.append(r)
 
     return render_template(

@@ -91,8 +91,12 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if linha.ciente %}
-                                <span class="badge badge-ok" title="Confirmada em {{ (linha.ciente_em|fortaleza).strftime('%d/%m/%Y %H:%M') if linha.ciente_em else '-' }}">Confirmada</span>
+                            {% if linha.assinatura_status == 'confirmada' %}
+                                <span class="badge badge-ok" title="Confirmada em {{ (linha.assinatura_em|fortaleza).strftime('%d/%m/%Y %H:%M') if linha.assinatura_em else '-' }}">Confirmada</span>
+                            {% elif linha.assinatura_status == 'assinada_recurso' %}
+                                <span class="badge badge-ok" title="Assinada (após o recurso) em {{ (linha.assinatura_em|fortaleza).strftime('%d/%m/%Y %H:%M') if linha.assinatura_em else '-' }}">Assinada<br>(recurso)</span>
+                            {% elif linha.assinatura_status == 'recurso_pendente' %}
+                                <span class="badge badge-new" title="Recorreu — ainda não assinou a resposta final do recurso">Recurso em andamento</span>
                             {% elif linha.liberado %}
                                 {% if linha.prazo_ciencia and linha.prazo_ciencia < agora %}
                                     <span class="badge badge-danger" title="Prazo era {{ linha.prazo_ciencia.strftime('%d/%m/%Y') }}">Atrasada</span>

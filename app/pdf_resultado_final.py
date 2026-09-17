@@ -231,9 +231,19 @@ def gerar_pdf_resultado_final(dados):
 
     nome_avaliado_assinatura = avaliacao_auto.avaliado.nome if avaliacao_auto else avaliado.nome
 
+    texto_assinatura_avaliador = nome_avaliador
+    if avaliacao_gestor and avaliacao_gestor.assinado_em:
+        texto_assinatura_avaliador += f" — assinado em {formatar_data_local(avaliacao_gestor.assinado_em)}"
+
+    texto_assinatura_avaliado = nome_avaliado_assinatura
+    if resultado_registro and resultado_registro.ciente_avaliado and resultado_registro.ciente_em:
+        texto_assinatura_avaliado += f" — assinado em {formatar_data_local(resultado_registro.ciente_em)}"
+    else:
+        texto_assinatura_avaliado += " — assinatura pendente"
+
     linhas_assinatura = [
-        [Paragraph("Assinatura do Avaliador:", celula_nome), Paragraph(nome_avaliador, celula)],
-        [Paragraph("Assinatura do Avaliado:", celula_nome), Paragraph(nome_avaliado_assinatura, celula)],
+        [Paragraph("Assinatura do Avaliador:", celula_nome), Paragraph(texto_assinatura_avaliador, celula)],
+        [Paragraph("Assinatura do Avaliado:", celula_nome), Paragraph(texto_assinatura_avaliado, celula)],
     ]
     tabela_assinatura = Table(linhas_assinatura, colWidths=[4.5 * cm, 12.5 * cm])
     tabela_assinatura.setStyle(
@@ -303,8 +313,16 @@ def gerar_pdf_resultado_final_lista(ciclo, linhas, somente_concluidos=True):
             Paragraph("ADMISSÃO", celula_cabecalho),
             Paragraph("NOTA", celula_cabecalho),
             Paragraph("CONCEITO", celula_cabecalho),
+            Paragraph("CIÊNCIA / ASSINATURA", celula_cabecalho),
         ]
     ]
+
+    TEXTO_ASSINATURA = {
+        "confirmada": "Confirmada",
+        "assinada_recurso": "Assinada (recurso)",
+        "recurso_pendente": "Recurso em andamento",
+        "pendente": "Pendente",
+    }
 
     contagem_conceitos = {"A": 0, "B": 0, "C": 0}
     for i, linha in enumerate(linhas_a_exportar, start=1):
@@ -313,6 +331,10 @@ def gerar_pdf_resultado_final_lista(ciclo, linhas, somente_concluidos=True):
         conceito = linha["conceito"]
         if conceito in contagem_conceitos:
             contagem_conceitos[conceito] += 1
+
+        texto_assinatura = TEXTO_ASSINATURA.get(linha.get("assinatura_status"), "Pendente")
+        if linha.get("assinatura_em"):
+            texto_assinatura += f" ({formatar_data_local(linha['assinatura_em'], com_hora=False)})"
 
         tabela_linhas.append(
             [
@@ -323,12 +345,13 @@ def gerar_pdf_resultado_final_lista(ciclo, linhas, somente_concluidos=True):
                 ),
                 Paragraph(f"{resultado_final:.2f}" if resultado_final is not None else "-", celula_centro),
                 Paragraph(conceito or "-", celula_centro),
+                Paragraph(texto_assinatura, celula_centro),
             ]
         )
 
     tabela = Table(
         tabela_linhas,
-        colWidths=[1.6 * cm, 8 * cm, 2.6 * cm, 2 * cm, 2.3 * cm],
+        colWidths=[1.4 * cm, 5.6 * cm, 2.5 * cm, 1.6 * cm, 2.9 * cm, 3.6 * cm],
         repeatRows=1,
     )
     tabela.setStyle(

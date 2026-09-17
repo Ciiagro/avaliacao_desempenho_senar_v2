@@ -9,7 +9,7 @@
     &middot; Aberto em {{ (recurso.criado_em|fortaleza).strftime('%d/%m/%Y') if recurso.criado_em else '-' }}
     &middot; Status atual:
     {% if recurso.status == 'aguardando_gestor' %}Aguardando resposta do gestor
-    {% elif recurso.status == 'aguardando_funcionario' %}Aguardando decisão do empregado
+    {% elif recurso.status == 'aguardando_funcionario' %}Aguardando o empregado assinar o termo de recebimento
     {% elif recurso.status == 'aguardando_presidencia' %}Aguardando decisão da presidência
     {% elif recurso.status == 'encerrado' %}Encerrado
     {% else %}{{ recurso.status }}

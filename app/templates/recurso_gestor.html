@@ -24,14 +24,15 @@
     </div>
 {% endfor %}
 
-<h2>Já respondidos</h2>
+<h2>Recursos finalizados</h2>
+<p class="muted">Você já respondeu — o que falta agora não depende mais de você.</p>
 {% if not recursos_respondidos %}
     <p class="muted">Nenhum ainda.</p>
 {% endif %}
 {% for r in recursos_respondidos %}
     <div class="card" style="margin-bottom:12px; text-align:left;">
         <h2 style="font-size:1.05rem;">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</h2>
-        <p class="muted">Status: {{ r.status }}</p>
+        <p class="muted">Status: {{ r.status_legivel }}</p>
         <a class="botao botao-secundario botao-pequeno" href="{{ url_for('recursos.recurso_gestor_detalhe', recurso_id=r.id) }}">Ver</a>
     </div>
 {% endfor %}

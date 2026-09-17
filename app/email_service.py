@@ -328,6 +328,77 @@ def avisar_empregado_recurso_encerrado(recurso, resumo):
     )
 
 
+def avisar_prazo_avaliacao(funcionario, tipo, dias_restantes, prazo):
+    """Lembrete de prazo (5 dias / 2 dias / no dia) pra quem ainda não
+    concluiu a autoavaliação ou a avaliação do gestor de alguém."""
+    nome_tipo = "autoavaliação" if tipo == "auto" else "avaliação do(s) empregado(s) sob sua gestão"
+
+    if dias_restantes == 0:
+        assunto_prazo = "encerra hoje"
+        frase_prazo = f"o prazo para concluir sua {nome_tipo} encerra hoje, {prazo.strftime('%d/%m/%Y')}."
+    else:
+        assunto_prazo = f"faltam {dias_restantes} dias"
+        frase_prazo = (
+            f"faltam {dias_restantes} dia(s) para o prazo de conclusão da sua "
+            f"{nome_tipo}, que encerra em {prazo.strftime('%d/%m/%Y')}."
+        )
+
+    _enviar_email(
+        _email_funcionario(funcionario),
+        f"[Avaliação de Desempenho] Prazo — {assunto_prazo} ({nome_tipo})",
+        titulo="Lembrete de prazo",
+        paragrafos=[
+            f"Olá, {funcionario.nome}.",
+            frase_prazo,
+            "Depois do prazo, o sistema não permite mais preencher ou alterar a avaliação.",
+        ],
+        link_url=_link_minha_area(),
+        link_texto="Acessar minha área",
+    )
+
+
+def avisar_prazo_ciencia_resultado(funcionario, dias_restantes, prazo):
+    """Lembrete pra quem ainda NÃO deu ciência do resultado final — mesmo
+    que a pessoa não pretenda recorrer, ela precisa confirmar que viu a
+    nota antes do prazo. Esse documento assinado é o que protege a
+    empresa numa reclamação futura, então esse lembrete vale tanto quanto
+    os de prazo de avaliação."""
+    if dias_restantes == 0:
+        assunto_prazo = "encerra hoje"
+        frase_prazo = f"o prazo para dar ciência do seu resultado final encerra hoje, {prazo.strftime('%d/%m/%Y')}."
+    else:
+        assunto_prazo = f"faltam {dias_restantes} dias"
+        frase_prazo = (
+            f"faltam {dias_restantes} dia(s) para o prazo de dar ciência do seu resultado final, "
+            f"que encerra em {prazo.strftime('%d/%m/%Y')}."
+        )
+
+    _enviar_email(
+        _email_funcionario(funcionario),
+        f"[Avaliação de Desempenho] Prazo — {assunto_prazo} (ciência do resultado final)",
+        titulo="Lembrete de prazo",
+        paragrafos=[
+            f"Olá, {funcionario.nome}.",
+            "Seu resultado final da avaliação de desempenho já foi liberado e ainda está "
+            "aguardando sua ciência.",
+            frase_prazo,
+            "Mesmo que você concorde com o resultado e não vá recorrer, é obrigatório confirmar "
+            "que você tomou conhecimento — isso é o que fica registrado como comprovante.",
+        ],
+        link_url=_link_minha_area(),
+        link_texto="Ver meu resultado",
+    )
+
+
+def _link_minha_area():
+    from flask import url_for
+
+    try:
+        return url_for("main.minha_area", _external=True)
+    except RuntimeError:
+        return ""
+
+
 def _link_comissao():
     from flask import url_for
 

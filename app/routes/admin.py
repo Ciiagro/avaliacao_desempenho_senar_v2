@@ -53,6 +53,8 @@ from ..models import (
     EventoFuncionario,
     Progressao,
     TIPOS_EVENTO_FUNCIONARIO,
+    RecursoAvaliacao,
+    RECURSO_STATUS_ENCERRADO,
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -279,6 +281,14 @@ def montar_linhas_resultado_final(ciclo):
         for r in ResultadoFinal.query.filter_by(ciclo_id=ciclo.id).all()
     }
 
+    # Pra quem recorreu, a "ciência" inicial não é o fim da história — a
+    # assinatura que realmente conta é a de quando o recurso encerra (ver
+    # app/routes/recursos.py: aceitar_recurso). Busca de uma vez só os
+    # recursos do ciclo pra não fazer uma query por funcionário.
+    recursos_por_avaliado = {
+        r.avaliado_id: r for r in RecursoAvaliacao.query.filter_by(ciclo_id=ciclo.id).all()
+    }
+
     linhas = []
     for f in funcionarios:
         if f.is_elegivel_avaliacao(referencia=ciclo.referencia_elegibilidade()) is False:
@@ -297,6 +307,25 @@ def montar_linhas_resultado_final(ciclo):
 
         resultado_registro = liberados_por_avaliado.get(f.id)
 
+        # Status real da assinatura: "pendente" (nem deu ciência ainda),
+        # "confirmada" (aceitou de primeira, já é definitivo), "recurso_pendente"
+        # (recorreu, mas o recurso ainda não foi assinado no fim) ou
+        # "assinada_recurso" (recorreu e já assinou a resposta final do recurso).
+        recurso = recursos_por_avaliado.get(f.id)
+        if not (resultado_registro and resultado_registro.ciente_avaliado):
+            assinatura_status = "pendente"
+            assinatura_em = None
+        elif resultado_registro.decisao_avaliado == "recorreu":
+            if recurso and recurso.status == RECURSO_STATUS_ENCERRADO and recurso.ciente_funcionario:
+                assinatura_status = "assinada_recurso"
+                assinatura_em = recurso.ciente_funcionario_em
+            else:
+                assinatura_status = "recurso_pendente"
+                assinatura_em = None
+        else:
+            assinatura_status = "confirmada"
+            assinatura_em = resultado_registro.ciente_em
+
         linhas.append(
             {
                 "funcionario": f,
@@ -308,6 +337,8 @@ def montar_linhas_resultado_final(ciclo):
                 "liberado": bool(resultado_registro and resultado_registro.liberado),
                 "ciente": bool(resultado_registro and resultado_registro.ciente_avaliado),
                 "ciente_em": resultado_registro.ciente_em if resultado_registro else None,
+                "assinatura_status": assinatura_status,
+                "assinatura_em": assinatura_em,
                 "prazo_ciencia": (
                     adicionar_dias_uteis(
                         para_fortaleza(resultado_registro.liberado_em), PRAZO_CIENCIA_DIAS_UTEIS

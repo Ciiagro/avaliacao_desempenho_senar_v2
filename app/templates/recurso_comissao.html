@@ -277,14 +277,14 @@
 
 {% if em_andamento %}
 <h2>Em andamento fora da Comissão agora</h2>
-<p class="muted">Recursos que já saíram das mãos da Comissão neste momento (esperando o empregado decidir, ou esperando a presidência). Clique para ver os detalhes.</p>
+<p class="muted">Recursos que já saíram das mãos da Comissão neste momento (esperando o empregado assinar, ou esperando a presidência). Clique para ver os detalhes.</p>
 {% for r in em_andamento %}
     <a href="{{ url_for('recursos.recurso_comissao_detalhe', recurso_id=r.id) }}" class="card card-link" style="display:block; margin-bottom:12px; text-align:left;">
         <strong>{{ r.avaliado.nome }}</strong> &mdash; Exercício {{ r.ciclo.exercicio }}
         <p class="muted" style="margin:4px 0 0;">
             Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
             &middot;
-            {% if r.status == 'aguardando_funcionario' %}<span class="badge badge-pending">Aguardando decisão do empregado</span>
+            {% if r.status == 'aguardando_funcionario' %}<span class="badge badge-pending">Aguardando o empregado assinar o termo de recebimento</span>
             {% elif r.status == 'aguardando_presidencia' %}<span class="badge badge-pending">Aguardando decisão da presidência</span>
             {% else %}{{ r.status }}
             {% endif %}

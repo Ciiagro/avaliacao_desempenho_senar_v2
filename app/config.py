@@ -33,3 +33,8 @@ class Config:
     MAIL_PORT = int(os.environ.get("MAIL_PORT", 465))
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_APP_PASSWORD = os.environ.get("MAIL_APP_PASSWORD")
+
+    # Segredo que protege a rota /tarefas/verificar-prazos (lembretes de
+    # prazo por e-mail), chamada 1x/dia pelo Vercel Cron. Sem essa variável
+    # configurada, a rota fica desativada.
+    CRON_SECRET = os.environ.get("CRON_SECRET")

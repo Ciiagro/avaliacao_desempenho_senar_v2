@@ -53,12 +53,37 @@
 
 {% if dados.resultado_registro and dados.resultado_registro.ciente_avaliado %}
     {% if dados.resultado_registro.decisao_avaliado == 'recorreu' %}
-        <div class="flash flash-warning" style="margin-top:16px;">
-            <strong>Ciência registrada.</strong>
-            Você deu ciência em {{ (dados.resultado_registro.ciente_em|fortaleza).strftime('%d/%m/%Y às %H:%M') }}
-            e optou por recorrer. Acompanhe o andamento do seu recurso na
-            <a href="{{ url_for('recursos.recurso_area') }}">área de recursos</a>.
-        </div>
+        {% if recurso_atual and recurso_atual.status == 'aguardando_funcionario' %}
+            <div class="flash flash-warning" style="margin-top:16px;">
+                <p style="margin:0 0 10px;">
+                    <strong>Chegou a resposta do seu recurso.</strong>
+                    Essa é a resposta final do gestor, já revisada pela Comissão — confirme o
+                    recebimento para assinar eletronicamente e encerrar o recurso.
+                </p>
+                <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=recurso_atual.id) }}" onsubmit="return confirm('Confirmar o recebimento e assinar eletronicamente? Isso encerra o recurso definitivamente.');">
+                    <button type="submit" class="botao">Confirmar recebimento e assinar</button>
+                </form>
+            </div>
+        {% elif recurso_atual and recurso_atual.status == 'encerrado' %}
+            <div class="flash flash-success" style="margin-top:16px;">
+                <strong>Recurso encerrado.</strong>
+                {% if recurso_atual.ciente_funcionario_em %}
+                    Você assinou eletronicamente em {{ (recurso_atual.ciente_funcionario_em|fortaleza).strftime('%d/%m/%Y às %H:%M') }}.
+                {% endif %}
+                <a href="{{ url_for('recursos.recurso_pdf', recurso_id=recurso_atual.id) }}">Baixar comprovante do recurso em PDF</a>.
+            </div>
+        {% else %}
+            <div class="flash flash-warning" style="margin-top:16px;">
+                <strong>Ciência registrada.</strong>
+                Você deu ciência em {{ (dados.resultado_registro.ciente_em|fortaleza).strftime('%d/%m/%Y às %H:%M') }}
+                e optou por recorrer.
+                {% if recurso_atual %}
+                    Status atual do recurso: <strong>{{ recurso_atual.status_legivel }}</strong>.
+                {% endif %}
+                Acompanhe o andamento na
+                <a href="{{ url_for('recursos.recurso_area') }}">área de recursos</a>.
+            </div>
+        {% endif %}
     {% else %}
         <div class="flash flash-success" style="margin-top:16px;">
             <strong>Ciência registrada.</strong>

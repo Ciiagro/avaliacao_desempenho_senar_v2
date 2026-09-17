@@ -4,5 +4,11 @@
     "wsgi.py": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/tarefas/verificar-prazos",
+      "schedule": "0 11 * * *"
+    }
+  ]
 }

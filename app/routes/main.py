@@ -268,6 +268,24 @@ def meu_resultado_detalhe(ciclo_id):
         flash("Seu resultado final ainda não está disponível.", "warning")
         return redirect(url_for("main.minha_area"))
 
+    # Se o empregado optou por recorrer, busca o recurso pra mostrar o
+    # status ATUAL dele aqui mesmo (em vez de um texto fixo que nunca
+    # muda) — e, quando estiver esperando a assinatura dele, deixa
+    # assinar direto por aqui também, sem precisar ir pra área de
+    # recursos (mesma ação, mesmo resultado dos dois lugares).
+    recurso_atual = None
+    if registro.decisao_avaliado == "recorreu":
+        from ..models import RecursoAvaliacao
+        from .recursos import STATUS_RECURSO_LABEL
+
+        recurso_atual = RecursoAvaliacao.query.filter_by(
+            ciclo_id=ciclo_id, avaliado_id=funcionario.id
+        ).first()
+        if recurso_atual:
+            recurso_atual.status_legivel = STATUS_RECURSO_LABEL.get(
+                recurso_atual.status, recurso_atual.status
+            )
+
     return render_template(
         "resultado_detalhe_funcionario.html",
         ciclo=ciclo,
@@ -275,6 +293,7 @@ def meu_resultado_detalhe(ciclo_id):
         dados=dados,
         prazo_ciencia=prazo_ciencia(registro),
         agora=datetime.now(timezone.utc),
+        recurso_atual=recurso_atual,
     )
 
 
@@ -375,4 +394,32 @@ def meu_resultado_excel(ciclo_id):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={nome_arquivo}"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Tarefa automática (chamada 1x/dia pelo Vercel Cron — ver vercel.json):
+# manda os lembretes de prazo por e-mail (5 dias, 2 dias e no dia).
+# Não é uma tela — não usa login de funcionário/admin. É protegida por um
+# segredo (CRON_SECRET) pra ninguém de fora poder disparar isso à toa.
+# ---------------------------------------------------------------------------
+@main_bp.route("/tarefas/verificar-prazos")
+def tarefa_verificar_prazos():
+    from flask import current_app, jsonify
+    from ..lembretes_service import enviar_lembretes_prazo
+
+    segredo_esperado = current_app.config.get("CRON_SECRET")
+    if not segredo_esperado:
+        # Sem CRON_SECRET configurado, a rota fica desativada por segurança
+        # (nunca deixar essa rota aberta pra qualquer um acionar).
+        return jsonify({"erro": "CRON_SECRET não configurado no ambiente."}), 503
+
+    # O Vercel Cron manda automaticamente "Authorization: Bearer <CRON_SECRET>"
+    # quando essa variável de ambiente existe no projeto — não precisa
+    # configurar isso na mão, só cadastrar CRON_SECRET no painel do Vercel.
+    autorizacao = request.headers.get("Authorization", "")
+    if autorizacao != f"Bearer {segredo_esperado}":
+        return jsonify({"erro": "não autorizado"}), 401
+
+    resumo = enviar_lembretes_prazo()
+    return jsonify(resumo)
 

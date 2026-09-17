@@ -50,7 +50,7 @@
             {% elif r.status == 'aguardando_comissao_repasse' %}
                 <span class="badge badge-pending">Gestor já respondeu — aguardando a Comissão repassar</span>
             {% elif r.status == 'aguardando_funcionario' %}
-                <span class="badge badge-pending">Aguardando sua decisão</span>
+                <span class="badge badge-pending">Aguardando sua assinatura</span>
             {% elif r.status == 'aguardando_comissao_fechamento' %}
                 <span class="badge badge-pending">Aguardando a Comissão confirmar o encerramento</span>
             {% elif r.status == 'aguardando_comissao_recurso' %}
@@ -97,41 +97,40 @@
         </div>
 
         {% if r.status == 'aguardando_funcionario' %}
-            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-                <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=r.id) }}" onsubmit="return confirm('Confirmar que você aceita a decisão do gestor? Isso encerra o recurso.');">
-                    <button type="submit" class="botao botao-secundario">Aceitar a decisão do gestor</button>
+            <div style="margin-top:12px;">
+                <p class="muted" style="margin:0 0 8px;">
+                    Essa é a resposta final do gestor, já revisada pela Comissão. Confirme o
+                    recebimento para assinar eletronicamente e encerrar o recurso.
+                </p>
+                <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=r.id) }}" onsubmit="return confirm('Confirmar o recebimento e assinar eletronicamente? Isso encerra o recurso definitivamente.');">
+                    <button type="submit" class="botao">Confirmar recebimento e assinar</button>
                 </form>
-                {% if r.pode_recorrer %}
-                    <form method="post" action="{{ url_for('recursos.recorrer_recurso', recurso_id=r.id) }}" style="flex:1; min-width:260px;">
-                        <textarea name="justificativa" rows="2" placeholder="Por que você ainda não concorda? (obrigatório)" required></textarea>
-                        <button type="submit" class="botao" style="margin-top:6px;">Ainda não concordo, quero recorrer</button>
-                    </form>
-                {% else %}
-                    <p class="muted" style="flex:1; min-width:260px; margin:0;">
-                        Seu gestor imediato é a presidência — essa resposta já é a decisão final,
-                        não existe mais nenhuma instância pra recorrer.
-                    </p>
-                {% endif %}
             </div>
         {% endif %}
 
-        {% if r.status == 'encerrado' and r.eventos|selectattr('tipo', 'equalto', 'decisao_presidencia')|list %}
-            {% if r.ciente_funcionario %}
-                <p class="muted" style="margin-top:12px;">
-                    ✅ Você deu ciência dessa decisão em
-                    {{ (r.ciente_funcionario_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if r.ciente_funcionario_em else '' }}.
-                </p>
-            {% else %}
-                <div class="flash flash-warning" style="margin-top:12px;">
-                    <p style="margin:0 0 10px;">
-                        Seu recurso foi encerrado com a decisão final da presidência.
-                        Dê ciência de que você tomou conhecimento.
+        {% if r.status == 'encerrado' %}
+            {% set fechado_por_presidencia = r.eventos|selectattr('tipo', 'equalto', 'decisao_presidencia')|list %}
+            <div style="margin-top:12px;">
+                {% if r.ciente_funcionario %}
+                    <p class="muted" style="margin:0 0 8px;">
+                        ✅ Você {{ 'deu ciência dessa decisão' if fechado_por_presidencia else 'assinou eletronicamente' }} em
+                        {{ (r.ciente_funcionario_em|fortaleza).strftime('%d/%m/%Y às %H:%M') if r.ciente_funcionario_em else '' }}.
                     </p>
-                    <form method="post" action="{{ url_for('recursos.recurso_dar_ciencia', recurso_id=r.id) }}">
-                        <button type="submit" class="botao">Dar ciência da decisão</button>
-                    </form>
-                </div>
-            {% endif %}
+                    <a class="botao botao-secundario" href="{{ url_for('recursos.recurso_pdf', recurso_id=r.id) }}">Baixar comprovante em PDF</a>
+                {% elif fechado_por_presidencia %}
+                    <div class="flash flash-warning">
+                        <p style="margin:0 0 10px;">
+                            Seu recurso foi encerrado com a decisão final da presidência.
+                            Dê ciência de que você tomou conhecimento.
+                        </p>
+                        <form method="post" action="{{ url_for('recursos.recurso_dar_ciencia', recurso_id=r.id) }}">
+                            <button type="submit" class="botao">Dar ciência da decisão</button>
+                        </form>
+                    </div>
+                {% else %}
+                    <a class="botao botao-secundario" href="{{ url_for('recursos.recurso_pdf', recurso_id=r.id) }}">Baixar comprovante em PDF</a>
+                {% endif %}
+            </div>
         {% endif %}
     </div>
 {% endfor %}
