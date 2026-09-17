@@ -94,7 +94,7 @@
 </form>
 
 <div class="tabela-toolbar">
-    <input type="search" id="busca-funcionario" placeholder="Buscar por nome, cargo ou setor...">
+    <input type="search" id="busca-funcionario" placeholder="Buscar por nome, cargo, setor ou nível hierárquico...">
     <div class="filtros-andamento">
         <a href="{{ url_for('admin.funcionarios', status='ativos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
            class="botao-filtro {% if status_filtro == 'ativos' %}ativo{% endif %}">Só ativos</a>
@@ -136,7 +136,7 @@
         </thead>
         <tbody>
             {% for f in lista %}
-                <tr class="linha-funcionario {% if not f.ativo %}linha-inativa{% endif %}" data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else ''))|lower }}">
+                <tr class="linha-funcionario {% if not f.ativo %}linha-inativa{% endif %}" data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else '') ~ ' ' ~ (f.nivel_hierarquico or ''))|lower }}">
                     <td>
                         <div class="funcionario-nome">
                             {{ f.nome }}
