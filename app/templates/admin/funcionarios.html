@@ -103,8 +103,16 @@
         <a href="{{ url_for('admin.funcionarios', status='todos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
            class="botao-filtro {% if status_filtro == 'todos' %}ativo{% endif %}">Todos</a>
         <span style="width:1px; background:#dcdfe6; align-self:stretch; margin:0 2px;"></span>
-        <a href="{{ url_for('admin.funcionarios', status=status_filtro, setor_id=setor_filtro.id if setor_filtro else None, elegivel='sim' if elegivel_filtro != 'sim' else 'todos') }}"
-           class="botao-filtro {% if elegivel_filtro == 'sim' %}ativo{% endif %}">Só elegíveis</a>
+        <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; padding:0 8px;">
+            <input
+                type="checkbox"
+                {% if elegivel_filtro == 'sim' %}checked{% endif %}
+                onchange="location.href = this.checked
+                    ? '{{ url_for('admin.funcionarios', status=status_filtro, setor_id=setor_filtro.id if setor_filtro else None, elegivel='sim') }}'
+                    : '{{ url_for('admin.funcionarios', status=status_filtro, setor_id=setor_filtro.id if setor_filtro else None, elegivel='todos') }}';"
+            >
+            Só elegíveis
+        </label>
     </div>
     <button type="button" id="botao-sensiveis" class="botao botao-secundario">Mostrar dados sensíveis</button>
     <a href="{{ url_for('admin.exportar_funcionarios') }}" class="botao">Exportar para Excel</a>
