@@ -1446,7 +1446,13 @@ def funcionarios():
         consulta = consulta.filter_by(ativo=False)
     # "todos" não filtra por status
 
+    elegivel_filtro = request.args.get("elegivel", "todos")  # todos (padrão) | sim | nao
     lista = consulta.order_by(Funcionario.nome).all()
+    if elegivel_filtro == "sim":
+        lista = [f for f in lista if f.is_elegivel_avaliacao() is True]
+    elif elegivel_filtro == "nao":
+        lista = [f for f in lista if f.is_elegivel_avaliacao() is not True]
+
     cargos = Cargo.query.order_by(Cargo.nome).all()
     setores = Setor.query.order_by(Setor.nome).all()
     return render_template(
@@ -1460,6 +1466,7 @@ def funcionarios():
         opcoes_sexo=OPCOES_SEXO,
         setor_filtro=setor_filtro,
         status_filtro=status_filtro,
+        elegivel_filtro=elegivel_filtro,
     )
 
 

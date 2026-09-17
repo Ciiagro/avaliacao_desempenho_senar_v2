@@ -96,12 +96,15 @@
 <div class="tabela-toolbar">
     <input type="search" id="busca-funcionario" placeholder="Buscar por nome, cargo ou setor...">
     <div class="filtros-andamento">
-        <a href="{{ url_for('admin.funcionarios', status='ativos', setor_id=setor_filtro.id if setor_filtro else None) }}"
+        <a href="{{ url_for('admin.funcionarios', status='ativos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
            class="botao-filtro {% if status_filtro == 'ativos' %}ativo{% endif %}">Só ativos</a>
-        <a href="{{ url_for('admin.funcionarios', status='inativos', setor_id=setor_filtro.id if setor_filtro else None) }}"
+        <a href="{{ url_for('admin.funcionarios', status='inativos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
            class="botao-filtro {% if status_filtro == 'inativos' %}ativo{% endif %}">Inativos</a>
-        <a href="{{ url_for('admin.funcionarios', status='todos', setor_id=setor_filtro.id if setor_filtro else None) }}"
+        <a href="{{ url_for('admin.funcionarios', status='todos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
            class="botao-filtro {% if status_filtro == 'todos' %}ativo{% endif %}">Todos</a>
+        <span style="width:1px; background:#dcdfe6; align-self:stretch; margin:0 2px;"></span>
+        <a href="{{ url_for('admin.funcionarios', status=status_filtro, setor_id=setor_filtro.id if setor_filtro else None, elegivel='sim' if elegivel_filtro != 'sim' else 'todos') }}"
+           class="botao-filtro {% if elegivel_filtro == 'sim' %}ativo{% endif %}">Só elegíveis</a>
     </div>
     <button type="button" id="botao-sensiveis" class="botao botao-secundario">Mostrar dados sensíveis</button>
     <a href="{{ url_for('admin.exportar_funcionarios') }}" class="botao">Exportar para Excel</a>
