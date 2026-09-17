@@ -124,7 +124,7 @@
             <tr>
                 <th>Funcionário</th>
                 <th>Nível hierárquico</th>
-                <th>Elegível avaliação</th>
+                <th style="white-space:normal; max-width:80px; text-align:center;">Elegível</th>
                 <th>Login</th>
                 <th>E-mail</th>
                 <th class="coluna-sensivel">CPF</th>
@@ -157,7 +157,7 @@
                             <span class="badge badge-nivel-{{ f.nivel_hierarquico|lower }}">{{ f.nivel_hierarquico }}</span>
                         {% else %}-{% endif %}
                     </td>
-                    <td>
+                    <td style="text-align:center;">
                         {% set eleg = f.is_elegivel_avaliacao() %}
                         {% if eleg is none %}-
                         {% elif eleg %}<span class="badge badge-elegivel-sim">Sim</span>
