@@ -11,7 +11,11 @@
         (10 dias corridos a partir do encaminhamento da Comissão)
     </p>
 {% endif %}
-<p><strong>Motivo do recurso:</strong> {{ recurso.motivo }}</p>
+{% set itens_contestados = recurso.itens_contestados_por_fator %}
+{% set fatores_reavaliados = recurso.revisoes_notas | map(attribute='fator_id') | list %}
+{% if not itens_contestados %}
+    <p><strong>Motivo do recurso:</strong> {{ recurso.motivo }}</p>
+{% endif %}
 
 {% for e in recurso.eventos %}
     {% if e.tipo == 'encaminhamento_comissao_gestor' %}
@@ -31,9 +35,19 @@
         </thead>
         <tbody>
             {% for fator in dados.fatores %}
-                <tr>
+                <tr class="{{ 'linha-contestada' if fator.id in itens_contestados else '' }}">
                     <td>{{ fator.ordem }}</td>
-                    <td>{{ fator.nome }}</td>
+                    <td>
+                        {{ fator.nome }}
+                        {% if fator.id in fatores_reavaliados %}
+                            <span class="badge badge-ok" style="margin-left:6px;">Reavaliado</span>
+                        {% elif fator.id in itens_contestados %}
+                            <span class="badge badge-pending" style="margin-left:6px;">Contestado</span>
+                        {% endif %}
+                        {% if fator.id in itens_contestados %}
+                            <div class="muted" style="font-size:0.82rem; font-weight:400; margin-top:3px;">{{ itens_contestados[fator.id] }}</div>
+                        {% endif %}
+                    </td>
                     <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
                     <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
                 </tr>
@@ -57,33 +71,88 @@
             </thead>
             <tbody>
                 {% for fator in dados.fatores %}
-                    <tr>
-                        <td>{{ fator.nome }}</td>
-                        {% for valor in [10, 8, 6, 4] %}
-                            <td class="celula-radio">
-                                <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
-                                       {% if dados.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
-                            </td>
-                        {% endfor %}
-                    </tr>
+                    {% if (fator.id in itens_contestados) or (not itens_contestados) %}
+                        <tr class="{{ 'linha-contestada' if fator.id in itens_contestados else '' }}">
+                            <td>{{ fator.nome }}{% if fator.id in itens_contestados %} <span class="badge badge-pending" style="margin-left:4px;">Contestado</span>{% endif %}</td>
+                            {% for valor in [10, 8, 6, 4] %}
+                                <td class="celula-radio">
+                                    <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
+                                           {% if dados.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>
-        <p class="muted">Só preencha as notas acima se escolher "Revisar". Se marcar "Manter", elas são ignoradas.</p>
+        <p class="muted">
+            {% if itens_contestados %}
+                Aqui aparecem só os itens contestados. Se escolher "Manter", as notas acima são ignoradas.
+            {% else %}
+                Só preencha as notas acima se escolher "Revisar". Se marcar "Manter", elas são ignoradas.
+            {% endif %}
+        </p>
 
-        <label for="justificativa">Justificativa (obrigatória nos dois casos)</label>
-        <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
+        {% if itens_contestados %}
+            <p class="muted" style="margin:0 0 6px;">Explique o motivo da sua decisão em cada item contestado (mesmo que tenha mantido a nota):</p>
+            <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:14px; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">
+                {% for fator in dados.fatores %}
+                    {% if fator.id in itens_contestados %}
+                        <div>
+                            <label for="motivo_fator_{{ fator.id }}" style="font-weight:600; text-transform:none;">{{ fator.nome }}</label>
+                            <textarea id="motivo_fator_{{ fator.id }}" name="motivo_fator_{{ fator.id }}" rows="2" required
+                                      placeholder="Explique por que manteve ou mudou a nota de {{ fator.nome }}..."></textarea>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <label for="justificativa">Justificativa (obrigatória nos dois casos)</label>
+            <textarea id="justificativa" name="justificativa" rows="4" required></textarea>
+        {% endif %}
 
         <button type="submit" class="botao" style="margin-top:12px;">Enviar resposta</button>
     </form>
 {% else %}
+    {% if itens_contestados %}
+        {% set revisoes_por_fator_gestor = {} %}
+        {% for rev in recurso.revisoes_notas %}
+            {% set _ = revisoes_por_fator_gestor.update({rev.fator_id: rev}) %}
+        {% endfor %}
+        <h2 style="margin-top:20px;">O que aconteceu com cada item contestado</h2>
+        <table class="tabela" style="margin-bottom:12px;">
+            <thead>
+                <tr><th>Fator</th><th class="centro">Nota atual</th><th>Situação</th></tr>
+            </thead>
+            <tbody>
+                {% for fator in dados.fatores %}
+                    {% if fator.id in itens_contestados %}
+                        {% set rev = revisoes_por_fator_gestor.get(fator.id) %}
+                        <tr>
+                            <td>{{ fator.nome }}</td>
+                            <td class="centro"><strong>{{ dados.respostas_gestor.get(fator.id, '-') }}</strong></td>
+                            <td>
+                                {% if rev %}
+                                    <span class="badge badge-ok">Alterada: {{ rev.nota_anterior if rev.nota_anterior is not none else '-' }} &rarr; {{ rev.nota_nova }}</span>
+                                {% else %}
+                                    <span class="badge badge-new">Mantida</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
     <h2 style="margin-top:20px;">Linha do tempo</h2>
     {% for e in recurso.eventos %}
-        <p class="muted">
+        <p class="muted" style="white-space:pre-line;">
             <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
             {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
             {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou a você: "{{ e.texto }}"
             {% elif e.tipo == 'resposta_gestor' %}Sua resposta: {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }} &mdash; "{{ e.texto }}"
+            {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: "{{ e.texto }}"{% endif %}
             {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado.
             {% elif e.tipo == 'fechamento_comissao' %}Comissão confirmou o encerramento.
             {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer.

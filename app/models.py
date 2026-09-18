@@ -317,6 +317,32 @@ class RecursoAvaliacao(db.Model):
     revisoes_notas = db.relationship(
         "RecursoRevisaoNota", order_by="RecursoRevisaoNota.criado_em"
     )
+    itens_contestados = db.relationship(
+        "RecursoItemContestado", order_by="RecursoItemContestado.id"
+    )
+
+    @property
+    def itens_contestados_por_fator(self):
+        """{fator_id: motivo} -- pra usar direto no template e destacar a
+        linha do fator na tabela de notas."""
+        return {item.fator_id: item.motivo for item in self.itens_contestados}
+
+
+class RecursoItemContestado(db.Model):
+    """Um fator específico que o empregado contestou ao abrir o recurso,
+    com o motivo daquele item. Complementa o campo `motivo` (texto livre)
+    de RecursoAvaliacao, permitindo destacar cada item direto na tabela de
+    notas em vez de um bloco de texto solto."""
+
+    __tablename__ = "recurso_itens_contestados"
+
+    id = db.Column(db.Integer, primary_key=True)
+    recurso_id = db.Column(db.Integer, db.ForeignKey("recursos_avaliacao.id"), nullable=False)
+    fator_id = db.Column(db.Integer, db.ForeignKey("fatores.id"), nullable=False)
+    motivo = db.Column(db.Text, nullable=False)
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+    fator = db.relationship("Fator")
 
 
 class RecursoEvento(db.Model):

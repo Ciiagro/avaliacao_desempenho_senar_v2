@@ -13,6 +13,10 @@ from ..models import (
     RecursoAvaliacao,
     RecursoEvento,
     RecursoRevisaoNota,
+    RecursoItemContestado,
+    MembroComissao,
+    Formulario,
+    Fator,
     RECURSO_STATUS_AGUARDANDO_COMISSAO_INICIAL,
     RECURSO_STATUS_AGUARDANDO_GESTOR,
     RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE,
@@ -238,6 +242,13 @@ def recurso_area():
         avaliado_id=funcionario.id, liberado=True
     ).all()
 
+    formulario_funcionario = None
+    if funcionario.nivel_hierarquico:
+        formulario_funcionario = Formulario.query.filter_by(
+            nivel_hierarquico=funcionario.nivel_hierarquico
+        ).first()
+    fatores_funcionario = formulario_funcionario.fatores if formulario_funcionario else []
+
     ciclos_sem_recurso = []
     for registro in registros_liberados:
         if registro.decisao_avaliado == "aceito":
@@ -248,6 +259,7 @@ def recurso_area():
             ciclo.prazo_abrir_recurso = prazo_dias_corridos(
                 registro.liberado_em, PRAZO_RECURSO_FUNCIONARIO_DIAS
             )
+            ciclo.fatores = fatores_funcionario
             ciclos_sem_recurso.append(ciclo)
 
     meus_recursos = (
@@ -259,13 +271,19 @@ def recurso_area():
     # A resposta do gestor só aparece pro empregado depois que a Comissão
     # repassar (ou confirmar o encerramento, no caso do gestor ter revisado
     # a nota) — a Comissão sempre vê e decide antes do empregado.
+    # "ajuste_comissao" é um acerto interno entre Comissão e gestor (pode
+    # acontecer antes de repassar) e nunca aparece pro empregado — ele só
+    # vê o resultado final, já recalculado com a nota ajustada.
     for r in meus_recursos:
         liberado = any(
             e.tipo in ("repasse_comissao_funcionario", "fechamento_comissao")
             for e in r.eventos
         )
         r.eventos_visiveis = [
-            e for e in r.eventos if not (e.tipo == "resposta_gestor" and not liberado)
+            e
+            for e in r.eventos
+            if e.tipo != "ajuste_comissao"
+            and not (e.tipo == "resposta_gestor" and not liberado)
         ]
         r.resultado_atual_em_texto = (
             _resultado_atual_texto(montar_dados_resultado_final(r.ciclo, r.avaliado))
@@ -287,10 +305,24 @@ def abrir_recurso():
         return redirect(url_for("main.login"))
 
     ciclo_id = int(request.form.get("ciclo_id"))
-    motivo = request.form.get("motivo", "").strip()
-    if not motivo:
-        flash("Conte o motivo do recurso antes de enviar.", "danger")
+    fatores_ids = [i for i in request.form.getlist("itens_discordancia") if i]
+
+    if not fatores_ids:
+        flash("Selecione ao menos um item da avaliação com o qual você não concorda.", "danger")
         return redirect(url_for("recursos.recurso_area"))
+
+    partes_motivo = []
+    itens_contestados = []
+    for fator_id in fatores_ids:
+        fator = Fator.query.get(int(fator_id))
+        texto_item = request.form.get(f"motivo_fator_{fator_id}", "").strip()
+        if not fator or not texto_item:
+            flash("Explique o motivo de cada item marcado antes de enviar.", "danger")
+            return redirect(url_for("recursos.recurso_area"))
+        partes_motivo.append(f"{fator.nome}: {texto_item}")
+        itens_contestados.append((fator.id, texto_item))
+
+    motivo = "\n\n".join(partes_motivo)
 
     ja_existe = not _pode_abrir_novo_recurso(ciclo_id, funcionario.id)
     if ja_existe:
@@ -322,6 +354,13 @@ def abrir_recurso():
     db.session.add(recurso)
     db.session.flush()
 
+    for fator_id, texto_item in itens_contestados:
+        db.session.add(
+            RecursoItemContestado(
+                recurso_id=recurso.id, fator_id=fator_id, motivo=texto_item
+            )
+        )
+
     db.session.add(
         RecursoEvento(
             recurso_id=recurso.id, tipo="abertura", autor_id=funcionario.id, texto=motivo
@@ -340,7 +379,7 @@ def abrir_recurso():
 
     db.session.commit()
     avisar_comissao_novo_recurso(recurso)
-    flash("Recurso aberto. A Comissão vai analisar e encaminhar ao gestor.", "success")
+    flash("Seu recurso foi aberto e está em análise. Acompanhe o andamento por aqui ou pelo e-mail cadastrado.", "success")
     return redirect(url_for("recursos.recurso_area"))
 
 
@@ -543,13 +582,44 @@ def recurso_gestor_detalhe(recurso_id):
             return redirect(url_for("recursos.recurso_gestor_area"))
 
         decisao = request.form.get("decisao")
-        justificativa = request.form.get("justificativa", "").strip()
+        itens_contestados = recurso.itens_contestados_por_fator
+
+        if itens_contestados:
+            # Um motivo por item contestado (igual o empregado faz ao abrir
+            # o recurso) — mesmo que o gestor mantenha a nota de um item e
+            # mude a de outro, cada um precisa do seu próprio motivo.
+            partes_justificativa = []
+            for fator_id in itens_contestados:
+                texto_item = request.form.get(f"motivo_fator_{fator_id}", "").strip()
+                if not texto_item:
+                    flash("Escreva o motivo de cada item contestado antes de enviar.", "danger")
+                    return redirect(url_for("recursos.recurso_gestor_detalhe", recurso_id=recurso.id))
+                fator = Fator.query.get(fator_id)
+                partes_justificativa.append(f"{fator.nome if fator else fator_id}: {texto_item}")
+            justificativa = "\n\n".join(partes_justificativa)
+        else:
+            justificativa = request.form.get("justificativa", "").strip()
+
         if decisao not in ("manteve", "revisou") or not justificativa:
             flash("Escolha manter ou revisar, e escreva a justificativa.", "danger")
             return redirect(url_for("recursos.recurso_gestor_detalhe", recurso_id=recurso.id))
 
         if decisao == "revisou":
-            _aplicar_revisao_notas(recurso, avaliacao_gestor, request.form, funcionario.id)
+            if itens_contestados:
+                # Só os fatores contestados podem ter a nota revisada aqui.
+                # Mesmo que alguém manipule o POST e mande outros "fator_<id>",
+                # eles são descartados antes de chegar em _aplicar_revisao_notas.
+                form_permitido = {
+                    chave: valor
+                    for chave, valor in request.form.items()
+                    if not chave.startswith("fator_")
+                    or int(chave.replace("fator_", "", 1)) in itens_contestados
+                }
+            else:
+                # Recurso antigo, sem itens contestados individualizados:
+                # mantém o comportamento anterior (todos os fatores editáveis).
+                form_permitido = request.form
+            _aplicar_revisao_notas(recurso, avaliacao_gestor, form_permitido, funcionario.id)
 
         recurso.status = RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE
 
@@ -701,11 +771,57 @@ def recurso_comissao_detalhe(recurso_id):
 
 @recursos_bp.route("/recurso/<int:recurso_id>/comissao-repassar", methods=["POST"])
 def recurso_comissao_repassar(recurso_id):
-    """A Comissão viu a resposta do gestor (manteve) e repassa ao empregado."""
+    """A Comissão viu a resposta do gestor e repassa ao empregado.
+
+    Antes de repassar, a Comissão pode ajustar a nota de algum item se achar
+    que o gestor errou. Isso é um acerto interno entre Comissão e gestor:
+    não pede pra dizer qual membro fez, e nunca aparece pro empregado — ele
+    só vê o resultado final (o recálculo já reflete a nota ajustada).
+    Só é permitido ajustar os itens que o próprio empregado contestou (a
+    não ser num recurso do formato antigo, sem itens individualizados, onde
+    qualquer fator pode ser ajustado, como já era)."""
     recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
     if recurso.status != RECURSO_STATUS_AGUARDANDO_COMISSAO_REPASSE:
         flash("Esse recurso não está aguardando a Comissão.", "warning")
         return redirect(url_for("recursos.recurso_comissao_area"))
+
+    campos_fator = {
+        chave: valor
+        for chave, valor in request.form.items()
+        if chave.startswith("fator_") and valor
+    }
+    if campos_fator:
+        itens_contestados = recurso.itens_contestados_por_fator
+        if itens_contestados:
+            campos_fator = {
+                chave: valor
+                for chave, valor in campos_fator.items()
+                if int(chave.replace("fator_", "", 1)) in itens_contestados
+            }
+
+    if campos_fator:
+        avaliacao_gestor = _avaliacao_gestor_do_recurso(recurso)
+        membro = (
+            Funcionario.query.join(MembroComissao, MembroComissao.funcionario_id == Funcionario.id)
+            .order_by(Funcionario.nome)
+            .first()
+        )
+        if not avaliacao_gestor:
+            flash("Não encontrei a avaliação do gestor para esse recurso.", "danger")
+            return redirect(url_for("recursos.recurso_comissao_area"))
+        if not membro:
+            flash("Não há nenhum membro da Comissão cadastrado — cadastre um antes de ajustar notas.", "danger")
+            return redirect(url_for("recursos.recurso_comissao_area"))
+
+        _aplicar_revisao_notas(recurso, avaliacao_gestor, campos_fator, membro.id)
+        db.session.add(
+            RecursoEvento(
+                recurso_id=recurso.id,
+                tipo="ajuste_comissao",
+                autor_id=membro.id,
+                texto=request.form.get("justificativa_ajuste", "").strip() or None,
+            )
+        )
 
     recurso.status = RECURSO_STATUS_AGUARDANDO_FUNCIONARIO
     db.session.add(

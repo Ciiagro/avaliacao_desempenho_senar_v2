@@ -31,9 +31,29 @@
 </div>
 {% endmacro %}
 
-{% macro bloco_avaliacoes(dados) %}
+{% macro bloco_motivo(titulo, texto=none, itens=none) %}
+<div style="background:var(--bg); border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+    <p style="margin:0 0 6px; font-weight:700;">{{ titulo }}</p>
+    {% if itens %}
+        <ul style="margin:0; padding-left:20px;">
+            {% for label, valor in itens %}
+                <li><strong>{{ label }}:</strong> {{ valor }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p style="margin:0; white-space:pre-line;">{{ texto }}</p>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro bloco_avaliacoes(dados, itens_contestados={}) %}
 <details style="margin:12px 0 16px;">
-    <summary style="cursor:pointer; font-weight:600;">Ver as duas avaliações (autoavaliação e avaliação do gestor)</summary>
+    <summary style="cursor:pointer; font-weight:600;">
+        Ver as duas avaliações (autoavaliação e avaliação do gestor)
+        {% if itens_contestados %}
+            <span class="badge badge-pending" style="margin-left:6px;">{{ itens_contestados|length }} item(ns) contestado(s)</span>
+        {% endif %}
+    </summary>
     <div style="margin-top:12px;">
         <div class="tabela-container">
             <table class="tabela">
@@ -47,9 +67,15 @@
                 </thead>
                 <tbody>
                     {% for fator in dados.fatores %}
-                        <tr>
+                        <tr class="{{ 'linha-contestada' if fator.id in itens_contestados else '' }}">
                             <td>{{ fator.ordem }}</td>
-                            <td>{{ fator.nome }}</td>
+                            <td>
+                                {{ fator.nome }}
+                                {% if fator.id in itens_contestados %}
+                                    <span class="badge badge-pending" style="margin-left:6px;">Contestado</span>
+                                    <div class="muted" style="font-size:0.82rem; font-weight:400; margin-top:3px;">{{ itens_contestados[fator.id] }}</div>
+                                {% endif %}
+                            </td>
                             <td class="centro">{{ dados.respostas_auto.get(fator.id, '-') }}</td>
                             <td class="centro">{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
                         </tr>
@@ -123,8 +149,19 @@
     <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
         <summary>{{ cabecalho_resumo(r, limite) }}</summary>
         <div class="recurso-card-corpo">
-        <p><strong>Motivo do empregado:</strong> {{ r.motivo }}</p>
-        {{ bloco_avaliacoes(r.dados_avaliacoes) }}
+        {% set itens_contestados_iniciais = r.itens_contestados_por_fator %}
+        {% if not itens_contestados_iniciais %}
+            {{ bloco_motivo("Motivo do empregado", texto=r.motivo) }}
+        {% else %}
+            {% set itens_lista_iniciais = [] %}
+            {% for fator in r.dados_avaliacoes.fatores %}
+                {% if fator.id in itens_contestados_iniciais %}
+                    {% set _ = itens_lista_iniciais.append((fator.nome, itens_contestados_iniciais[fator.id])) %}
+                {% endif %}
+            {% endfor %}
+            {{ bloco_motivo("O que o empregado contestou", itens=itens_lista_iniciais) }}
+        {% endif %}
+        {{ bloco_avaliacoes(r.dados_avaliacoes, r.itens_contestados_por_fator) }}
         <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar_gestor', recurso_id=r.id) }}">
             <label>Mensagem para o gestor, pedindo reavaliação</label>
             <textarea name="comentario" rows="3" required></textarea>
@@ -150,44 +187,91 @@
     <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
         <summary>{{ cabecalho_resumo(r, limite, extra_gestor) }}</summary>
         <div class="recurso-card-corpo">
-        {% if resposta %}
-            <p>
-                <strong>O gestor {{ 'REVISOU a nota' if resposta.decisao == 'revisou' else 'MANTEVE a nota' }}:</strong>
-                {{ resposta.texto }}
-            </p>
+        {% set itens_contestados_repasse = r.itens_contestados_por_fator %}
+        {% if not itens_contestados_repasse %}
+            {{ bloco_motivo("Motivo do empregado", texto=r.motivo) }}
+        {% else %}
+            {% set itens_lista_repasse = [] %}
+            {% for fator in r.dados_avaliacoes.fatores %}
+                {% if fator.id in itens_contestados_repasse %}
+                    {% set _ = itens_lista_repasse.append((fator.nome, itens_contestados_repasse[fator.id])) %}
+                {% endif %}
+            {% endfor %}
+            {{ bloco_motivo("O que o empregado contestou", itens=itens_lista_repasse) }}
         {% endif %}
 
-        {% if resposta and resposta.decisao == 'revisou' %}
-            {% if r.revisoes_notas %}
-                <p class="muted" style="margin-bottom:4px;"><strong>O que o gestor alterou:</strong></p>
-                <table class="tabela" style="margin-bottom:12px;">
-                    <thead>
-                        <tr><th>Fator</th><th class="centro">Nota anterior</th><th class="centro">Nota nova</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for rev in r.revisoes_notas %}
+        {% if resposta %}
+            {{ bloco_motivo("O gestor " ~ ('REVISOU a nota' if resposta.decisao == 'revisou' else 'MANTEVE a nota'), texto=resposta.texto) }}
+        {% endif %}
+
+        {% if itens_contestados_repasse %}
+            {% set revisoes_por_fator = {} %}
+            {% for rev in r.revisoes_notas %}
+                {% set _ = revisoes_por_fator.update({rev.fator_id: rev}) %}
+            {% endfor %}
+            <p class="muted" style="margin-bottom:4px;"><strong>O que aconteceu com cada item contestado:</strong></p>
+            <table class="tabela" style="margin-bottom:12px;">
+                <thead>
+                    <tr><th>Fator</th><th class="centro">Nota atual</th><th>Situação</th></tr>
+                </thead>
+                <tbody>
+                    {% for fator in r.dados_avaliacoes.fatores %}
+                        {% if fator.id in itens_contestados_repasse %}
+                            {% set rev = revisoes_por_fator.get(fator.id) %}
                             <tr>
-                                <td>{{ rev.fator.nome }}</td>
-                                <td class="centro">{{ rev.nota_anterior if rev.nota_anterior is not none else '-' }}</td>
-                                <td class="centro"><strong>{{ rev.nota_nova }}</strong></td>
+                                <td>{{ fator.nome }}</td>
+                                <td class="centro"><strong>{{ r.dados_avaliacoes.respostas_gestor.get(fator.id, '-') }}</strong></td>
+                                <td>
+                                    {% if rev %}
+                                        <span class="badge badge-ok">Alterada: {{ rev.nota_anterior if rev.nota_anterior is not none else '-' }} &rarr; {{ rev.nota_nova }}</span>
+                                    {% else %}
+                                        <span class="badge badge-new">Mantida</span>
+                                    {% endif %}
+                                </td>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
-                    <p class="flash flash-success" style="display:inline-block; margin-bottom:12px;">
-                        <strong>Resultado final se repassar assim:</strong> {{ r.resultado_atual_em_texto }}
-                        <span class="muted">(era {{ r.resultado_final_em_texto or '-' }})</span>
-                    </p>
-                {% endif %}
-            {% else %}
-                <p class="muted" style="margin-bottom:12px;">O gestor marcou "revisar", mas não alterou nenhuma nota — só a justificativa.</p>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
+                <p class="flash flash-success" style="display:inline-block; margin-bottom:12px;">
+                    <strong>Resultado final se repassar assim:</strong> {{ r.resultado_atual_em_texto }}
+                    <span class="muted">(era {{ r.resultado_final_em_texto or '-' }})</span>
+                </p>
             {% endif %}
         {% endif %}
 
-        {{ bloco_avaliacoes(r.dados_avaliacoes) }}
+        {{ bloco_avaliacoes(r.dados_avaliacoes, r.itens_contestados_por_fator) }}
 
+        {% set itens_contestados_r = r.itens_contestados_por_fator %}
         <form method="post" action="{{ url_for('recursos.recurso_comissao_repassar', recurso_id=r.id) }}">
+            <details style="margin-bottom:14px;">
+                <summary style="cursor:pointer; font-weight:600;">Ajustes da Comissão (Opcional)</summary>
+                <div style="margin-top:10px;">
+                    <table class="tabela tabela-formulario" style="margin-bottom:10px;">
+                        <thead>
+                            <tr><th>Fator</th><th>10</th><th>8</th><th>6</th><th>4</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for fator in r.dados_avaliacoes.fatores %}
+                                {% if (fator.id in itens_contestados_r) or (not itens_contestados_r) %}
+                                    <tr class="{{ 'linha-contestada' if fator.id in itens_contestados_r else '' }}">
+                                        <td>{{ fator.nome }}{% if fator.id in itens_contestados_r %} <span class="badge badge-pending" style="margin-left:4px;">Contestado</span>{% endif %}</td>
+                                        {% for valor in [10, 8, 6, 4] %}
+                                            <td class="celula-radio">
+                                                <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
+                                                       {% if r.dados_avaliacoes.respostas_gestor.get(fator.id) == valor %}checked{% endif %}>
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <label>Observação interna do ajuste (opcional &mdash; não vai pro empregado)</label>
+                    <textarea name="justificativa_ajuste" rows="2"></textarea>
+                </div>
+            </details>
             <label>Comentário ao repassar pro empregado (opcional)</label>
             <textarea name="comentario" rows="2"></textarea>
             <button type="submit" class="botao" style="margin-top:8px;">Repassar ao empregado</button>
@@ -221,45 +305,65 @@
     <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
         <summary>{{ cabecalho_resumo(r, limite) }}</summary>
         <div class="recurso-card-corpo">
-        <p><strong>Motivo original:</strong> {{ r.motivo }}</p>
+        {% set itens_contestados_recurso = r.itens_contestados_por_fator %}
+        {% if not itens_contestados_recurso %}
+            {{ bloco_motivo("Motivo original", texto=r.motivo) }}
+        {% else %}
+            {% set itens_lista_recurso = [] %}
+            {% for fator in r.dados_avaliacoes.fatores %}
+                {% if fator.id in itens_contestados_recurso %}
+                    {% set _ = itens_lista_recurso.append((fator.nome, itens_contestados_recurso[fator.id])) %}
+                {% endif %}
+            {% endfor %}
+            {{ bloco_motivo("O que o empregado contestou", itens=itens_lista_recurso) }}
+        {% endif %}
         {% for e in r.eventos %}
             {% if e.tipo == 'resposta_gestor' %}
-                <p><strong>O gestor {{ 'REVISOU a nota' if e.decisao == 'revisou' else 'manteve' }}, justificativa:</strong> {{ e.texto }}</p>
+                {{ bloco_motivo("O gestor " ~ ('REVISOU a nota' if e.decisao == 'revisou' else 'MANTEVE a nota') ~ ", justificativa", texto=e.texto) }}
             {% elif e.tipo == 'pedido_recorrer' and e.texto %}
-                <p><strong>Empregado, ao recorrer:</strong> {{ e.texto }}</p>
+                {{ bloco_motivo("Empregado, ao recorrer", texto=e.texto) }}
             {% endif %}
         {% endfor %}
 
         {% set resposta_gestor = r.eventos|selectattr('tipo', 'equalto', 'resposta_gestor')|list|last %}
-        {% if resposta_gestor and resposta_gestor.decisao == 'revisou' %}
-            {% if r.revisoes_notas %}
-                <p class="muted" style="margin-bottom:4px;"><strong>O que o gestor alterou:</strong></p>
-                <table class="tabela" style="margin-bottom:12px;">
-                    <thead>
-                        <tr><th>Fator</th><th class="centro">Nota anterior</th><th class="centro">Nota nova</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for rev in r.revisoes_notas %}
+        {% if itens_contestados_recurso %}
+            {% set revisoes_por_fator_recurso = {} %}
+            {% for rev in r.revisoes_notas %}
+                {% set _ = revisoes_por_fator_recurso.update({rev.fator_id: rev}) %}
+            {% endfor %}
+            <p class="muted" style="margin-bottom:4px;"><strong>O que aconteceu com cada item contestado:</strong></p>
+            <table class="tabela" style="margin-bottom:12px;">
+                <thead>
+                    <tr><th>Fator</th><th class="centro">Nota atual</th><th>Situação</th></tr>
+                </thead>
+                <tbody>
+                    {% for fator in r.dados_avaliacoes.fatores %}
+                        {% if fator.id in itens_contestados_recurso %}
+                            {% set rev = revisoes_por_fator_recurso.get(fator.id) %}
                             <tr>
-                                <td>{{ rev.fator.nome }}</td>
-                                <td class="centro">{{ rev.nota_anterior if rev.nota_anterior is not none else '-' }}</td>
-                                <td class="centro"><strong>{{ rev.nota_nova }}</strong></td>
+                                <td>{{ fator.nome }}</td>
+                                <td class="centro"><strong>{{ r.dados_avaliacoes.respostas_gestor.get(fator.id, '-') }}</strong></td>
+                                <td>
+                                    {% if rev %}
+                                        <span class="badge badge-ok">Alterada: {{ rev.nota_anterior if rev.nota_anterior is not none else '-' }} &rarr; {{ rev.nota_nova }}</span>
+                                    {% else %}
+                                        <span class="badge badge-new">Mantida</span>
+                                    {% endif %}
+                                </td>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
-                    <p class="flash flash-success" style="display:inline-block; margin-bottom:12px;">
-                        <strong>Resultado final atual:</strong> {{ r.resultado_atual_em_texto }}
-                        <span class="muted">(era {{ r.resultado_final_em_texto or '-' }})</span>
-                    </p>
-                {% endif %}
-            {% else %}
-                <p class="muted" style="margin-bottom:12px;">O gestor marcou "revisar", mas não alterou nenhuma nota — só a justificativa.</p>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
+                <p class="flash flash-success" style="display:inline-block; margin-bottom:12px;">
+                    <strong>Resultado final atual:</strong> {{ r.resultado_atual_em_texto }}
+                    <span class="muted">(era {{ r.resultado_final_em_texto or '-' }})</span>
+                </p>
             {% endif %}
         {% endif %}
 
-        {{ bloco_avaliacoes(r.dados_avaliacoes) }}
+        {{ bloco_avaliacoes(r.dados_avaliacoes, r.itens_contestados_por_fator) }}
 
         <form method="post" action="{{ url_for('recursos.recurso_comissao_encaminhar', recurso_id=r.id) }}">
             <label>Comentário/justificativa para a presidência</label>

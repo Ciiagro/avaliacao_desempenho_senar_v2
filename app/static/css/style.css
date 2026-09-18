@@ -352,10 +352,19 @@ a { color: var(--navy-700); }
 
 .tabela tbody tr:nth-child(even) { background: #f8f9fb; }
 .tabela tbody tr:hover { background: var(--info-bg); }
+.tabela tbody tr.linha-contestada,
+.tabela tbody tr.linha-contestada:nth-child(even) { background: var(--aviso-bg); }
+.tabela tbody tr.linha-contestada:hover { background: #f7e9c9; }
 
 .tabela-formulario { font-size: 0.85rem; }
 .tabela-formulario th { background: var(--navy-800); }
 .tabela-formulario .celula-radio { text-align: center; width: 60px; }
+.tabela-formulario .celula-radio-somente-leitura {
+    text-align: center;
+    color: var(--texto-muted);
+    font-weight: 700;
+    background: var(--bg);
+}
 .tabela-formulario .fator-nome { font-weight: 700; width: 190px; color: var(--navy-900); }
 .tabela-formulario .fator-descricao { color: var(--texto-muted); }
 .tabela-formulario input[type="radio"] {

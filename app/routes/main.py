@@ -356,6 +356,16 @@ def meu_resultado_pdf(ciclo_id):
         flash("Confirme a ciência de recebimento antes de baixar o PDF.", "warning")
         return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
 
+    if registro.decisao_avaliado == "recorreu":
+        from ..models import RecursoAvaliacao, RECURSO_STATUS_AGUARDANDO_FUNCIONARIO
+
+        recurso_atual = RecursoAvaliacao.query.filter_by(
+            ciclo_id=ciclo_id, avaliado_id=funcionario.id
+        ).first()
+        if recurso_atual and recurso_atual.status == RECURSO_STATUS_AGUARDANDO_FUNCIONARIO:
+            flash("Confirme o recebimento e assine a resposta do recurso antes de baixar.", "warning")
+            return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
+
     ciclo = CicloAvaliacao.query.get_or_404(ciclo_id)
     dados = montar_dados_resultado_final(ciclo, funcionario)
     if dados["resultado_final"] is None:
@@ -377,9 +387,24 @@ def meu_resultado_excel(ciclo_id):
     if not funcionario:
         return redirect(url_for("main.login"))
 
-    if not _resultado_liberado_do_ciclo(funcionario, ciclo_id):
+    registro = _resultado_liberado_do_ciclo(funcionario, ciclo_id)
+    if not registro:
         flash("Seu resultado final ainda não foi liberado pela administração.", "warning")
         return redirect(url_for("main.minha_area"))
+
+    if not registro.ciente_avaliado:
+        flash("Confirme a ciência de recebimento antes de baixar o Excel.", "warning")
+        return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
+
+    if registro.decisao_avaliado == "recorreu":
+        from ..models import RecursoAvaliacao, RECURSO_STATUS_AGUARDANDO_FUNCIONARIO
+
+        recurso_atual = RecursoAvaliacao.query.filter_by(
+            ciclo_id=ciclo_id, avaliado_id=funcionario.id
+        ).first()
+        if recurso_atual and recurso_atual.status == RECURSO_STATUS_AGUARDANDO_FUNCIONARIO:
+            flash("Confirme o recebimento e assine a resposta do recurso antes de baixar.", "warning")
+            return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
 
     ciclo = CicloAvaliacao.query.get_or_404(ciclo_id)
     dados = montar_dados_resultado_final(ciclo, funcionario)

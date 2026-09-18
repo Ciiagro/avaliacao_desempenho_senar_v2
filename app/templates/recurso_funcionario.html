@@ -6,22 +6,39 @@
 
 {% if ciclos_sem_recurso %}
     <p class="muted">
-        Se você recebeu o resultado final e não concorda, pode abrir um recurso aqui.
-        O gestor vai rever a avaliação; se ele mantiver a nota e você continuar sem concordar,
-        a Comissão encaminha o caso pra presidência decidir.
+        Se você recebeu o resultado final e não concorda com ele, pode abrir um recurso aqui.
+        Indique claramente quais itens da avaliação você não concorda e o motivo de cada um —
+        isso ajuda o gestor e a Comissão a analisar seu caso com mais precisão. Depois de aberto,
+        o gestor revê a avaliação; se ele mantiver a nota e você continuar sem concordar, a
+        Comissão encaminha o caso para a presidência decidir.
     </p>
     <h2>Abrir recurso</h2>
     {% for ciclo in ciclos_sem_recurso %}
         <form method="post" action="{{ url_for('recursos.abrir_recurso') }}" style="margin-bottom:20px;">
             <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
-            <label>Exercício {{ ciclo.exercicio }} &mdash; motivo do recurso</label>
+            <label>Exercício {{ ciclo.exercicio }}</label>
             {% if ciclo.prazo_abrir_recurso %}
                 <p class="muted" style="margin:-2px 0 8px;">
                     Prazo para abrir recurso: <span class="badge badge-pending">até {{ ciclo.prazo_abrir_recurso.strftime('%d/%m/%Y') }}</span>
                     (5 dias corridos a partir da liberação do resultado)
                 </p>
             {% endif %}
-            <textarea name="motivo" rows="4" placeholder="Explique por que você não concorda com o resultado final..." required></textarea>
+
+            {% if ciclo.fatores %}
+                <p class="muted" style="margin:0 0 6px;">Marque os itens da avaliação com os quais você não concorda e explique o motivo de cada um:</p>
+                <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:14px; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">
+                    {% for fator in ciclo.fatores %}
+                        <div class="item-discordancia">
+                            <label style="display:flex; align-items:flex-start; gap:8px; margin:0; text-transform:none; font-weight:400; font-size:0.9rem;">
+                                <input type="checkbox" name="itens_discordancia" value="{{ fator.id }}" style="margin-top:3px;" onchange="toggleMotivoItem(this)">
+                                {{ fator.nome }}
+                            </label>
+                            <textarea name="motivo_fator_{{ fator.id }}" class="motivo-item" style="display:none; margin-top:6px;" rows="2" placeholder="Explique por que não concorda com {{ fator.nome }}..."></textarea>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             <button type="submit" class="botao" style="margin-top:8px;">Abrir recurso</button>
         </form>
     {% endfor %}
@@ -31,6 +48,30 @@
         ou ainda não foi liberado, ou você já deu ciência aceitando o resultado.
     </p>
 {% endif %}
+
+<script>
+function toggleMotivoItem(checkbox) {
+    var textarea = checkbox.closest('.item-discordancia').querySelector('textarea');
+    if (checkbox.checked) {
+        textarea.style.display = 'block';
+        textarea.required = true;
+    } else {
+        textarea.style.display = 'none';
+        textarea.required = false;
+        textarea.value = '';
+    }
+}
+
+document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form.querySelector('[name="itens_discordancia"]')) return;
+    var algumMarcado = form.querySelectorAll('[name="itens_discordancia"]:checked').length > 0;
+    if (!algumMarcado) {
+        e.preventDefault();
+        alert('Selecione ao menos um item da avaliação com o qual você não concorda.');
+    }
+});
+</script>
 
 <h2>Meus recursos</h2>
 {% if not meus_recursos %}
@@ -44,7 +85,7 @@
             Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
             &middot;
             {% if r.status == 'aguardando_comissao_inicial' %}
-                <span class="badge badge-pending">Aguardando a Comissão encaminhar ao gestor</span>
+                <span class="badge badge-ok">Seu recurso foi aberto e está em análise</span>
             {% elif r.status == 'aguardando_gestor' %}
                 <span class="badge badge-pending">Aguardando o gestor</span>
             {% elif r.status == 'aguardando_comissao_repasse' %}
@@ -62,6 +103,10 @@
             {% endif %}
         </p>
 
+        {% if r.status == 'aguardando_comissao_inicial' %}
+            <p class="muted" style="margin:-4px 0 12px;">Acompanhe o andamento por aqui ou pelo e-mail cadastrado.</p>
+        {% endif %}
+
         {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
             <p class="flash flash-success" style="display:inline-block;">
                 <strong>Nota atual, com a resposta do gestor:</strong> {{ r.resultado_atual_em_texto }}
@@ -71,7 +116,7 @@
 
         <div class="linha-tempo">
             {% for e in r.eventos_visiveis %}
-                <p class="muted" style="margin:4px 0;">
+                <p class="muted" style="margin:4px 0; white-space:pre-line;">
                     <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
                     {% if e.tipo == 'abertura' %}
                         Você abriu o recurso: "{{ e.texto }}"

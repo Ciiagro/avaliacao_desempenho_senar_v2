@@ -91,10 +91,18 @@
             {{ (dados.resultado_registro.ciente_em|fortaleza).strftime('%d/%m/%Y às %H:%M') }}.
         </div>
     {% endif %}
-    <p style="margin-top:12px;">
-        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=ciclo.id) }}">Baixar PDF</a>
-        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=ciclo.id) }}">Baixar Excel</a>
-    </p>
+    {% if recurso_atual and recurso_atual.status == 'aguardando_funcionario' %}
+        <p style="margin-top:12px;">
+            <span class="botao botao-secundario botao-pequeno" style="opacity:0.5; cursor:not-allowed; pointer-events:none;" title="Disponível depois de confirmar o recebimento e assinar">Baixar PDF</span>
+            <span class="botao botao-secundario botao-pequeno" style="opacity:0.5; cursor:not-allowed; pointer-events:none;" title="Disponível depois de confirmar o recebimento e assinar">Baixar Excel</span>
+        </p>
+        <p class="muted" style="margin-top:-8px;">Os downloads liberam depois que você confirmar o recebimento e assinar.</p>
+    {% else %}
+        <p style="margin-top:12px;">
+            <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=ciclo.id) }}">Baixar PDF</a>
+            <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=ciclo.id) }}">Baixar Excel</a>
+        </p>
+    {% endif %}
 {% else %}
     <div class="flash {% if prazo_ciencia and prazo_ciencia < agora %}flash-danger{% else %}flash-warning{% endif %}" style="margin-top:16px;">
         <p style="margin:0 0 10px;">
