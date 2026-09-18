@@ -135,7 +135,7 @@ document.addEventListener('submit', function (e) {
                     {% elif e.tipo == 'decisao_presidencia' %}
                         A presidência {{ 'acatou o recurso e revisou a avaliação' if e.decisao == 'acatado' else 'não acatou o recurso' }}: "{{ e.texto }}"
                     {% elif e.tipo == 'aceite_funcionario' %}
-                        Você aceitou a decisão do gestor.
+                        Empregado confirmou o recebimento &mdash; recurso finalizado.
                     {% endif %}
                 </p>
             {% endfor %}

@@ -30,6 +30,10 @@ _COR_BORDA = "#e2e6ee"
 _COR_FUNDO = "#f3f5f8"
 _COR_DESTAQUE_BG = "#fbf1dc"
 _COR_DESTAQUE_TEXTO = "#93691f"
+_COR_SUCESSO_BG = "#e5f5ea"
+_COR_SUCESSO_TEXTO = "#1f8a4c"
+_COR_NEUTRO_BG = "#eef0f4"
+_COR_NEUTRO_TEXTO = "#6b7385"
 
 
 def _emails_comissao():
@@ -54,11 +58,13 @@ def _email_funcionario(funcionario):
 # ---------------------------------------------------------------------------
 # Montagem do e-mail (HTML + texto simples) a partir de um conteúdo comum
 # ---------------------------------------------------------------------------
-def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=None):
+def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=None, selo=None):
     """Monta o par (texto_simples, html) de um e-mail de aviso, com um
     layout único e consistente:
 
-    - título no cabeçalho (cor de marca);
+    - título no cabeçalho (cor de marca), com um selo colorido opcional
+      ao lado (ex.: "REVISOU A NOTA" / "MANTEVE A NOTA"), pro leitor bater
+      o olho e já saber do que se trata antes de ler o texto;
     - parágrafos de texto corrido, em ordem;
     - um "destaque" opcional (ex.: motivo do recurso, justificativa),
       mostrado numa caixa clara, separado do resto do texto;
@@ -68,7 +74,10 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
     paragrafos = [p for p in paragrafos if p]
 
     # ---- texto simples (fallback) ----
-    partes_txt = [titulo, ""]
+    partes_txt = [titulo]
+    if selo:
+        partes_txt[0] = f"{titulo} [{selo[0]}]"
+    partes_txt.append("")
     for p in paragrafos:
         partes_txt.append(p)
         partes_txt.append("")
@@ -109,6 +118,14 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
                   color:#ffffff; font-size:13px; font-weight:bold; text-decoration:none;
                   border-radius:6px;">{esc(link_texto or 'Acessar o sistema')}</a>"""
 
+    selo_html = ""
+    if selo:
+        selo_texto, selo_bg, selo_texto_cor = selo
+        selo_html = f"""
+                <span style="display:inline-block; margin-top:6px; padding:3px 9px; background:{selo_bg};
+                             color:{selo_texto_cor}; font-size:10px; font-weight:bold; letter-spacing:0.03em;
+                             text-transform:uppercase; border-radius:20px;">{esc(selo_texto)}</span>"""
+
     corpo_html = f"""\
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -120,6 +137,7 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
                 <p style="margin:0 0 2px; font-size:10px; font-weight:bold; letter-spacing:0.05em;
                           text-transform:uppercase; color:rgba(255,255,255,0.6);">Avaliação de Desempenho</p>
                 <h1 style="margin:0; font-size:15px; color:#ffffff;">{esc(titulo)}</h1>
+                {selo_html}
             </td>
         </tr>
         <tr>
@@ -144,7 +162,7 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
     return texto, corpo_html
 
 
-def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, link_url=None, link_texto=None):
+def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, link_url=None, link_texto=None, selo=None):
     """Envio de e-mail de baixo nível, usado tanto pros avisos da Comissão
     quanto pros avisos ao gestor/empregado. Manda em HTML com uma versão
     em texto simples como alternativa.
@@ -173,7 +191,7 @@ def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, lin
         )
         return
 
-    texto, corpo_html = _montar_email(titulo, paragrafos, destaque, link_url, link_texto)
+    texto, corpo_html = _montar_email(titulo, paragrafos, destaque, link_url, link_texto, selo)
 
     msg = EmailMessage()
     msg["Subject"] = assunto
@@ -230,6 +248,10 @@ def avisar_comissao_novo_recurso(recurso):
 
 def avisar_comissao_gestor_respondeu(recurso, decisao, justificativa):
     decisao_texto = "revisou a nota" if decisao == "revisou" else "manteve a nota"
+    if decisao == "revisou":
+        selo = ("Revisou a nota", _COR_SUCESSO_BG, _COR_SUCESSO_TEXTO)
+    else:
+        selo = ("Manteve a nota", _COR_NEUTRO_BG, _COR_NEUTRO_TEXTO)
     _enviar_email(
         _emails_comissao(),
         f"[Avaliação de Desempenho] Gestor respondeu recurso — {recurso.avaliado.nome}",
@@ -241,6 +263,7 @@ def avisar_comissao_gestor_respondeu(recurso, decisao, justificativa):
         destaque=("Justificativa do gestor", justificativa),
         link_url=_link_comissao(),
         link_texto="Revisar antes de repassar ao empregado",
+        selo=selo,
     )
 
 

@@ -32,7 +32,7 @@
         {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'REVISOU a nota' if e.decisao == 'revisou' else 'MANTEVE a nota' }}: "{{ e.texto }}"
         {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: "{{ e.texto }}"{% endif %}
         {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado{% if e.texto %}: "{{ e.texto }}"{% endif %}
-        {% elif e.tipo == 'aceite_funcionario' %}Empregado aceitou a resposta e não quis recorrer.
+        {% elif e.tipo == 'aceite_funcionario' %}Empregado confirmou o recebimento &mdash; recurso finalizado.
         {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: "{{ e.texto }}"{% endif %}
         {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou à presidência: "{{ e.texto }}"
         {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'ACATOU' if e.decisao == 'acatado' else 'NÃO acatou' }}: "{{ e.texto }}"
@@ -42,6 +42,12 @@
         {% endif %}
     </p>
 {% endfor %}
+
+{% if recurso.status == 'encerrado' %}
+    <p style="margin-top:16px;">
+        <a class="botao botao-secundario" href="{{ url_for('recursos.recurso_comissao_pdf', recurso_id=recurso.id) }}">Baixar comprovante em PDF</a>
+    </p>
+{% endif %}
 
 {% if recurso.status == 'aguardando_presidencia' %}
     <div class="card" style="margin:16px 0; text-align:left;" id="card-decisao-presidencia">

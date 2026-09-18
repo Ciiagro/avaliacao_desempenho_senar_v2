@@ -769,6 +769,27 @@ def recurso_comissao_detalhe(recurso_id):
     )
 
 
+@recursos_bp.route("/recurso/<int:recurso_id>/comissao-pdf")
+def recurso_comissao_pdf(recurso_id):
+    """Mesmo comprovante em PDF que o empregado pode baixar, mas liberado
+    pra Comissão puxar direto do histórico do recurso, sem precisar pedir
+    pro empregado reenviar. Só faz sentido pegar depois que o recurso
+    estiver encerrado (antes disso ainda pode mudar)."""
+    recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
+    if recurso.status != RECURSO_STATUS_ENCERRADO:
+        flash("Esse recurso ainda não foi encerrado.", "warning")
+        return redirect(url_for("recursos.recurso_comissao_detalhe", recurso_id=recurso.id))
+
+    dados = montar_dados_resultado_final(recurso.ciclo, recurso.avaliado)
+    pdf_buffer = gerar_pdf_recurso(recurso, dados)
+    nome_arquivo = f"recurso_{recurso.avaliado.nome.replace(' ', '_')}_{recurso.ciclo.exercicio}.pdf"
+    return Response(
+        pdf_buffer.read(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
+    )
+
+
 @recursos_bp.route("/recurso/<int:recurso_id>/comissao-repassar", methods=["POST"])
 def recurso_comissao_repassar(recurso_id):
     """A Comissão viu a resposta do gestor e repassa ao empregado.
