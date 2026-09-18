@@ -26,8 +26,14 @@
         {% endfor %}
     </select>
     <input type="email" name="email" placeholder="E-mail (necessário para login)" value="{{ f.email or '' }}">
-    <input type="text" name="matricula" placeholder="Matrícula (opcional)" value="{{ f.matricula or '' }}">
-    <input type="text" name="cpf" placeholder="CPF (opcional)" value="{{ f.cpf or '' }}">
+    <label style="display:flex; flex-direction:column; gap:4px;">
+        Matrícula
+        <input type="text" name="matricula" placeholder="Matrícula (opcional)" value="{{ f.matricula or '' }}">
+    </label>
+    <label style="display:flex; flex-direction:column; gap:4px;">
+        CPF
+        <input type="text" name="cpf" id="cpf" placeholder="CPF (opcional)" value="{{ f.cpf or '' }}" inputmode="numeric" maxlength="14">
+    </label>
     <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
         Data de nascimento
         <input type="date" name="data_nascimento" value="{{ f.data_nascimento.isoformat() if f.data_nascimento else '' }}">
@@ -58,4 +64,26 @@
     </label>
     <button type="submit" class="botao">Salvar alterações</button>
 </form>
+
+<script>
+(function () {
+    var cpfInput = document.getElementById('cpf');
+    if (!cpfInput) return;
+
+    function mascararCpf(valor) {
+        valor = valor.replace(/\D/g, '').slice(0, 11);
+        valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+        valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+        valor = valor.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        return valor;
+    }
+
+    cpfInput.addEventListener('input', function (e) {
+        e.target.value = mascararCpf(e.target.value);
+    });
+
+    // Aplica a máscara no valor já existente (ao carregar a página)
+    cpfInput.value = mascararCpf(cpfInput.value);
+})();
+</script>
 {% endblock %}
