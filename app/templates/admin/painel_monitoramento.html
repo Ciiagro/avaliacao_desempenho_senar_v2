@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Painel de monitoramento{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Painel de monitoramento</h1>
+<p class="muted">Visão rápida do andamento do exercício — quantos já responderam, quem falta e quanto tempo resta.</p>
+
+{% if not ciclo %}
+    <p class="flash flash-warning">Nenhum ciclo cadastrado ainda.</p>
+{% else %}
+    <form method="get" class="form-inline" style="margin-bottom:20px;">
+        <select name="ciclo_id" onchange="this.form.submit()">
+            {% for c in ciclos %}
+                <option value="{{ c.id }}" {% if c.id == ciclo.id %}selected{% endif %}>
+                    Exercício {{ c.exercicio }} ({{ c.status }})
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <div class="cards">
+        <div class="card card-numero-grande">
+            <h2>{{ resumo.auto_concluida }} / {{ resumo.total }}</h2>
+            <p>Autoavaliações concluídas ({{ resumo.pct_auto }}%)</p>
+            <div class="barra-progresso">
+                <div class="barra-progresso-preenchimento {% if resumo.pct_auto == 100 %}completa{% elif resumo.pct_auto < 50 %}perigo{% endif %}" style="width:{{ resumo.pct_auto }}%;"></div>
+            </div>
+        </div>
+        <div class="card card-numero-grande">
+            <h2>{{ resumo.gestor_concluida }} / {{ resumo.total }}</h2>
+            <p>Avaliações do gestor concluídas ({{ resumo.pct_gestor }}%)</p>
+            <div class="barra-progresso">
+                <div class="barra-progresso-preenchimento {% if resumo.pct_gestor == 100 %}completa{% elif resumo.pct_gestor < 50 %}perigo{% endif %}" style="width:{{ resumo.pct_gestor }}%;"></div>
+            </div>
+        </div>
+        {% if resumo.gestores_com_equipe %}
+            {% set pct_gestores = (100 * resumo.gestores_completos / resumo.gestores_com_equipe)|round|int %}
+            <div class="card card-numero-grande card-destaque">
+                <h2>{{ resumo.gestores_completos }} / {{ resumo.gestores_com_equipe }}</h2>
+                <p>Gestor(es) que já avaliaram toda a equipe ({{ pct_gestores }}%)</p>
+                <div class="barra-progresso">
+                    <div class="barra-progresso-preenchimento {% if pct_gestores == 100 %}completa{% elif pct_gestores < 50 %}perigo{% endif %}" style="width:{{ pct_gestores }}%;"></div>
+                </div>
+            </div>
+        {% endif %}
+        {% if resumo.prazo_auto %}
+            <div class="card">
+                <h2>
+                    {% if resumo.prazo_auto.atrasado %}<span style="color:var(--perigo);">Atrasado</span>
+                    {% else %}{{ resumo.prazo_auto.dias }}{% endif %}
+                </h2>
+                <p>
+                    {% if resumo.prazo_auto.atrasado %}
+                        Prazo da autoavaliação era {{ resumo.prazo_auto.data.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        dia(s) até o prazo da autoavaliação ({{ resumo.prazo_auto.data.strftime('%d/%m/%Y') }})
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+        {% if resumo.prazo_gestor %}
+            <div class="card">
+                <h2>
+                    {% if resumo.prazo_gestor.atrasado %}<span style="color:var(--perigo);">Atrasado</span>
+                    {% else %}{{ resumo.prazo_gestor.dias }}{% endif %}
+                </h2>
+                <p>
+                    {% if resumo.prazo_gestor.atrasado %}
+                        Prazo da avaliação do gestor era {{ resumo.prazo_gestor.data.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        dia(s) até o prazo da avaliação do gestor ({{ resumo.prazo_gestor.data.strftime('%d/%m/%Y') }})
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+        {% if resumo.sem_avaliador %}
+            <div class="card">
+                <h2>{{ resumo.sem_avaliador|length }}</h2>
+                <p>Sem gestor/avaliador vinculado neste ciclo</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:8px;">
+        <div style="flex:1; min-width:300px;">
+            <h2>Faltam autoavaliação ({{ resumo.pendentes_auto|length }})</h2>
+            {% if not resumo.pendentes_auto %}
+                <p class="muted">🎉 Ninguém — todo mundo concluiu.</p>
+            {% else %}
+                <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
+                    {% for f in resumo.pendentes_auto %}
+                        <li>
+                            <span style="font-weight:600; color:var(--navy-800);">{{ f.nome }}</span>
+                            <span class="tag">{{ f.setor.nome if f.setor else '-' }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+        <div style="flex:1; min-width:300px;">
+            <h2>Faltam avaliação do gestor ({{ resumo.pendentes_gestor|length }})</h2>
+            {% if not resumo.pendentes_gestor %}
+                <p class="muted">🎉 Ninguém — todo mundo concluiu.</p>
+            {% else %}
+                <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
+                    {% for f in resumo.pendentes_gestor %}
+                        <li>
+                            <span style="font-weight:600; color:var(--navy-800);">{{ f.nome }}</span>
+                            <span class="tag">{{ f.setor.nome if f.setor else '-' }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if resumo.gestores_pendentes %}
+        <h2 style="margin-top:24px;">Gestores com equipe ainda incompleta ({{ resumo.gestores_pendentes|length }})</h2>
+        <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
+            {% for g in resumo.gestores_pendentes %}
+                <li>
+                    <span style="font-weight:600; color:var(--navy-800);">{{ g.gestor.nome if g.gestor else '-' }}</span>
+                    <span class="tag">{{ g.concluidas }} / {{ g.total }} da equipe avaliados</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if resumo.sem_avaliador %}
+        <h2 style="margin-top:24px;">Sem gestor vinculado ({{ resumo.sem_avaliador|length }})</h2>
+        <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
+            {% for f in resumo.sem_avaliador %}
+                <li>
+                    <span style="font-weight:600; color:var(--navy-800);">{{ f.nome }}</span>
+                    <span class="tag">{{ f.setor.nome if f.setor else '-' }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <p class="muted" style="margin-top:24px;">
+        Pra ver detalhes de cada avaliação, baixar PDFs ou agir em cima de uma pessoa específica, use a
+        <a href="{{ url_for('admin.andamento', ciclo_id=ciclo.id) }}">tela de Andamento das avaliações</a>.
+    </p>
+{% endif %}
+{% endblock %}

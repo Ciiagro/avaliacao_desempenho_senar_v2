@@ -212,6 +212,126 @@ def andamento():
     )
 
 
+@admin_bp.route("/painel-monitoramento")
+def painel_monitoramento():
+    """Painel enxuto pra acompanhar o andamento do exercício de longe: só
+    os números (quantos já responderam, quantos faltam de cada lado,
+    prazo) e a lista de quem falta — sem a tabela grande de ações que tem
+    em 'Andamento das avaliações'."""
+    ciclo_id_param = request.args.get("ciclo_id")
+    if ciclo_id_param:
+        ciclo = CicloAvaliacao.query.get_or_404(int(ciclo_id_param))
+    else:
+        ciclo = (
+            CicloAvaliacao.query.filter_by(status="aberto")
+            .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
+            .first()
+        ) or CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).first()
+
+    ciclos = CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).all()
+
+    if not ciclo:
+        return render_template(
+            "admin/painel_monitoramento.html", ciclo=None, ciclos=ciclos, resumo=None
+        )
+
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+
+    vinculos_por_avaliado = {
+        v.avaliado_id: v.avaliador
+        for v in VinculoAvaliacao.query.filter_by(ciclo_id=ciclo.id)
+        .join(Funcionario, VinculoAvaliacao.avaliador_id == Funcionario.id)
+        .all()
+    }
+
+    avaliacoes = Avaliacao.query.filter_by(ciclo_id=ciclo.id).all()
+    avaliacao_por_chave = {(a.avaliado_id, a.avaliador_id, a.tipo): a for a in avaliacoes}
+
+    pendentes_auto = []
+    pendentes_gestor = []
+    sem_avaliador = []
+    auto_concluida = 0
+    gestor_concluida = 0
+    total = 0
+
+    subordinados_por_avaliador = {}  # avaliador_id -> [avaliado_id, ...] (só elegíveis)
+
+    for f in funcionarios:
+        if f.is_elegivel_avaliacao(referencia=ciclo.referencia_elegibilidade()) is False:
+            continue
+        total += 1
+
+        avaliacao_auto = avaliacao_por_chave.get((f.id, f.id, "auto"))
+        if avaliacao_auto and avaliacao_auto.status == "concluida":
+            auto_concluida += 1
+        else:
+            pendentes_auto.append(f)
+
+        avaliador = vinculos_por_avaliado.get(f.id)
+        if not avaliador:
+            sem_avaliador.append(f)
+        else:
+            subordinados_por_avaliador.setdefault(avaliador.id, []).append(f.id)
+            avaliacao_gestor = avaliacao_por_chave.get((f.id, avaliador.id, "gestor"))
+            if avaliacao_gestor and avaliacao_gestor.status == "concluida":
+                gestor_concluida += 1
+            else:
+                pendentes_gestor.append(f)
+
+    # Progresso de cada gestor na equipe dele: quantos dos subordinados
+    # dele já foram avaliados. "Completo" = 100% da equipe avaliada.
+    funcionario_por_id = {f.id: f for f in funcionarios}
+    gestores_completos = 0
+    gestores_pendentes = []
+    for avaliador_id, avaliado_ids in subordinados_por_avaliador.items():
+        concluidas = sum(
+            1
+            for aid in avaliado_ids
+            if (avaliacao_por_chave.get((aid, avaliador_id, "gestor")) or None)
+            and avaliacao_por_chave[(aid, avaliador_id, "gestor")].status == "concluida"
+        )
+        if concluidas == len(avaliado_ids):
+            gestores_completos += 1
+        else:
+            gestor_obj = funcionario_por_id.get(avaliador_id) or Funcionario.query.get(avaliador_id)
+            gestores_pendentes.append(
+                {"gestor": gestor_obj, "concluidas": concluidas, "total": len(avaliado_ids)}
+            )
+    gestores_pendentes.sort(key=lambda g: g["concluidas"] / g["total"])
+    gestores_com_equipe = len(subordinados_por_avaliador)
+
+    hoje = para_fortaleza(datetime.now(timezone.utc)).date()
+
+    def _prazo_info(prazo):
+        if not prazo:
+            return None
+        dias = (prazo - hoje).days
+        return {"data": prazo, "dias": dias, "atrasado": dias < 0}
+
+    resumo = {
+        "total": total,
+        "auto_concluida": auto_concluida,
+        "gestor_concluida": gestor_concluida,
+        "pct_auto": round(100 * auto_concluida / total) if total else 0,
+        "pct_gestor": round(100 * gestor_concluida / total) if total else 0,
+        "pendentes_auto": pendentes_auto,
+        "pendentes_gestor": pendentes_gestor,
+        "sem_avaliador": sem_avaliador,
+        "prazo_auto": _prazo_info(ciclo.data_limite_autoavaliacao),
+        "prazo_gestor": _prazo_info(ciclo.data_limite_gestor),
+        "gestores_completos": gestores_completos,
+        "gestores_com_equipe": gestores_com_equipe,
+        "gestores_pendentes": gestores_pendentes,
+    }
+
+    return render_template(
+        "admin/painel_monitoramento.html",
+        ciclo=ciclo,
+        ciclos=ciclos,
+        resumo=resumo,
+    )
+
+
 @admin_bp.route("/resultados")
 def resultados():
     """
@@ -1446,13 +1566,7 @@ def funcionarios():
         consulta = consulta.filter_by(ativo=False)
     # "todos" não filtra por status
 
-    elegivel_filtro = request.args.get("elegivel", "todos")  # todos (padrão) | sim | nao
     lista = consulta.order_by(Funcionario.nome).all()
-    if elegivel_filtro == "sim":
-        lista = [f for f in lista if f.is_elegivel_avaliacao() is True]
-    elif elegivel_filtro == "nao":
-        lista = [f for f in lista if f.is_elegivel_avaliacao() is not True]
-
     cargos = Cargo.query.order_by(Cargo.nome).all()
     setores = Setor.query.order_by(Setor.nome).all()
     return render_template(
@@ -1466,7 +1580,6 @@ def funcionarios():
         opcoes_sexo=OPCOES_SEXO,
         setor_filtro=setor_filtro,
         status_filtro=status_filtro,
-        elegivel_filtro=elegivel_filtro,
     )
 
 

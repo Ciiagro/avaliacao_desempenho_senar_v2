@@ -284,6 +284,26 @@ a { color: var(--navy-700); }
 .card h2 { margin: 0 0 8px; color: var(--navy-900); border: none; padding: 0; font-size: 1.05rem; }
 .card p { margin: 0; color: var(--texto-muted); font-size: 0.9rem; }
 
+.card-destaque { border-top-color: var(--gold); }
+.card-numero-grande h2 { font-size: 1.9rem; }
+
+.barra-progresso {
+    background: #eef0f4;
+    border-radius: 999px;
+    height: 7px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+.barra-progresso-preenchimento {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--navy-800);
+    transition: width 0.3s ease;
+}
+.barra-progresso-preenchimento.completa { background: var(--sucesso); }
+.barra-progresso-preenchimento.alerta { background: var(--aviso); }
+.barra-progresso-preenchimento.perigo { background: var(--perigo); }
+
 /* ---------------- Listas de pessoas ---------------- */
 
 .lista-pessoas { list-style: none; padding: 0; }
