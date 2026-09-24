@@ -4,6 +4,13 @@
 {% block content %}
 <h1>Olá, {{ funcionario.nome.split(' ')[0] }}</h1>
 
+<div class="cards">
+    <a class="card" href="{{ url_for('main.minhas_capacitacoes') }}">
+        <h2>Minhas Capacitações</h2>
+        <p>Cadastre seus cursos, treinamentos e certificações</p>
+    </a>
+</div>
+
 {% if resultados_liberados %}
     <h2>Meus resultados finais</h2>
     <div class="cards">

@@ -1,9 +1,22 @@
 from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, g
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, g, abort
+from werkzeug.utils import secure_filename
 
 from ..extensions import db
-from ..models import Funcionario, VinculoAvaliacao, CicloAvaliacao, Avaliacao, ResultadoFinal
+from ..models import (
+    Funcionario,
+    VinculoAvaliacao,
+    CicloAvaliacao,
+    Avaliacao,
+    ResultadoFinal,
+    Capacitacao,
+    TIPOS_CAPACITACAO,
+    TIPOS_STATUS_CAPACITACAO,
+    TRIMESTRES,
+    trimestre_atual,
+    limites_trimestre,
+)
 from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, adicionar_dias_uteis, para_fortaleza
 from ..resultado_final_service import montar_dados_resultado_final
 from ..pdf_resultado_final import gerar_pdf_resultado_final
@@ -230,6 +243,290 @@ def minha_area():
     )
 
 
+# ---------------- Capacitações: comprovante ----------------
+EXT_COMPROVACAO = {
+    "pdf": "application/pdf",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+}
+ASSINATURAS_COMPROVACAO = {
+    "application/pdf": (b"%PDF",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+}
+# O servidor (Vercel) aceita corpo de até ~4,5 MB por requisição.
+MAX_COMPROVACAO_BYTES = 4 * 1024 * 1024
+
+
+def _ler_comprovacao(file):
+    """Valida o arquivo enviado. Devolve (nome, mimetype, bytes, erro)."""
+    if not file or not file.filename:
+        return None, None, None, None
+    nome = secure_filename(file.filename) or "comprovacao"
+    ext = nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
+    mimetype = EXT_COMPROVACAO.get(ext)
+    if not mimetype:
+        return None, None, None, "O documento precisa ser PDF, JPG ou PNG."
+    dados = file.read(MAX_COMPROVACAO_BYTES + 1)
+    if len(dados) > MAX_COMPROVACAO_BYTES:
+        return None, None, None, "O documento é grande demais (máximo de 4 MB)."
+    if not any(dados.startswith(a) for a in ASSINATURAS_COMPROVACAO[mimetype]):
+        return None, None, None, "O conteúdo do arquivo não corresponde a um PDF, JPG ou PNG válido."
+    return nome, mimetype, dados, None
+
+
+def _parse_data_form(campo):
+    valor = request.form.get(campo)
+    if not valor:
+        return None
+    try:
+        return datetime.strptime(valor, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _parse_decimal_form(campo):
+    valor = request.form.get(campo, "").strip()
+    if not valor:
+        return None
+    try:
+        return float(valor)
+    except ValueError:
+        return None
+
+
+def _parse_carga_horaria_form():
+    valor = _parse_decimal_form("carga_horaria")
+    return int(round(valor)) if valor is not None else None
+
+
+def _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao):
+    """Mensagem de erro se as datas saírem do trimestre; senão None."""
+    ini_tri, fim_tri = limites_trimestre(ano, trimestre)
+    periodo = f"{ini_tri.strftime('%d/%m/%Y')} a {fim_tri.strftime('%d/%m/%Y')}"
+    for rotulo, d in (("início", data_inicio), ("conclusão", data_conclusao)):
+        if d and not (ini_tri <= d <= fim_tri):
+            return (
+                f"A data de {rotulo} precisa estar dentro do {trimestre}º trimestre "
+                f"de {ano} ({periodo})."
+            )
+    if data_inicio and data_conclusao and data_conclusao < data_inicio:
+        return "A data de conclusão não pode ser anterior à data de início."
+    return None
+
+
+def resposta_documento_capacitacao(capacitacao):
+    """Devolve o comprovante para ser aberto no navegador (usado também pelo admin)."""
+    if not capacitacao.arquivo_tipo or not capacitacao.arquivo_dados:
+        abort(404)
+    resp = Response(bytes(capacitacao.arquivo_dados), mimetype=capacitacao.arquivo_tipo)
+    nome = (capacitacao.arquivo_comprovacao or "comprovacao").replace('"', "")
+    resp.headers["Content-Disposition"] = f'inline; filename="{nome}"'
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Cache-Control"] = "private, max-age=0, no-store"
+    return resp
+
+
+@main_bp.route("/minhas-capacitacoes", methods=["GET", "POST"])
+def minhas_capacitacoes():
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+    if funcionario.senha_provisoria:
+        return redirect(url_for("main.trocar_senha"))
+
+    # Trimestre selecionado (padrão: o trimestre atual). No POST vem do
+    # formulário; no GET, da query string.
+    ano_padrao, tri_padrao = trimestre_atual()
+    origem = request.form if request.method == "POST" else request.args
+    try:
+        ano = int(origem.get("ano", ano_padrao))
+        trimestre = int(origem.get("trimestre", tri_padrao))
+    except (TypeError, ValueError):
+        ano, trimestre = ano_padrao, tri_padrao
+    if trimestre not in TRIMESTRES or not (2000 <= ano <= 2100):
+        ano, trimestre = ano_padrao, tri_padrao
+
+    if request.method == "POST":
+        nome_curso = request.form.get("nome_curso", "").strip()
+        if not nome_curso:
+            flash("Informe o nome do curso/capacitação.", "danger")
+            return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+
+        carga_horaria = _parse_carga_horaria_form()
+
+        # As datas precisam estar dentro do trimestre selecionado.
+        data_inicio = _parse_data_form("data_inicio")
+        data_conclusao = _parse_data_form("data_conclusao")
+        erro_datas = _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao)
+        if erro_datas:
+            flash(erro_datas, "danger")
+            return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+
+        # Documento de comprovação (fica guardado no banco)
+        arquivo_nome, arquivo_tipo, arquivo_dados, erro_arquivo = _ler_comprovacao(
+            request.files.get("arquivo_comprovacao")
+        )
+        if erro_arquivo:
+            flash(erro_arquivo, "danger")
+            return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+
+        capacitacao = Capacitacao(
+            funcionario_id=funcionario.id,
+            nome_curso=nome_curso,
+            instituicao=request.form.get("instituicao", "").strip() or None,
+            tipo=request.form.get("tipo") or None,
+            carga_horaria=carga_horaria,
+            data_inicio=data_inicio,
+            data_conclusao=data_conclusao,
+            status=request.form.get("status") or None,
+            arquivo_comprovacao=arquivo_nome,
+            arquivo_tipo=arquivo_tipo,
+            arquivo_dados=arquivo_dados,
+            valor_pago_senar=_parse_decimal_form("valor_pago_senar"),
+            observacoes=request.form.get("observacoes", "").strip() or None,
+            ano=ano,
+            trimestre=trimestre,
+        )
+        db.session.add(capacitacao)
+        db.session.commit()
+        flash(f"Capacitação adicionada ao {trimestre}º trimestre de {ano}!", "success")
+        return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+
+    lista = (
+        Capacitacao.query.filter_by(funcionario_id=funcionario.id, ano=ano, trimestre=trimestre)
+        .order_by(Capacitacao.data_conclusao.desc().nullslast(), Capacitacao.criado_em.desc())
+        .all()
+    )
+    ini_tri, fim_tri = limites_trimestre(ano, trimestre)
+
+    total_horas = sum(c.carga_horaria or 0 for c in lista)
+    total_valor = sum((c.valor_pago_senar or 0) for c in lista)
+    total_valor_fmt = (
+        f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+    return render_template(
+        "minhas_capacitacoes.html",
+        inicio_trimestre=ini_tri,
+        fim_trimestre=fim_tri,
+        total_horas=total_horas,
+        total_valor_fmt=total_valor_fmt,
+        funcionario=funcionario,
+        capacitacoes=lista,
+        tipos=TIPOS_CAPACITACAO,
+        status_options=TIPOS_STATUS_CAPACITACAO,
+        ano=ano,
+        trimestre=trimestre,
+        trimestres=TRIMESTRES,
+        anos=list(range(ano_padrao - 3, ano_padrao + 2)),
+    )
+
+
+@main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/editar", methods=["GET", "POST"])
+def editar_minha_capacitacao(capacitacao_id):
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+    if funcionario.senha_provisoria:
+        return redirect(url_for("main.trocar_senha"))
+
+    capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
+    if str(capacitacao.funcionario_id) != str(funcionario.id):
+        flash("Você não tem permissão para editar esta capacitação.", "danger")
+        return redirect(url_for("main.minhas_capacitacoes"))
+
+    # A capacitação continua no trimestre em que foi lançada.
+    ano, trimestre = capacitacao.ano, capacitacao.trimestre
+    voltar = url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre)
+    ini_tri, fim_tri = limites_trimestre(ano, trimestre)
+
+    if request.method == "POST":
+        nome_curso = request.form.get("nome_curso", "").strip()
+        if not nome_curso:
+            flash("Informe o nome do curso/capacitação.", "danger")
+            return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
+
+        data_inicio = _parse_data_form("data_inicio")
+        data_conclusao = _parse_data_form("data_conclusao")
+        erro_datas = _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao)
+        if erro_datas:
+            flash(erro_datas, "danger")
+            return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
+
+        arquivo_nome, arquivo_tipo, arquivo_dados, erro_arquivo = _ler_comprovacao(
+            request.files.get("arquivo_comprovacao")
+        )
+        if erro_arquivo:
+            flash(erro_arquivo, "danger")
+            return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
+
+        capacitacao.nome_curso = nome_curso
+        capacitacao.instituicao = request.form.get("instituicao", "").strip() or None
+        capacitacao.tipo = request.form.get("tipo") or None
+        capacitacao.status = request.form.get("status") or None
+        capacitacao.carga_horaria = _parse_carga_horaria_form()
+        capacitacao.data_inicio = data_inicio
+        capacitacao.data_conclusao = data_conclusao
+        capacitacao.valor_pago_senar = _parse_decimal_form("valor_pago_senar")
+        capacitacao.observacoes = request.form.get("observacoes", "").strip() or None
+
+        if arquivo_dados:  # novo comprovante substitui o anterior
+            capacitacao.arquivo_comprovacao = arquivo_nome
+            capacitacao.arquivo_tipo = arquivo_tipo
+            capacitacao.arquivo_dados = arquivo_dados
+        elif request.form.get("remover_arquivo"):
+            capacitacao.arquivo_comprovacao = None
+            capacitacao.arquivo_tipo = None
+            capacitacao.arquivo_dados = None
+
+        db.session.commit()
+        flash("Capacitação atualizada!", "success")
+        return redirect(voltar)
+
+    return render_template(
+        "minhas_capacitacoes_editar.html",
+        capacitacao=capacitacao,
+        tipos=TIPOS_CAPACITACAO,
+        status_options=TIPOS_STATUS_CAPACITACAO,
+        ano=ano,
+        trimestre=trimestre,
+        inicio_trimestre=ini_tri,
+        fim_trimestre=fim_tri,
+        voltar=voltar,
+    )
+
+
+@main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/documento")
+def documento_minha_capacitacao(capacitacao_id):
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+
+    capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
+    if str(capacitacao.funcionario_id) != str(funcionario.id):
+        abort(403)
+    return resposta_documento_capacitacao(capacitacao)
+
+
+@main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/excluir", methods=["POST"])
+def excluir_minha_capacitacao(capacitacao_id):
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+
+    capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
+    if str(capacitacao.funcionario_id) != str(funcionario.id):
+        flash("Você não tem permissão para excluir esta capacitação.", "danger")
+        return redirect(url_for("main.minhas_capacitacoes"))
+
+    ano, trimestre = capacitacao.ano, capacitacao.trimestre
+    db.session.delete(capacitacao)
+    db.session.commit()
+    flash("Capacitação removida.", "success")
+    return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+
+
 def _resultado_liberado_do_ciclo(funcionario, ciclo_id):
     """Confere se o resultado final desse ciclo foi liberado para este
     empregado, e devolve o registro (ou None caso não tenha sido)."""
@@ -352,10 +649,6 @@ def meu_resultado_pdf(ciclo_id):
         flash("Seu resultado final ainda não foi liberado pela administração.", "warning")
         return redirect(url_for("main.minha_area"))
 
-    if not registro.ciente_avaliado:
-        flash("Confirme a ciência de recebimento antes de baixar o PDF.", "warning")
-        return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
-
     if registro.decisao_avaliado == "recorreu":
         from ..models import RecursoAvaliacao, RECURSO_STATUS_AGUARDANDO_FUNCIONARIO
 
@@ -391,10 +684,6 @@ def meu_resultado_excel(ciclo_id):
     if not registro:
         flash("Seu resultado final ainda não foi liberado pela administração.", "warning")
         return redirect(url_for("main.minha_area"))
-
-    if not registro.ciente_avaliado:
-        flash("Confirme a ciência de recebimento antes de baixar o Excel.", "warning")
-        return redirect(url_for("main.meu_resultado_detalhe", ciclo_id=ciclo_id))
 
     if registro.decisao_avaliado == "recorreu":
         from ..models import RecursoAvaliacao, RECURSO_STATUS_AGUARDANDO_FUNCIONARIO

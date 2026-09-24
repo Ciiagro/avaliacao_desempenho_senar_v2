@@ -44,7 +44,7 @@
                 <tr>
                     <th style="width:8%;">Mat.</th>
                     <th style="width:18%;">Nome</th>
-                    <th style="width:10%;">Admissão</th>
+                    <th style="width:10%;">Devolutiva</th>
                     <th style="width:10%;" class="centro">Autoaval.</th>
                     <th style="width:10%;" class="centro">Aval. gestor</th>
                     <th style="width:9%;">Resultado</th>
@@ -62,7 +62,18 @@
                             <a class="funcionario-nome" href="{{ url_for('admin.detalhe_resultado', avaliado_id=linha.funcionario.id, ciclo_id=ciclo.id) }}">{{ linha.funcionario.nome }}</a>
                             <div class="funcionario-subinfo muted">{{ linha.funcionario.setor.nome if linha.funcionario.setor else '-' }}</div>
                         </td>
-                        <td>{{ linha.funcionario.data_admissao.strftime('%d/%m/%Y') if linha.funcionario.data_admissao else '-' }}</td>
+                        <td>
+                            {% if linha.funcionario.tem_devolutiva_marcada() %}
+                                <strong style="color:#1a5f7a;">{{ linha.funcionario.devolutiva.data_devolutiva.strftime('%d/%m/%Y') }}</strong>
+                                {% if linha.funcionario.devolutiva.pode_recorrer() %}
+                                    <div class="muted" style="font-size:0.78rem;">prazo até {{ linha.funcionario.devolutiva.data_limite_recorrer.strftime('%d/%m/%Y') }}</div>
+                                {% else %}
+                                    <div class="muted" style="font-size:0.78rem;">prazo encerrado</div>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge badge-new">Não marcada</span>
+                            {% endif %}
+                        </td>
                         <td class="centro {% if linha.media_auto is not none %}{% if linha.media_auto >= 8 %}nota-alta{% elif linha.media_auto >= 7 %}nota-media{% else %}nota-baixa{% endif %}{% endif %}">
                             {{ '%.2f'|format(linha.media_auto) if linha.media_auto is not none else '-' }}
                         </td>
@@ -96,7 +107,7 @@
                             {% elif linha.assinatura_status == 'assinada_recurso' %}
                                 <span class="badge badge-ok" title="Assinada (após o recurso) em {{ (linha.assinatura_em|fortaleza).strftime('%d/%m/%Y %H:%M') if linha.assinatura_em else '-' }}">Assinada<br>(recurso)</span>
                             {% elif linha.assinatura_status == 'recurso_pendente' %}
-                                <span class="badge badge-new" title="Recorreu — ainda não assinou a resposta final do recurso">Recurso em andamento</span>
+                                <span class="badge badge-new" title="Recorreu — ainda não assinou a resposta final do recurso">Recurso<br>em andamento</span>
                             {% elif linha.liberado %}
                                 {% if linha.prazo_ciencia and linha.prazo_ciencia < agora %}
                                     <span class="badge badge-danger" title="Prazo era {{ linha.prazo_ciencia.strftime('%d/%m/%Y') }}">Atrasada</span>
@@ -131,6 +142,16 @@
                                             </button>
                                         </form>
                                     {% endif %}
+                                    <button
+                                        type="button"
+                                        class="botao-icone botao-icone-secundario"
+                                        title="{% if linha.funcionario.tem_devolutiva_marcada() %}Devolutiva: {{ linha.funcionario.devolutiva.data_devolutiva.strftime('%d/%m/%Y') }} (clique para alterar){% else %}Marcar data de devolutiva{% endif %}"
+                                        aria-label="Marcar devolutiva de {{ linha.funcionario.nome }}"
+                                        onclick="abrirModalDevolutiva('{{ linha.funcionario.id }}', '{{ linha.funcionario.nome }}', '{{ linha.funcionario.devolutiva.data_devolutiva.isoformat() if linha.funcionario.tem_devolutiva_marcada() else '' }}')"
+                                        style="{% if linha.funcionario.tem_devolutiva_marcada() %}color:#1a5f7a;{% endif %}"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    </button>
                                 </div>
                             {% else %}
                                 <span class="muted">-</span>
@@ -141,6 +162,40 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Modal para marcar devolutiva (compartilhado por todas as linhas) -->
+    <div id="modal-devolutiva" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:8px; padding:24px; max-width:420px; width:90%;">
+            <h3 style="margin-top:0;">📅 Marcar devolutiva</h3>
+            <p style="margin:0 0 16px;">
+                Funcionário: <strong id="modal-devolutiva-nome"></strong>
+            </p>
+            <form id="form-devolutiva" method="post" action="">
+                <label for="modal-devolutiva-data" style="display:block; margin-bottom:6px; font-weight:600;">Data da devolutiva:</label>
+                <input type="date" id="modal-devolutiva-data" name="data_devolutiva" required style="width:100%; padding:8px; margin-bottom:6px;">
+                <small class="muted" style="display:block; margin-bottom:16px;">
+                    O prazo para recorrer será calculado automaticamente (data + 5 dias).
+                </small>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button type="button" class="botao botao-secundario" onclick="fecharModalDevolutiva()">Cancelar</button>
+                    <button type="submit" class="botao">Marcar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        var URL_BASE_MARCAR_DEVOLUTIVA = "{{ url_for('admin.marcar_devolutiva_funcionario', funcionario_id='__ID__') }}";
+        function abrirModalDevolutiva(funcionarioId, funcionarioNome, dataAtual) {
+            document.getElementById('modal-devolutiva-nome').textContent = funcionarioNome;
+            document.getElementById('modal-devolutiva-data').value = dataAtual || '';
+            document.getElementById('form-devolutiva').action = URL_BASE_MARCAR_DEVOLUTIVA.replace('__ID__', funcionarioId);
+            document.getElementById('modal-devolutiva').style.display = 'flex';
+        }
+        function fecharModalDevolutiva() {
+            document.getElementById('modal-devolutiva').style.display = 'none';
+        }
+    </script>
 
     <script>
         (function () {

@@ -134,9 +134,9 @@
             </div>
         </form>
     </div>
-    <p class="muted" style="margin-top:8px;">
-        O download do PDF e do Excel fica disponível depois que você marcar a ciência acima
-        e escolher uma das duas opções (aceitar ou recorrer).
+    <p style="margin-top:12px;">
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=ciclo.id) }}">Baixar PDF</a>
+        <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=ciclo.id) }}">Baixar Excel</a>
     </p>
 {% endif %}
 

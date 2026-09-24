@@ -327,10 +327,9 @@ def avisar_empregado_resposta_disponivel(recurso, comentario):
         paragrafos=[
             f"Chegou uma resposta ao seu recurso sobre o resultado da avaliação de "
             f"desempenho (Exercício {recurso.ciclo.exercicio}).",
+            "Acesse o sistema para visualizar a resposta completa e confirmar o recebimento.",
         ],
         destaque=("Comentário da Comissão", comentario) if comentario else None,
-        link_url=_link_empregado(),
-        link_texto="Ver resposta e decidir",
     )
 
 
@@ -410,6 +409,25 @@ def avisar_prazo_ciencia_resultado(funcionario, dias_restantes, prazo):
         ],
         link_url=_link_minha_area(),
         link_texto="Ver meu resultado",
+    )
+
+
+def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite):
+    """Devolutiva marcada para o funcionário: aviso com a data e o prazo
+    que ele tem para concordar ou recorrer à presidência."""
+    dias = (data_limite - data_devolutiva).days
+    _enviar_email(
+        _email_funcionario(funcionario),
+        "[Avaliação de Desempenho] Data de devolutiva marcada",
+        titulo="Devolutiva marcada",
+        paragrafos=[
+            f"A data de devolutiva da sua avaliação foi marcada para "
+            f"{data_devolutiva.strftime('%d/%m/%Y')}.",
+            f"Você terá até {data_limite.strftime('%d/%m/%Y')} ({dias} dias) para "
+            f"concordar com a resposta ou recorrer à presidência.",
+        ],
+        link_url=_link_empregado(),
+        link_texto="Acessar meus recursos",
     )
 
 

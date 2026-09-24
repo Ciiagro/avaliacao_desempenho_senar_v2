@@ -1,0 +1,156 @@
+{% extends "admin/base.html" %}
+
+{% block titulo %}Devolutiva de Funcionários{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid mt-4">
+    <h1>📅 Devolutiva de Funcionários</h1>
+    <p class="text-muted">Marca a data de devolutiva para cada funcionário. Todos os seus recursos usarão essa data.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive mt-4">
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>NOME</th>
+                    <th>EMAIL</th>
+                    <th>DEVOLUTIVA</th>
+                    <th>PRAZO RECORRER</th>
+                    <th>STATUS</th>
+                    <th>AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if funcionarios %}
+                    {% for func in funcionarios %}
+                    <tr>
+                        <td>{{ func.nome }}</td>
+                        <td><small>{{ func.email }}</small></td>
+                        <td>
+                            {% if func.data_devolutiva %}
+                                <strong style="color: #1a5f7a;">{{ func.data_devolutiva.strftime('%d/%m/%Y') }}</strong>
+                            {% else %}
+                                <span class="badge bg-secondary">Sem data</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if func.data_limite %}
+                                <small>até {{ func.data_limite.strftime('%d/%m/%Y') }}</small>
+                            {% else %}
+                                <span class="badge bg-light text-dark">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if func.tem_devolutiva %}
+                                <span class="badge bg-success">✓ Marcada</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">⏳ Pendente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button 
+                                type="button" 
+                                class="btn btn-sm btn-primary" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modalMarcar"
+                                onclick="preencherModal('{{ func.id }}', '{{ func.nome }}')"
+                            >
+                                📅 Marcar/Alterar
+                            </button>
+                            
+                            {% if func.tem_devolutiva %}
+                            <form 
+                                action="{{ url_for('admin.remover_devolutiva_funcionario', funcionario_id=func.id) }}" 
+                                method="POST" 
+                                style="display:inline;"
+                                onsubmit="return confirm('Tem certeza que deseja remover a devolutiva?');"
+                            >
+                                <button type="submit" class="btn btn-sm btn-danger">🗑️ Remover</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Nenhum funcionário encontrado</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para marcar devolutiva -->
+<div class="modal fade" id="modalMarcar" tabindex="-1" aria-labelledby="modalMarcarLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalMarcarLabel">📅 Marcar Devolutiva</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="formMarcarDevolutiva">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Funcionário:</strong></label>
+                        <p id="nomeFuncionario" class="form-control-plaintext fw-bold text-primary"></p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="dataDevolutiva" class="form-label"><strong>Data de Devolutiva:</strong></label>
+                        <input 
+                            type="date" 
+                            id="dataDevolutiva" 
+                            name="data_devolutiva" 
+                            class="form-control" 
+                            required
+                        >
+                        <small class="text-muted d-block mt-2">
+                            ℹ️ O prazo para recorrer será automaticamente calculado como: data + 5 dias
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">✓ Marcar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function preencherModal(funcionarioId, funcionarioNome) {
+    document.getElementById('nomeFuncionario').textContent = funcionarioNome;
+    const form = document.getElementById('formMarcarDevolutiva');
+    form.action = `/devolutiva/funcionario/${funcionarioId}/marcar`;
+}
+</script>
+
+<style>
+    .table th {
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    .badge {
+        font-size: 0.85rem;
+        padding: 0.35rem 0.65rem;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}

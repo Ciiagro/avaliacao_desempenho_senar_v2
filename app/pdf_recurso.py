@@ -90,7 +90,46 @@ def gerar_pdf_recurso(recurso, dados_resultado):
         f"{resultado_final:.2f} ({conceito})" if resultado_final is not None else "Ainda não disponível."
     )
     story.append(Paragraph(texto_resultado, corpo))
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 12))
+
+    # ---- Notas que foram alteradas ----
+    if recurso.revisoes_notas:
+        story.append(Paragraph("Fatores que foram alterados", secao))
+        
+        # Cabeçalho da tabela
+        dados_tabela = [
+            [
+                Paragraph("<b>Fator</b>", celula_nome),
+                Paragraph("<b>Nota Anterior</b>", celula_nome),
+                Paragraph("<b>Nota Nova</b>", celula_nome),
+            ]
+        ]
+        
+        # Linhas com os dados
+        for rev in recurso.revisoes_notas:
+            dados_tabela.append([
+                Paragraph(rev.fator.nome, celula),
+                Paragraph(str(rev.nota_anterior or "-"), celula),
+                Paragraph(f"<b>{rev.nota_nova}</b>", celula),
+            ])
+        
+        tabela_notas = Table(dados_tabela, colWidths=[7 * cm, 4.5 * cm, 4.5 * cm])
+        tabela_notas.setStyle(
+            TableStyle([
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8f5e9")),
+                ("BACKGROUND", (2, 1), (2, -1), colors.HexColor("#f1f8e9")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#2e7d32")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ])
+        )
+        story.append(tabela_notas)
+        story.append(Spacer(1, 18))
+    else:
+        story.append(Spacer(1, 6))
 
     # ---- Assinatura eletrônica do empregado ----
     if recurso.ciente_funcionario and recurso.ciente_funcionario_em:

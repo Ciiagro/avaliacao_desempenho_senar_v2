@@ -108,10 +108,37 @@ document.addEventListener('submit', function (e) {
         {% endif %}
 
         {% if r.resultado_atual_em_texto and r.resultado_atual_em_texto != r.resultado_final_em_texto %}
-            <p class="flash flash-success" style="display:inline-block;">
-                <strong>Nota atual, com a resposta do gestor:</strong> {{ r.resultado_atual_em_texto }}
-                <span class="muted">(era {{ r.resultado_final_em_texto or '-' }} quando você abriu o recurso)</span>
-            </p>
+            <div style="background:#e8f5e9; border-left:4px solid #4caf50; padding:14px; margin:12px 0; border-radius:4px;">
+                <p style="margin-top:0; margin-bottom:6px;"><strong style="color:#2e7d32;">✓ Nota Atualizada</strong></p>
+                <p style="margin:0; color:#333;">
+                    <strong>Resultado anterior:</strong> {{ r.resultado_final_em_texto or '-' }} 
+                    <strong style="color:#4caf50; margin-left:8px;">→ Resultado atual:</strong> {{ r.resultado_atual_em_texto }}
+                </p>
+            </div>
+
+            {% if r.revisoes_notas %}
+                <div style="margin:16px 0;">
+                    <p style="font-weight:600; color:#333; margin:0 0 12px;">Fatores que foram alterados:</p>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f5f5f5; border-bottom:1px solid #ddd;">
+                                <th style="padding:10px; text-align:left; font-weight:600;">Fator</th>
+                                <th style="padding:10px; text-align:center; font-weight:600;">Nota anterior</th>
+                                <th style="padding:10px; text-align:center; font-weight:600; color:#4caf50;">Nota nova</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rev in r.revisoes_notas %}
+                                <tr style="border-bottom:1px solid #eee;">
+                                    <td style="padding:10px;">{{ rev.fator.nome }}</td>
+                                    <td style="padding:10px; text-align:center; background:#fff3cd;">{{ rev.nota_anterior or '-' }}</td>
+                                    <td style="padding:10px; text-align:center; background:#e8f5e9; font-weight:600; color:#2e7d32;">{{ rev.nota_nova }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
         {% endif %}
 
         <div class="linha-tempo">
@@ -144,12 +171,32 @@ document.addEventListener('submit', function (e) {
         {% if r.status == 'aguardando_funcionario' %}
             <div style="margin-top:12px;">
                 <p class="muted" style="margin:0 0 8px;">
-                    Essa é a resposta final do gestor, já revisada pela Comissão. Confirme o
-                    recebimento para assinar eletronicamente e encerrar o recurso.
+                    Essa é a resposta final do gestor, já revisada pela Comissão (devolutiva).
                 </p>
-                <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=r.id) }}" onsubmit="return confirm('Confirmar o recebimento e assinar eletronicamente? Isso encerra o recurso definitivamente.');">
-                    <button type="submit" class="botao">Confirmar recebimento e assinar</button>
-                </form>
+
+                {% if funcionario.devolutiva %}
+                    <p class="muted" style="margin:0 0 8px;">
+                        <strong>Data da devolutiva:</strong> {{ funcionario.devolutiva.data_devolutiva.strftime('%d/%m/%Y') }}
+                        &middot;
+                        {% if funcionario.devolutiva.pode_recorrer() %}
+                            prazo para recorrer até <strong>{{ funcionario.devolutiva.data_limite_recorrer.strftime('%d/%m/%Y') }}</strong>
+                            ({{ funcionario.devolutiva.dias_restantes() }} dia(s) restante(s))
+                        {% else %}
+                            prazo para recorrer encerrado em {{ funcionario.devolutiva.data_limite_recorrer.strftime('%d/%m/%Y') }}
+                        {% endif %}
+                    </p>
+                {% endif %}
+
+                <p class="muted" style="margin:0 0 8px;">
+                    O download do comprovante em PDF fica disponível depois que você confirmar
+                    o recebimento (ou recorrer).
+                </p>
+
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=r.id) }}" onsubmit="return confirm('Confirmar o recebimento e assinar eletronicamente? Isso encerra o recurso definitivamente.');">
+                        <button type="submit" class="botao">✓ Concordo, confirmar recebimento</button>
+                    </form>
+                </div>
             </div>
         {% endif %}
 

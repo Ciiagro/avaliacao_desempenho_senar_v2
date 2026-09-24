@@ -1,0 +1,31 @@
+<style>
+/* Estilos do formulário de capacitação (usado em "Minhas Capacitações" e na edição) */
+.cap-grid {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 16px;
+}
+.cap-campo { display: flex; flex-direction: column; gap: 6px; margin: 0; min-width: 0; text-transform: none; letter-spacing: 0; }
+.cap-campo > span {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--texto-muted);
+}
+.cap-2 { grid-column: span 2; }
+.cap-3 { grid-column: span 3; }
+.cap-6 { grid-column: span 6; }
+.cap-acoes { display: flex; gap: 10px; margin-top: 20px; }
+.cap-painel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow-sm);
+    padding: 22px 24px; margin-bottom: 24px;
+}
+.cap-painel[hidden] { display: none; }
+.cap-painel-topo h2 { margin: 0 0 4px; border: none; padding: 0; font-size: 1.1rem; }
+.cap-painel-topo p { margin: 0 0 18px; font-size: 0.9rem; }
+.cap-check { flex-direction: row; align-items: center; gap: 8px; }
+.cap-check input { width: auto; }
+.cap-check span { text-transform: none; letter-spacing: 0; font-size: 0.9rem; font-weight: 600; color: var(--texto); }
+@media (max-width: 760px) {
+    .cap-grid { grid-template-columns: 1fr; }
+    .cap-2, .cap-3, .cap-6 { grid-column: auto; }
+}
+</style>

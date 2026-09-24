@@ -2,146 +2,436 @@
 {% block title %}Painel de monitoramento{% endblock %}
 
 {% block content %}
+<style>
+    .mon [hidden] { display: none !important; }
+    .mon { --mon-auto: #5fc3bf; --mon-gestor: #e0aa4f; --mon-ok: #1f8a4c; }
+    .mon-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .mon-topo form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .mon-topo select { padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); font: inherit; }
+    .mon-atualiza { font-size: 0.82rem; color: var(--texto-muted); display: flex; gap: 8px; align-items: center; }
+    .mon-atualiza label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
+    /* ---------- Hero ---------- */
+    .mon-hero { display: grid; grid-template-columns: 260px 1fr; gap: 36px; background: var(--navy-900); color: #e8f1f1; border-radius: 16px; padding: 30px 34px; margin: 18px 0 16px; }
+    .mon-aneis { position: relative; width: 220px; height: 220px; margin: 0 auto; }
+    .mon-aneis svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .mon-aneis circle { fill: none; stroke-linecap: round; }
+    .mon-anel-fundo { stroke: rgba(255, 255, 255, 0.11); }
+    .mon-anel { stroke-dasharray: var(--len) 1000; animation: mon-desenha 1.1s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes mon-desenha { from { stroke-dasharray: 0 1000; } }
+    .mon-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .mon-centro b { font-family: "Manrope", sans-serif; font-size: 2.6rem; line-height: 1; color: #fff; }
+    .mon-centro span { font-size: 0.8rem; color: #9fbcbc; margin-top: 4px; }
+    .mon-legenda { grid-column: 1; display: grid; gap: 12px; margin-top: 8px; }
+    .mon-leg { display: grid; grid-template-columns: 12px 1fr auto; gap: 4px 10px; align-items: baseline; }
+    .mon-leg i { width: 12px; height: 12px; border-radius: 4px; align-self: center; }
+    .mon-leg strong { font-family: "Manrope", sans-serif; font-size: 1.25rem; color: #fff; }
+    .mon-leg small { grid-column: 2 / 4; color: #9fbcbc; }
+
+    .mon-pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; background: rgba(255,255,255,0.1); }
+    .mon-pill::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+    .mon-pill.ok { color: #6fdc9b; } .mon-pill.atencao { color: #f4bf55; } .mon-pill.critico { color: #ff8f8f; } .mon-pill.info { color: #9fd0e8; }
+    .mon-manchete { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 1.85rem; line-height: 1.2; color: #fff; margin: 14px 0 6px; letter-spacing: -0.02em; }
+    .mon-sub { color: #b6cccc; margin: 0 0 22px; }
+    .mon-ritmos { display: grid; gap: 10px; }
+    .mon-ritmo { background: rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: 1.3fr repeat(3, 1fr); gap: 8px 16px; align-items: center; }
+    .mon-ritmo h3 { margin: 0; color: #fff; font-size: 0.95rem; }
+    .mon-ritmo .mon-chip { font-size: 0.78rem; font-weight: 700; }
+    .mon-ritmo .ok { color: #6fdc9b; } .mon-ritmo .atencao { color: #f4bf55; } .mon-ritmo .critico { color: #ff8f8f; } .mon-ritmo .info { color: #9fd0e8; }
+    .mon-ritmo dl { margin: 0; } .mon-ritmo dt { font-size: 0.75rem; color: #9fbcbc; } .mon-ritmo dd { margin: 0; font-weight: 700; color: #fff; }
+
+    /* ---------- Linha do tempo ---------- */
+    .mon-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 26px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+    .mon-card h2 { margin: 0 0 4px; font-size: 1.1rem; border: none; padding: 0; }
+    .mon-card > p.muted { margin: 0 0 16px; font-size: 0.87rem; }
+    .mon-linha { position: relative; height: 150px; margin-top: 8px; }
+    .mon-trilho { position: absolute; left: 6%; right: 6%; top: 40px; height: 8px; border-radius: 99px; background: #e6ecec; }
+    .mon-passado { position: absolute; left: 6%; top: 40px; height: 8px; border-radius: 99px; background: var(--navy-700); }
+    .mon-hoje { position: absolute; top: 0; transform: translateX(-50%); text-align: center; font-size: 0.78rem; font-weight: 700; color: var(--navy-900); }
+    .mon-hoje span { display: block; background: var(--navy-900); color: #fff; padding: 3px 10px; border-radius: 99px; }
+    .mon-hoje::after { content: ""; display: block; width: 2px; height: 20px; background: var(--navy-900); margin: 0 auto; }
+    .mon-marco { position: absolute; top: 36px; transform: translateX(-50%); text-align: center; white-space: nowrap; font-size: 0.8rem; }
+    .mon-marco::before { content: ""; display: block; width: 16px; height: 16px; margin: 0 auto 6px; border-radius: 50%; background: var(--surface); border: 3px solid var(--gold); }
+    .mon-marco.marco::before { border-color: var(--navy-600); }
+    .mon-marco b { display: block; color: var(--texto); }
+    .mon-marco small { color: var(--texto-muted); }
+    .mon-marco.n1::before { margin-bottom: 48px; }
+    .mon-marco.n1::after { content: ""; position: absolute; left: 50%; top: 22px; height: 46px; width: 1px; background: var(--border-strong); }
+
+    /* ---------- Pontos de atenção ---------- */
+    .mon-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+    .mon-ins { border-radius: 10px; padding: 14px 16px; border-left: 5px solid var(--info); background: var(--info-bg); }
+    .mon-ins.critico { border-color: var(--perigo); background: var(--perigo-bg); }
+    .mon-ins.atencao { border-color: var(--gold); background: var(--aviso-bg); }
+    .mon-ins.ok { border-color: var(--sucesso); background: var(--sucesso-bg); }
+    .mon-ins b { display: block; color: var(--navy-900); margin-bottom: 2px; }
+    .mon-ins span { font-size: 0.88rem; color: var(--texto); }
+
+    /* ---------- Setores ---------- */
+    .mon-setor { display: grid; grid-template-columns: minmax(150px, 260px) 1fr 84px; gap: 6px 16px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 8px; font: inherit; cursor: pointer; color: var(--texto); }
+    .mon-setor:hover { background: #f3f7f7; }
+    .mon-setor .nome { font-weight: 600; color: var(--navy-800); font-size: 0.9rem; }
+    .mon-barras { display: grid; gap: 4px; }
+    .mon-barra { height: 8px; border-radius: 99px; background: #eaefef; overflow: hidden; }
+    .mon-barra i { display: block; height: 100%; border-radius: 99px; }
+    .mon-barra.a i { background: var(--navy-600); } .mon-barra.g i { background: var(--gold); }
+    .mon-setor .num { font-size: 0.8rem; color: var(--texto-muted); text-align: right; line-height: 1.35; }
+    .mon-chave { display: flex; gap: 16px; font-size: 0.8rem; color: var(--texto-muted); margin-bottom: 8px; }
+    .mon-chave i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+
+    /* ---------- Gestores ---------- */
+    .mon-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .mon-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+    .mon-seg button { border: 0; background: var(--surface); padding: 6px 14px; font: inherit; font-size: 0.85rem; cursor: pointer; color: var(--texto-muted); }
+    .mon-seg button[aria-pressed="true"] { background: var(--navy-800); color: #fff; }
+    .mon-gestores { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+    .mon-gestores.so-pendentes .is-completo { display: none; }
+    .mon-gestor { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .mon-gestor summary { list-style: none; cursor: pointer; padding: 12px 14px; }
+    .mon-gestor summary::-webkit-details-marker { display: none; }
+    .mon-gestor[open] { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+    .mon-g-linha { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .mon-g-linha b { color: var(--navy-800); font-size: 0.9rem; }
+    .mon-g-linha span { font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
+    .mon-g-setor { font-size: 0.78rem; color: var(--texto-muted); margin: 0 0 8px; }
+    .mon-segs { display: flex; gap: 3px; }
+    .mon-segs i { flex: 1; height: 8px; border-radius: 3px; background: #e6ecec; }
+    .mon-segs i.ok { background: var(--sucesso); }
+    .mon-g-corpo { padding: 0 14px 12px; font-size: 0.85rem; }
+    .mon-g-corpo div { display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid var(--border); }
+    .mon-g-corpo .ok { color: var(--sucesso); font-weight: 600; } .mon-g-corpo .pend { color: var(--perigo); font-weight: 600; }
+
+    /* ---------- Quem falta ---------- */
+    .mon-abas { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+    .mon-abas button { border: 0; background: none; padding: 10px 14px; font: inherit; font-weight: 600; color: var(--texto-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+    .mon-abas button[aria-selected="true"] { color: var(--navy-800); border-color: var(--gold); }
+    .mon-abas em { font-style: normal; background: #e9eff0; border-radius: 99px; padding: 1px 9px; font-size: 0.78rem; margin-left: 6px; }
+    .mon-ferramentas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .mon-ferramentas input[type=search] { flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: 8px; font: inherit; }
+    .mon-btn { border: 1px solid var(--navy-700); background: var(--surface); color: var(--navy-800); padding: 8px 14px; border-radius: 8px; font: inherit; font-weight: 600; font-size: 0.86rem; cursor: pointer; }
+    .mon-btn:hover { background: var(--navy-800); color: #fff; }
+    .mon-filtro { display: inline-flex; align-items: center; gap: 8px; background: var(--aviso-bg); border-radius: 99px; padding: 4px 6px 4px 12px; font-size: 0.82rem; }
+    .mon-filtro button { border: 0; background: var(--gold); color: #fff; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; }
+    .mon-lista { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
+    .mon-lista li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--surface); }
+    .mon-lista b { display: block; color: var(--navy-800); font-size: 0.88rem; }
+    .mon-lista small { color: var(--texto-muted); }
+    .mon-grupos { max-height: 520px; overflow-y: auto; display: grid; gap: 12px; padding-right: 4px; }
+    .mon-grupo { border: 1px solid var(--border); border-left: 5px solid var(--gold); border-radius: 10px; background: var(--surface); padding: 12px 14px; }
+    .mon-grupo header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+    .mon-grupo header b { color: var(--navy-900); font-size: 0.95rem; }
+    .mon-grupo header span { font-size: 0.8rem; font-weight: 700; color: var(--aviso); background: var(--aviso-bg); border-radius: 99px; padding: 2px 10px; white-space: nowrap; }
+    .mon-grupo .mon-lista { max-height: none; overflow: visible; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .mon-grupo .mon-lista li { background: #fafbfb; }
+    .mon-vazio { color: var(--texto-muted); padding: 18px 4px; }
+
+    .mon button:focus-visible, .mon summary:focus-visible, .mon input:focus-visible, .mon select:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+    @media (max-width: 860px) {
+        .mon-hero { grid-template-columns: 1fr; padding: 24px 20px; }
+        .mon-ritmo { grid-template-columns: 1fr 1fr; }
+        .mon-setor { grid-template-columns: 1fr 70px; } .mon-setor .mon-barras { grid-column: 1 / 3; grid-row: 2; }
+    }
+    @media (prefers-reduced-motion: reduce) { .mon-anel { animation: none; } }
+</style>
+
+<div class="mon">
 <a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
-<h1>Painel de monitoramento</h1>
-<p class="muted">Visão rápida do andamento do exercício — quantos já responderam, quem falta e quanto tempo resta.</p>
+
+<div class="mon-topo">
+    <div>
+        <h1>Painel de monitoramento</h1>
+        <p class="muted" style="margin:0;">Como está o exercício, o que está travando e quem precisa ser cobrado.</p>
+    </div>
+    {% if ciclo %}
+    <form method="get">
+        <select name="ciclo_id" aria-label="Exercício" onchange="this.form.submit()">
+            {% for c in ciclos %}
+                <option value="{{ c.id }}" {% if c.id == ciclo.id %}selected{% endif %}>Exercício {{ c.exercicio }} ({{ c.status }})</option>
+            {% endfor %}
+        </select>
+        <span class="mon-atualiza">
+            Atualizado às {{ resumo.atualizado_em }}
+            <label><input type="checkbox" id="mon-auto"> atualizar sozinho</label>
+        </span>
+    </form>
+    {% endif %}
+</div>
 
 {% if not ciclo %}
     <p class="flash flash-warning">Nenhum ciclo cadastrado ainda.</p>
 {% else %}
-    <form method="get" class="form-inline" style="margin-bottom:20px;">
-        <select name="ciclo_id" onchange="this.form.submit()">
-            {% for c in ciclos %}
-                <option value="{{ c.id }}" {% if c.id == ciclo.id %}selected{% endif %}>
-                    Exercício {{ c.exercicio }} ({{ c.status }})
-                </option>
-            {% endfor %}
-        </select>
-    </form>
-
-    <div class="cards">
-        <div class="card card-numero-grande">
-            <h2>{{ resumo.auto_concluida }} / {{ resumo.total }}</h2>
-            <p>Autoavaliações concluídas ({{ resumo.pct_auto }}%)</p>
-            <div class="barra-progresso">
-                <div class="barra-progresso-preenchimento {% if resumo.pct_auto == 100 %}completa{% elif resumo.pct_auto < 50 %}perigo{% endif %}" style="width:{{ resumo.pct_auto }}%;"></div>
+    {# ---------------- Hero ---------------- #}
+    <section class="mon-hero">
+        <div>
+            <div class="mon-aneis" role="img" aria-label="Autoavaliações {{ resumo.pct_auto }}% e avaliações do gestor {{ resumo.pct_gestor }}% concluídas">
+                <svg viewBox="0 0 220 220">
+                    <circle class="mon-anel-fundo" cx="110" cy="110" r="96" stroke-width="15"/>
+                    <circle class="mon-anel" cx="110" cy="110" r="96" stroke-width="15" stroke="var(--mon-auto)" style="--len: {{ (603.2 * resumo.pct_auto / 100)|round(1) }}px"/>
+                    <circle class="mon-anel-fundo" cx="110" cy="110" r="73" stroke-width="15"/>
+                    <circle class="mon-anel" cx="110" cy="110" r="73" stroke-width="15" stroke="var(--mon-gestor)" style="--len: {{ (458.7 * resumo.pct_gestor / 100)|round(1) }}px"/>
+                </svg>
+                <div class="mon-centro"><b>{{ resumo.pct_geral }}%</b><span>concluído</span></div>
             </div>
-        </div>
-        <div class="card card-numero-grande">
-            <h2>{{ resumo.gestor_concluida }} / {{ resumo.total }}</h2>
-            <p>Avaliações do gestor concluídas ({{ resumo.pct_gestor }}%)</p>
-            <div class="barra-progresso">
-                <div class="barra-progresso-preenchimento {% if resumo.pct_gestor == 100 %}completa{% elif resumo.pct_gestor < 50 %}perigo{% endif %}" style="width:{{ resumo.pct_gestor }}%;"></div>
-            </div>
-        </div>
-        {% if resumo.gestores_com_equipe %}
-            {% set pct_gestores = (100 * resumo.gestores_completos / resumo.gestores_com_equipe)|round|int %}
-            <div class="card card-numero-grande card-destaque">
-                <h2>{{ resumo.gestores_completos }} / {{ resumo.gestores_com_equipe }}</h2>
-                <p>Gestor(es) que já avaliaram toda a equipe ({{ pct_gestores }}%)</p>
-                <div class="barra-progresso">
-                    <div class="barra-progresso-preenchimento {% if pct_gestores == 100 %}completa{% elif pct_gestores < 50 %}perigo{% endif %}" style="width:{{ pct_gestores }}%;"></div>
+            <div class="mon-legenda">
+                <div class="mon-leg">
+                    <i style="background:var(--mon-auto)"></i><span>Autoavaliação</span><strong>{{ resumo.auto_concluida }} / {{ resumo.total }}</strong>
+                    <small>{{ resumo.pct_auto }}% concluída</small>
+                </div>
+                <div class="mon-leg">
+                    <i style="background:var(--mon-gestor)"></i><span>Avaliação do gestor</span><strong>{{ resumo.gestor_concluida }} / {{ resumo.total }}</strong>
+                    <small>{{ resumo.pct_gestor }}% concluída · {{ resumo.gestores_completos }} de {{ resumo.gestores_com_equipe }} gestores fecharam a equipe</small>
                 </div>
             </div>
-        {% endif %}
-        {% if resumo.prazo_auto %}
-            <div class="card">
-                <h2>
-                    {% if resumo.prazo_auto.atrasado %}<span style="color:var(--perigo);">Atrasado</span>
-                    {% else %}{{ resumo.prazo_auto.dias }}{% endif %}
-                </h2>
-                <p>
-                    {% if resumo.prazo_auto.atrasado %}
-                        Prazo da autoavaliação era {{ resumo.prazo_auto.data.strftime('%d/%m/%Y') }}
-                    {% else %}
-                        dia(s) até o prazo da autoavaliação ({{ resumo.prazo_auto.data.strftime('%d/%m/%Y') }})
-                    {% endif %}
-                </p>
-            </div>
-        {% endif %}
-        {% if resumo.prazo_gestor %}
-            <div class="card">
-                <h2>
-                    {% if resumo.prazo_gestor.atrasado %}<span style="color:var(--perigo);">Atrasado</span>
-                    {% else %}{{ resumo.prazo_gestor.dias }}{% endif %}
-                </h2>
-                <p>
-                    {% if resumo.prazo_gestor.atrasado %}
-                        Prazo da avaliação do gestor era {{ resumo.prazo_gestor.data.strftime('%d/%m/%Y') }}
-                    {% else %}
-                        dia(s) até o prazo da avaliação do gestor ({{ resumo.prazo_gestor.data.strftime('%d/%m/%Y') }})
-                    {% endif %}
-                </p>
-            </div>
-        {% endif %}
-        {% if resumo.sem_avaliador %}
-            <div class="card">
-                <h2>{{ resumo.sem_avaliador|length }}</h2>
-                <p>Sem gestor/avaliador vinculado neste ciclo</p>
-            </div>
-        {% endif %}
-    </div>
-
-    <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:8px;">
-        <div style="flex:1; min-width:300px;">
-            <h2>Faltam autoavaliação ({{ resumo.pendentes_auto|length }})</h2>
-            {% if not resumo.pendentes_auto %}
-                <p class="muted">🎉 Ninguém — todo mundo concluiu.</p>
-            {% else %}
-                <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
-                    {% for f in resumo.pendentes_auto %}
-                        <li>
-                            <span style="font-weight:600; color:var(--navy-800);">{{ f.nome }}</span>
-                            <span class="tag">{{ f.setor.nome if f.setor else '-' }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
         </div>
-        <div style="flex:1; min-width:300px;">
-            <h2>Faltam avaliação do gestor ({{ resumo.pendentes_gestor|length }})</h2>
-            {% if not resumo.pendentes_gestor %}
-                <p class="muted">🎉 Ninguém — todo mundo concluiu.</p>
-            {% else %}
-                <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
-                    {% for f in resumo.pendentes_gestor %}
-                        <li>
-                            <span style="font-weight:600; color:var(--navy-800);">{{ f.nome }}</span>
-                            <span class="tag">{{ f.setor.nome if f.setor else '-' }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        </div>
-    </div>
 
-    {% if resumo.gestores_pendentes %}
-        <h2 style="margin-top:24px;">Gestores com equipe ainda incompleta ({{ resumo.gestores_pendentes|length }})</h2>
-        <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
-            {% for g in resumo.gestores_pendentes %}
-                <li>
-                    <span style="font-weight:600; color:var(--navy-800);">{{ g.gestor.nome if g.gestor else '-' }}</span>
-                    <span class="tag">{{ g.concluidas }} / {{ g.total }} da equipe avaliados</span>
-                </li>
+        <div>
+            <span class="mon-pill {{ resumo.saude.nivel }}">{{ resumo.saude.rotulo }}</span>
+            <h2 class="mon-manchete">{{ resumo.manchete }}</h2>
+            <p class="mon-sub">{{ resumo.subtitulo }}</p>
+            <div class="mon-ritmos">
+                {% for r in resumo.ritmos %}
+                    <div class="mon-ritmo">
+                        <div>
+                            <h3>{{ r.rotulo }}</h3>
+                            <span class="mon-chip {{ r.nivel }}">{{ r.situacao }}</span>
+                        </div>
+                        {% if r.pendentes %}
+                            <dl><dt>Última semana</dt><dd>{{ r.recentes }} concluída{{ '' if r.recentes == 1 else 's' }}</dd></dl>
+                            <dl><dt>Necessário</dt><dd>{% if r.necessario %}~{{ r.necessario }}/semana{% elif r.dias is not none and r.dias < 0 %}prazo vencido{% else %}—{% endif %}</dd></dl>
+                            <dl><dt>No ritmo atual</dt><dd>{% if r.projecao %}termina {{ r.projecao.strftime('%d/%m') }}{% else %}sem projeção{% endif %}</dd></dl>
+                        {% else %}
+                            <dl style="grid-column: 2 / 5;"><dt>Todos concluíram</dt><dd>Nenhuma pendência</dd></dl>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {# ---------------- Linha do tempo ---------------- #}
+    {% if resumo.linha_tempo %}
+    <section class="mon-card">
+        <h2>Prazos de resposta</h2>
+        <p class="muted">Exercício {{ ciclo.exercicio }}{% if ciclo.data_inicio and ciclo.data_fim %} (período avaliado: {{ ciclo.data_inicio.strftime('%d/%m/%Y') }} a {{ ciclo.data_fim.strftime('%d/%m/%Y') }}){% endif %}. A linha mostra só a janela em que as avaliações são respondidas.</p>
+        <div class="mon-linha">
+            <div class="mon-trilho"></div>
+            <div class="mon-passado" style="width: {{ [resumo.linha_tempo.hoje_pos - resumo.linha_tempo.inicio_pos, 0]|max }}%;"></div>
+            {% for m in resumo.linha_tempo.marcos %}
+                <div class="mon-marco {{ m.tipo }} n{{ m.nivel }}" style="left: {{ m.pos }}%;">
+                    <b>{{ m.rotulo }}</b><small>{{ m.data.strftime('%d/%m/%Y') }}</small>
+                </div>
             {% endfor %}
-        </ul>
+            <div class="mon-hoje" style="left: {{ resumo.linha_tempo.hoje_pos }}%;"><span>Hoje</span></div>
+        </div>
+    </section>
     {% endif %}
 
-    {% if resumo.sem_avaliador %}
-        <h2 style="margin-top:24px;">Sem gestor vinculado ({{ resumo.sem_avaliador|length }})</h2>
-        <ul class="lista-pessoas" style="max-height:340px; overflow-y:auto;">
-            {% for f in resumo.sem_avaliador %}
-                <li>
-                    <span style="font-weight:600; color:var(--navy-800);">{{ f.nome }}</span>
-                    <span class="tag">{{ f.setor.nome if f.setor else '-' }}</span>
-                </li>
+    {# ---------------- Pontos de atenção ---------------- #}
+    {% if resumo.insights %}
+    <section class="mon-card">
+        <h2>O que merece atenção</h2>
+        <p class="muted">Gerado a partir dos números atuais do exercício.</p>
+        <div class="mon-insights">
+            {% for i in resumo.insights %}
+                <div class="mon-ins {{ i.nivel }}"><b>{{ i.titulo }}</b><span>{{ i.texto }}</span></div>
             {% endfor %}
-        </ul>
+        </div>
+    </section>
     {% endif %}
 
-    <p class="muted" style="margin-top:24px;">
+    {# ---------------- Setores ---------------- #}
+    <section class="mon-card">
+        <h2>Progresso por setor</h2>
+        <p class="muted">Os mais atrasados aparecem primeiro. Clique num setor pra ver quem falta nele.</p>
+        <div class="mon-chave"><span><i style="background:var(--navy-600)"></i>Autoavaliação</span><span><i style="background:var(--gold)"></i>Avaliação do gestor</span></div>
+        {% for s in resumo.setores %}
+            <button type="button" class="mon-setor" data-setor="{{ s.nome }}">
+                <span class="nome">{{ s.nome }}</span>
+                <span class="mon-barras">
+                    <span class="mon-barra a"><i style="width: {{ s.pct_auto }}%"></i></span>
+                    <span class="mon-barra g"><i style="width: {{ s.pct_gestor }}%"></i></span>
+                </span>
+                <span class="num">{{ s.auto }}/{{ s.total }} auto<br>{{ s.gestor }}/{{ s.total }} gestor</span>
+            </button>
+        {% endfor %}
+    </section>
+
+    {# ---------------- Gestores ---------------- #}
+    {% if resumo.gestores %}
+    <section class="mon-card">
+        <div class="mon-cab">
+            <div>
+                <h2>Gestores e suas equipes</h2>
+                <p class="muted" style="margin:0;">Cada quadradinho é uma pessoa da equipe; verde = já avaliada. Clique pra abrir.</p>
+            </div>
+            <div class="mon-seg" role="group" aria-label="Filtro de gestores">
+                <button type="button" id="mon-g-pend" aria-pressed="true">Com pendência ({{ resumo.gestores|length - resumo.gestores_completos }})</button>
+                <button type="button" id="mon-g-todos" aria-pressed="false">Todos ({{ resumo.gestores|length }})</button>
+            </div>
+        </div>
+        <div class="mon-gestores so-pendentes" id="mon-gestores">
+            {% for g in resumo.gestores %}
+                <details class="mon-gestor {% if g.pct == 100 %}is-completo{% endif %}">
+                    <summary>
+                        <div class="mon-g-linha">
+                            <b>{{ g.nome }}</b>
+                            <span style="color: {% if g.pct == 100 %}var(--sucesso){% elif g.concluidas == 0 %}var(--perigo){% else %}var(--aviso){% endif %};">{{ g.concluidas }}/{{ g.total }}</span>
+                        </div>
+                        <p class="mon-g-setor">{{ g.setor or '—' }}</p>
+                        <div class="mon-segs">{% for p in g.pessoas|sort(attribute='ok', reverse=true) %}<i class="{{ 'ok' if p.ok else '' }}"></i>{% endfor %}</div>
+                    </summary>
+                    <div class="mon-g-corpo">
+                        {% for p in g.pessoas %}
+                            <div><span>{{ p.nome }}</span><span class="{{ 'ok' if p.ok else 'pend' }}">{{ 'Avaliado' if p.ok else 'Pendente' }}</span></div>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {# ---------------- Quem falta ---------------- #}
+    <section class="mon-card" id="mon-falta">
+        <h2>Quem falta</h2>
+        <p class="muted">Busque por nome, setor ou gestor. Dá pra copiar a lista pra mandar a cobrança.</p>
+        <div class="mon-abas" role="tablist">
+            <button type="button" role="tab" data-aba="auto" aria-selected="true">Autoavaliação<em>{{ resumo.pendentes_auto|length }}</em></button>
+            <button type="button" role="tab" data-aba="gestor" aria-selected="false">Avaliação do gestor<em>{{ resumo.pendentes_gestor|length }}</em></button>
+            {% if resumo.sem_avaliador %}
+                <button type="button" role="tab" data-aba="sem" aria-selected="false">Sem gestor vinculado<em>{{ resumo.sem_avaliador|length }}</em></button>
+            {% endif %}
+        </div>
+        <div class="mon-ferramentas">
+            <input type="search" id="mon-busca" placeholder="Buscar nome, setor ou gestor…" aria-label="Buscar">
+            <span class="mon-filtro" id="mon-filtro" hidden><span id="mon-filtro-txt"></span><button type="button" id="mon-filtro-x" aria-label="Limpar filtro de setor">&times;</button></span>
+            <button type="button" class="mon-btn" id="mon-copiar">Copiar lista</button>
+        </div>
+
+        {% macro painel(chave, itens, ativo) %}
+            <ul class="mon-lista" data-painel="{{ chave }}" {% if not ativo %}hidden{% endif %}>
+                {% for f in itens %}
+                    <li data-setor="{{ f.setor }}" data-busca="{{ (f.nome ~ ' ' ~ f.setor ~ ' ' ~ (f.gestor or ''))|lower }}" data-texto="{{ f.nome }} — {{ f.setor }}{% if f.gestor %} (gestor: {{ f.gestor }}){% endif %}">
+                        <b>{{ f.nome }}</b>
+                        <small>{{ f.setor }}{% if f.gestor %} · gestor: {{ f.gestor }}{% endif %}</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endmacro %}
+        {{ painel('auto', resumo.pendentes_auto, true) }}
+        <div class="mon-grupos" data-painel="gestor" hidden>
+            {% for g in resumo.pendentes_gestor_grupos %}
+                <section class="mon-grupo" data-gestor="{{ g.gestor }}">
+                    <header><b>{{ g.gestor }}</b><span class="mon-grupo-n">{{ g.pessoas|length }} pendente{{ '' if g.pessoas|length == 1 else 's' }}</span></header>
+                    <ul class="mon-lista">
+                        {% for f in g.pessoas %}
+                            <li data-setor="{{ f.setor }}" data-busca="{{ (f.nome ~ ' ' ~ f.setor ~ ' ' ~ g.gestor)|lower }}" data-texto="{{ f.nome }} — {{ f.setor }}">
+                                <b>{{ f.nome }}</b><small>{{ f.setor }}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endfor %}
+        </div>
+        {% if resumo.sem_avaliador %}{{ painel('sem', resumo.sem_avaliador, false) }}{% endif %}
+        <p class="mon-vazio" id="mon-vazio" hidden>Ninguém por aqui com esse filtro.</p>
+    </section>
+
+    <p class="muted">
         Pra ver detalhes de cada avaliação, baixar PDFs ou agir em cima de uma pessoa específica, use a
         <a href="{{ url_for('admin.andamento', ciclo_id=ciclo.id) }}">tela de Andamento das avaliações</a>.
     </p>
+
+<script>
+(function () {
+    var abaAtual = "auto", setorAtual = "";
+    var busca = document.getElementById("mon-busca");
+    var vazio = document.getElementById("mon-vazio");
+
+    function aplicar() {
+        var termo = busca.value.trim().toLowerCase(), visiveis = 0;
+        document.querySelectorAll("[data-painel]").forEach(function (painel) {
+            var ativo = painel.dataset.painel === abaAtual;
+            painel.hidden = !ativo;
+            if (!ativo) return;
+            painel.querySelectorAll("li").forEach(function (li) {
+                var ok = (!termo || li.dataset.busca.indexOf(termo) > -1) && (!setorAtual || li.dataset.setor === setorAtual);
+                li.hidden = !ok;
+                if (ok) visiveis++;
+            });
+            painel.querySelectorAll(".mon-grupo").forEach(function (g) {
+                var n = g.querySelectorAll("li:not([hidden])").length;
+                g.hidden = n === 0;
+                g.querySelector(".mon-grupo-n").textContent = n + (n === 1 ? " pendente" : " pendentes");
+            });
+        });
+        vazio.hidden = visiveis > 0;
+        var chip = document.getElementById("mon-filtro");
+        chip.hidden = !setorAtual;
+        document.getElementById("mon-filtro-txt").textContent = "Setor: " + setorAtual;
+    }
+
+    document.querySelectorAll("[data-aba]").forEach(function (b) {
+        b.addEventListener("click", function () {
+            abaAtual = b.dataset.aba;
+            document.querySelectorAll("[data-aba]").forEach(function (x) { x.setAttribute("aria-selected", x === b ? "true" : "false"); });
+            aplicar();
+        });
+    });
+    busca.addEventListener("input", aplicar);
+    document.getElementById("mon-filtro-x").addEventListener("click", function () { setorAtual = ""; aplicar(); });
+    document.querySelectorAll(".mon-setor").forEach(function (b) {
+        b.addEventListener("click", function () {
+            setorAtual = b.dataset.setor;
+            aplicar();
+            document.getElementById("mon-falta").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    });
+
+    document.getElementById("mon-copiar").addEventListener("click", function () {
+        var btn = this, linhas = [];
+        var painel = document.querySelector('[data-painel="' + abaAtual + '"]');
+        var grupos = painel.querySelectorAll(".mon-grupo:not([hidden])");
+        if (painel.classList.contains("mon-grupos")) {
+            grupos.forEach(function (g) {
+                var itens = g.querySelectorAll("li:not([hidden])");
+                linhas.push(g.dataset.gestor + " (" + itens.length + " pendente" + (itens.length === 1 ? "" : "s") + "):");
+                itens.forEach(function (li) { linhas.push("- " + li.dataset.texto); });
+                linhas.push("");
+            });
+        } else {
+            painel.querySelectorAll("li:not([hidden])").forEach(function (li) { linhas.push(li.dataset.texto); });
+        }
+        var texto = linhas.join("\n").trim();
+        var total = painel.querySelectorAll("li:not([hidden])").length;
+        var pronto = function () { btn.textContent = "Copiado (" + total + ")"; setTimeout(function () { btn.textContent = "Copiar lista"; }, 2000); };
+        if (navigator.clipboard) { navigator.clipboard.writeText(texto).then(pronto); }
+        else { var t = document.createElement("textarea"); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); pronto(); }
+    });
+
+    var gPend = document.getElementById("mon-g-pend"), gTodos = document.getElementById("mon-g-todos"), gBox = document.getElementById("mon-gestores");
+    if (gBox) {
+        function modo(soPend) {
+            gBox.classList.toggle("so-pendentes", soPend);
+            gPend.setAttribute("aria-pressed", soPend); gTodos.setAttribute("aria-pressed", !soPend);
+        }
+        gPend.addEventListener("click", function () { modo(true); });
+        gTodos.addEventListener("click", function () { modo(false); });
+    }
+
+    var auto = document.getElementById("mon-auto"), timer = null;
+    function ligar(on) {
+        clearInterval(timer);
+        if (on) timer = setInterval(function () { location.reload(); }, 120000);
+    }
+    try { auto.checked = localStorage.getItem("mon-auto") === "1"; } catch (e) {}
+    ligar(auto.checked);
+    auto.addEventListener("change", function () {
+        try { localStorage.setItem("mon-auto", auto.checked ? "1" : "0"); } catch (e) {}
+        ligar(auto.checked);
+    });
+})();
+</script>
 {% endif %}
+</div>
 {% endblock %}

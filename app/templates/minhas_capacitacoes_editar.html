@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Editar capacitação{% endblock %}
+
+{% block content %}
+<a href="{{ voltar }}" class="back-link">&larr; Minhas Capacitações</a>
+<h1>Editar capacitação</h1>
+<p class="muted">
+    {{ trimestre }}º trimestre de {{ ano }} &middot; {{ inicio_trimestre.strftime('%d/%m/%Y') }} a {{ fim_trimestre.strftime('%d/%m/%Y') }}.
+    As datas de início e conclusão precisam estar dentro desse período.
+</p>
+
+<div class="cap-painel">
+    <form method="post" enctype="multipart/form-data">
+        <div class="cap-grid">
+            <label class="cap-campo cap-3">
+                <span>Nome do curso/capacitação</span>
+                <input type="text" name="nome_curso" value="{{ capacitacao.nome_curso }}" required>
+            </label>
+            <label class="cap-campo cap-3">
+                <span>Instituição</span>
+                <input type="text" name="instituicao" value="{{ capacitacao.instituicao or '' }}">
+            </label>
+
+            <label class="cap-campo cap-2">
+                <span>Tipo</span>
+                <select name="tipo" required>
+                    <option value="">Selecione...</option>
+                    {% for t in tipos %}
+                        <option value="{{ t }}" {% if capacitacao.tipo == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="cap-campo cap-2">
+                <span>Status</span>
+                <select name="status">
+                    <option value="">Selecione...</option>
+                    {% for s in status_options %}
+                        <option value="{{ s }}" {% if capacitacao.status == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="cap-campo cap-2">
+                <span>Carga horária (h)</span>
+                <input type="number" name="carga_horaria" min="0" step="0.5"
+                       value="{{ capacitacao.carga_horaria if capacitacao.carga_horaria is not none else '' }}">
+            </label>
+
+            <label class="cap-campo cap-2">
+                <span>Início</span>
+                <input type="date" name="data_inicio" id="data_inicio"
+                       min="{{ inicio_trimestre.isoformat() }}" max="{{ fim_trimestre.isoformat() }}"
+                       value="{{ capacitacao.data_inicio.isoformat() if capacitacao.data_inicio else '' }}">
+            </label>
+            <label class="cap-campo cap-2">
+                <span>Conclusão</span>
+                <input type="date" name="data_conclusao" id="data_conclusao"
+                       min="{{ inicio_trimestre.isoformat() }}" max="{{ fim_trimestre.isoformat() }}"
+                       value="{{ capacitacao.data_conclusao.isoformat() if capacitacao.data_conclusao else '' }}">
+            </label>
+            <label class="cap-campo cap-2">
+                <span>Valor pago pelo SENAR (R$)</span>
+                <input type="number" name="valor_pago_senar" min="0" step="0.01"
+                       value="{{ capacitacao.valor_pago_senar if capacitacao.valor_pago_senar is not none else '' }}">
+            </label>
+
+            <label class="cap-campo cap-3">
+                <span>{{ 'Substituir comprovante' if capacitacao.arquivo_tipo else 'Comprovante' }} (PDF, JPG ou PNG, até 4 MB)</span>
+                <input type="file" name="arquivo_comprovacao" id="arquivo_comprovacao" accept=".pdf,.jpg,.jpeg,.png">
+            </label>
+            <label class="cap-campo cap-3">
+                <span>Observações (opcional)</span>
+                <input type="text" name="observacoes" value="{{ capacitacao.observacoes or '' }}">
+            </label>
+
+            {% if capacitacao.arquivo_tipo %}
+                <div class="cap-campo cap-6">
+                    <span>Comprovante atual</span>
+                    <div>
+                        <a href="{{ url_for('main.documento_minha_capacitacao', capacitacao_id=capacitacao.id) }}"
+                           target="_blank" rel="noopener">{{ capacitacao.arquivo_comprovacao or 'Ver documento' }}</a>
+                    </div>
+                    <label class="cap-campo cap-check">
+                        <input type="checkbox" name="remover_arquivo" value="1">
+                        <span>Remover o comprovante atual</span>
+                    </label>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="cap-acoes">
+            <button type="submit" class="botao">Salvar alterações</button>
+            <a href="{{ voltar }}" class="botao botao-secundario">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+{% include "_capacitacao_estilos.html" %}
+
+<script>
+(function () {
+    var inicio = document.getElementById('data_inicio');
+    var conclusao = document.getElementById('data_conclusao');
+    var arquivo = document.getElementById('arquivo_comprovacao');
+    var minTri = '{{ inicio_trimestre.isoformat() }}';
+    var maxTri = '{{ fim_trimestre.isoformat() }}';
+
+    conclusao.min = inicio.value || minTri;
+    inicio.max = conclusao.value || maxTri;
+    inicio.addEventListener('change', function () { conclusao.min = inicio.value || minTri; });
+    conclusao.addEventListener('change', function () { inicio.max = conclusao.value || maxTri; });
+
+    arquivo.addEventListener('change', function () {
+        var f = arquivo.files[0];
+        if (f && f.size > 4 * 1024 * 1024) {
+            alert('O documento tem mais de 4 MB. Escolha um arquivo menor.');
+            arquivo.value = '';
+        }
+    });
+})();
+</script>
+{% endblock %}

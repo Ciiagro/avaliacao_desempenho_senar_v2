@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Devolutiva do Recurso{% endblock %}
+
+{% block content %}
+<h1>Devolutiva do Recurso de Avaliação</h1>
+
+<div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:20px;">
+    <h2 style="margin:0 0 16px 0;">Informações do Recurso</h2>
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div>
+            <p style="margin:0; color:var(--text-muted); font-size:0.85rem; font-weight:500;">Ciclo de Avaliação</p>
+            <p style="margin:4px 0 0 0; font-size:1rem;">Exercício {{ recurso.ciclo.exercicio }}</p>
+        </div>
+        <div>
+            <p style="margin:0; color:var(--text-muted); font-size:0.85rem; font-weight:500;">Status</p>
+            <p style="margin:4px 0 0 0; font-size:1rem;">
+                {% if recurso.status == "encerrado" %}
+                    <span class="badge badge-success">Encerrado</span>
+                {% elif recurso.status == "aguardando_comissao_recurso" %}
+                    <span class="badge badge-pending">Aguardando Presidência</span>
+                {% else %}
+                    <span class="badge">{{ recurso.status }}</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+            <p style="margin:0; color:var(--text-muted); font-size:0.85rem; font-weight:500;">Data da Devolutiva</p>
+            <p style="margin:4px 0 0 0; font-size:1rem;">{{ recurso.data_devolutiva.strftime('%d/%m/%Y') }}</p>
+        </div>
+        <div>
+            <p style="margin:0; color:var(--text-muted); font-size:0.85rem; font-weight:500;">Prazo para Recorrer</p>
+            <p style="margin:4px 0 0 0; font-size:1rem;">até {{ recurso.data_limite_recorrer_apos_devolutiva.strftime('%d/%m/%Y') }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Status do Prazo -->
+<div style="
+    background:{% if pode_recorrer %}var(--success-light){% else %}var(--error-light){% endif %};
+    border:1px solid {% if pode_recorrer %}var(--success){% else %}var(--error){% endif %};
+    border-radius:8px;
+    padding:12px 16px;
+    margin-bottom:20px;
+">
+    {% if pode_recorrer %}
+        <p style="margin:0; color:var(--success); font-weight:500;">
+            ✓ Você ainda pode recorrer
+        </p>
+        <p style="margin:6px 0 0 0; font-size:0.9rem; color:var(--text);">
+            Faltam <strong>{{ dias_restantes }}</strong> dia(s) para expirar o prazo.
+        </p>
+    {% else %}
+        <p style="margin:0; color:var(--error); font-weight:500;">
+            ✗ O prazo para recorrer expirou
+        </p>
+        <p style="margin:6px 0 0 0; font-size:0.9rem; color:var(--text);">
+            Você pode apenas concordar com a resposta da devolutiva.
+        </p>
+    {% endif %}
+</div>
+
+<!-- Histórico de Eventos -->
+{% if eventos_relevantes %}
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:20px;">
+        <h2 style="margin:0 0 16px 0;">Histórico do Recurso</h2>
+        
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            {% for evento in eventos_relevantes %}
+                <div style="
+                    padding:12px;
+                    border-left:4px solid {% if evento.tipo == 'marcacao_devolutiva' %}var(--info){% elif evento.tipo == 'resposta_gestor' %}var(--warning){% elif evento.tipo == 'decisao_presidencia' %}var(--success){% else %}var(--text-muted){% endif %};
+                    background:var(--bg);
+                    border-radius:4px;
+                ">
+                    <div style="display:flex; justify-content:space-between; align-items:start; gap:12px;">
+                        <div style="flex:1;">
+                            <p style="margin:0; font-weight:500; font-size:0.95rem;">
+                                {% if evento.tipo == 'marcacao_devolutiva' %}
+                                    Data de Devolutiva Marcada
+                                {% elif evento.tipo == 'resposta_gestor' %}
+                                    Resposta do Gestor
+                                {% elif evento.tipo == 'decisao_presidencia' %}
+                                    Decisão da Presidência
+                                {% else %}
+                                    {{ evento.tipo | replace('_', ' ') | title }}
+                                {% endif %}
+                            </p>
+                            <p style="margin:6px 0 0 0; font-size:0.85rem; color:var(--text-muted);">
+                                {{ evento.criado_em.strftime('%d/%m/%Y às %H:%M') }}
+                            </p>
+                        </div>
+                        <div>
+                            {% if evento.decisao %}
+                                <span class="badge {% if evento.decisao == 'acatado' %}badge-success{% elif evento.decisao == 'revisou' %}badge-warning{% else %}badge-error{% endif %}">
+                                    {{ evento.decisao | replace('_', ' ') | title }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if evento.descricao %}
+                        <p style="margin:8px 0 0 0; font-size:0.9rem; line-height:1.4;">
+                            {{ evento.descricao }}
+                        </p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+<!-- Motivo Original do Recurso -->
+<div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:20px;">
+    <h2 style="margin:0 0 12px 0;">Seu Recurso Original</h2>
+    <p style="margin:0; white-space:pre-wrap; line-height:1.5;">{{ recurso.motivo }}</p>
+</div>
+
+<!-- Ações -->
+<div style="display:flex; gap:12px;">
+    <form method="post" action="{{ url_for('main.aceitar_devolutiva_recurso', recurso_id=recurso.id) }}" style="margin:0;">
+        <button type="submit" class="botao botao-success">
+            ✓ Concordo com a Resposta
+        </button>
+    </form>
+    
+    {% if pode_recorrer %}
+        <form method="post" action="{{ url_for('main.recorrer_apos_devolutiva', recurso_id=recurso.id) }}" style="margin:0;">
+            <button type="submit" class="botao botao-warning">
+                🔄 Recorrer à Presidência
+            </button>
+        </form>
+    {% else %}
+        <button class="botao botao-disabled" disabled>
+            🔄 Recorrer à Presidência (Prazo Expirado)
+        </button>
+    {% endif %}
+</div>
+
+<p style="margin:12px 0 0 0; font-size:0.85rem; color:var(--text-muted);">
+    <a href="{{ url_for('main.meus_recursos') }}">← Voltar aos meus recursos</a>
+</p>
+
+<style>
+    .botao-disabled {
+        opacity:0.5;
+        cursor:not-allowed;
+    }
+    
+    .botao-success {
+        background:var(--success);
+        color:white;
+    }
+    
+    .botao-success:hover:not(:disabled) {
+        background:var(--success-dark, #28a745);
+    }
+    
+    .botao-warning {
+        background:var(--warning);
+        color:white;
+    }
+    
+    .botao-warning:hover:not(:disabled) {
+        background:var(--warning-dark, #ffc107);
+    }
+</style>
+{% endblock %}

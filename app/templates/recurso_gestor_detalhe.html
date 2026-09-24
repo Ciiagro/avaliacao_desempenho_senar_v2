@@ -13,15 +13,41 @@
 {% endif %}
 {% set itens_contestados = recurso.itens_contestados_por_fator %}
 {% set fatores_reavaliados = recurso.revisoes_notas | map(attribute='fator_id') | list %}
-{% if not itens_contestados %}
-    <p><strong>Motivo do recurso:</strong> {{ recurso.motivo }}</p>
-{% endif %}
 
+{# Buscar e exibir o comentário da comissão de forma destacada #}
+{% set comentario_comissao = None %}
 {% for e in recurso.eventos %}
-    {% if e.tipo == 'encaminhamento_comissao_gestor' %}
-        <p><strong>Comentário da Comissão:</strong> {{ e.texto }}</p>
+    {% if e.tipo == 'encaminhamento_comissao_gestor' and not comentario_comissao %}
+        {% set comentario_comissao = e.texto %}
     {% endif %}
 {% endfor %}
+
+{# SEMPRE mostrar a caixa azul, com ou sem comentário #}
+<div style="background:#e3f2fd; border-left:4px solid #1976d2; padding:14px; margin:16px 0; border-radius:4px;">
+    <p style="margin-top:0; margin-bottom:6px;"><strong style="color:#1565c0;">📋 COMENTÁRIO DA COMISSÃO</strong></p>
+    {% if comentario_comissao %}
+        <p style="margin:0; white-space:pre-wrap; color:#333;">{{ comentario_comissao }}</p>
+    {% else %}
+        <p style="margin:0; color:#666; font-style:italic;">A Comissão não adicionou comentário neste recurso.</p>
+    {% endif %}
+</div>
+
+{# Seção de Itens Contestados #}
+{% if itens_contestados %}
+    <div style="background:#fff3e0; border-left:4px solid #f57c00; padding:14px; margin:16px 0; border-radius:4px;">
+        <p style="margin-top:0; margin-bottom:12px;"><strong style="color:#e65100;">⚠️ PONTOS QUESTIONADOS PELO EMPREGADO</strong></p>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            {% for item in recurso.itens_contestados %}
+                <div style="padding:10px; background:#fffbf0; border-radius:4px; border-left:2px solid #f57c00;">
+                    <p style="margin:0 0 6px; font-weight:600; color:#333;">{{ item.fator.nome }}</p>
+                    <p style="margin:0; color:#555; font-size:0.95rem; white-space:pre-wrap;">{{ item.motivo }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% elif not itens_contestados %}
+    <p><strong>Motivo do recurso:</strong> {{ recurso.motivo }}</p>
+{% endif %}
 
 <div class="tabela-container">
     <table class="tabela">

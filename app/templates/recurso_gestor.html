@@ -19,7 +19,21 @@
                 (10 dias corridos a partir do encaminhamento da Comissão)
             </p>
         {% endif %}
-        <p><strong>Motivo do recurso:</strong> {{ r.motivo }}</p>
+        
+        {% set itens_contestados = r.itens_contestados_por_fator %}
+        {% if itens_contestados %}
+            <div style="background:var(--bg); border-left:3px solid var(--accent); padding:10px 12px; margin:12px 0; border-radius:4px;">
+                <p style="margin-top:0;"><strong>Pontos questionados:</strong></p>
+                <ul style="margin:6px 0 0 20px; padding:0;">
+                    {% for item in r.itens_contestados %}
+                        <li style="margin:4px 0; font-size:0.95rem;">
+                            <strong>{{ item.fator.nome }}</strong>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        
         <a class="botao botao-pequeno" href="{{ url_for('recursos.recurso_gestor_detalhe', recurso_id=r.id) }}">Responder</a>
     </div>
 {% endfor %}

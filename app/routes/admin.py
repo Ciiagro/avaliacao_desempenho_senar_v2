@@ -1,7 +1,7 @@
 import io
 import unicodedata
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pandas as pd
 from sqlalchemy.orm import aliased, joinedload
@@ -55,6 +55,10 @@ from ..models import (
     TIPOS_EVENTO_FUNCIONARIO,
     RecursoAvaliacao,
     RECURSO_STATUS_ENCERRADO,
+    DevolutivaPorFuncionario,
+    Capacitacao,
+    trimestre_atual,
+    limites_trimestre,
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -214,10 +218,12 @@ def andamento():
 
 @admin_bp.route("/painel-monitoramento")
 def painel_monitoramento():
-    """Painel enxuto pra acompanhar o andamento do exercício de longe: só
-    os números (quantos já responderam, quantos faltam de cada lado,
-    prazo) e a lista de quem falta — sem a tabela grande de ações que tem
-    em 'Andamento das avaliações'."""
+    """Painel pra acompanhar o andamento do exercício de longe: situação
+    geral (com semáforo), ritmo x prazo, pontos de atenção gerados a partir
+    dos dados, progresso por setor, por gestor e a lista de quem falta — sem
+    a tabela grande de ações que tem em 'Andamento das avaliações'."""
+    import math
+
     ciclo_id_param = request.args.get("ciclo_id")
     if ciclo_id_param:
         ciclo = CicloAvaliacao.query.get_or_404(int(ciclo_id_param))
@@ -236,6 +242,7 @@ def painel_monitoramento():
         )
 
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    funcionario_por_id = {f.id: f for f in funcionarios}
 
     vinculos_por_avaliado = {
         v.avaliado_id: v.avaliador
@@ -247,60 +254,144 @@ def painel_monitoramento():
     avaliacoes = Avaliacao.query.filter_by(ciclo_id=ciclo.id).all()
     avaliacao_por_chave = {(a.avaliado_id, a.avaliador_id, a.tipo): a for a in avaliacoes}
 
-    pendentes_auto = []
-    pendentes_gestor = []
-    sem_avaliador = []
-    auto_concluida = 0
-    gestor_concluida = 0
-    total = 0
+    agora = para_fortaleza(datetime.now(timezone.utc))
+    hoje = agora.date()
 
-    subordinados_por_avaliador = {}  # avaliador_id -> [avaliado_id, ...] (só elegíveis)
+    # Datas de conclusão (pra medir o ritmo da última semana)
+    conclusoes = []  # (tipo, data)
+    for a in avaliacoes:
+        if a.status == "concluida":
+            momento = para_fortaleza(a.assinado_em or a.atualizado_em)
+            if momento:
+                conclusoes.append((a.tipo, momento.date()))
+
+    # ------------------------------------------------------------------
+    # Varredura principal
+    # ------------------------------------------------------------------
+    pendentes_auto, pendentes_gestor, sem_avaliador = [], [], []
+    auto_concluida = gestor_concluida = total = 0
+    setores = {}  # nome -> contagens
+    equipes = {}  # avaliador_id -> [{nome, ok}]
 
     for f in funcionarios:
         if f.is_elegivel_avaliacao(referencia=ciclo.referencia_elegibilidade()) is False:
             continue
         total += 1
-
-        avaliacao_auto = avaliacao_por_chave.get((f.id, f.id, "auto"))
-        if avaliacao_auto and avaliacao_auto.status == "concluida":
-            auto_concluida += 1
-        else:
-            pendentes_auto.append(f)
+        setor_nome = f.setor.nome if f.setor else "Sem setor"
+        st = setores.setdefault(setor_nome, {"nome": setor_nome, "total": 0, "auto": 0, "gestor": 0})
+        st["total"] += 1
 
         avaliador = vinculos_por_avaliado.get(f.id)
+        linha = {
+            "nome": f.nome,
+            "setor": setor_nome,
+            "gestor": avaliador.nome if avaliador else None,
+            "gestor_id": str(avaliador.id) if avaliador else None,
+        }
+
+        av_auto = avaliacao_por_chave.get((f.id, f.id, "auto"))
+        if av_auto and av_auto.status == "concluida":
+            auto_concluida += 1
+            st["auto"] += 1
+        else:
+            pendentes_auto.append(linha)
+
         if not avaliador:
-            sem_avaliador.append(f)
+            sem_avaliador.append(linha)
         else:
-            subordinados_por_avaliador.setdefault(avaliador.id, []).append(f.id)
-            avaliacao_gestor = avaliacao_por_chave.get((f.id, avaliador.id, "gestor"))
-            if avaliacao_gestor and avaliacao_gestor.status == "concluida":
+            av_gestor = avaliacao_por_chave.get((f.id, avaliador.id, "gestor"))
+            gestor_ok = bool(av_gestor and av_gestor.status == "concluida")
+            equipes.setdefault(avaliador.id, []).append({"nome": f.nome, "ok": gestor_ok})
+            if gestor_ok:
                 gestor_concluida += 1
+                st["gestor"] += 1
             else:
-                pendentes_gestor.append(f)
+                pendentes_gestor.append(linha)
 
-    # Progresso de cada gestor na equipe dele: quantos dos subordinados
-    # dele já foram avaliados. "Completo" = 100% da equipe avaliada.
-    funcionario_por_id = {f.id: f for f in funcionarios}
-    gestores_completos = 0
-    gestores_pendentes = []
-    for avaliador_id, avaliado_ids in subordinados_por_avaliador.items():
-        concluidas = sum(
-            1
-            for aid in avaliado_ids
-            if (avaliacao_por_chave.get((aid, avaliador_id, "gestor")) or None)
-            and avaliacao_por_chave[(aid, avaliador_id, "gestor")].status == "concluida"
+    pct = lambda parte, todo: round(100 * parte / todo) if todo else 0
+
+    # Pendências da avaliação do gestor agrupadas por gestor (quem precisa
+    # agir), do que tem mais gente pendente pro que tem menos.
+    _grupos = {}
+    for linha in pendentes_gestor:
+        _grupos.setdefault(linha["gestor_id"], {"gestor": linha["gestor"], "pessoas": []})["pessoas"].append(linha)
+    pendentes_gestor_grupos = sorted(
+        _grupos.values(), key=lambda g: (-len(g["pessoas"]), g["gestor"])
+    )
+
+    # ------------------------------------------------------------------
+    # Gestores (equipe avaliada x total)
+    # ------------------------------------------------------------------
+    gestores = []
+    for avaliador_id, pessoas in equipes.items():
+        g = funcionario_por_id.get(avaliador_id) or Funcionario.query.get(avaliador_id)
+        ok = sum(1 for p in pessoas if p["ok"])
+        gestores.append(
+            {
+                "nome": g.nome if g else "-",
+                "setor": g.setor.nome if g and g.setor else "",
+                "concluidas": ok,
+                "total": len(pessoas),
+                "pendentes": len(pessoas) - ok,
+                "pct": pct(ok, len(pessoas)),
+                "pessoas": sorted(pessoas, key=lambda p: (p["ok"], p["nome"])),
+            }
         )
-        if concluidas == len(avaliado_ids):
-            gestores_completos += 1
-        else:
-            gestor_obj = funcionario_por_id.get(avaliador_id) or Funcionario.query.get(avaliador_id)
-            gestores_pendentes.append(
-                {"gestor": gestor_obj, "concluidas": concluidas, "total": len(avaliado_ids)}
-            )
-    gestores_pendentes.sort(key=lambda g: g["concluidas"] / g["total"])
-    gestores_com_equipe = len(subordinados_por_avaliador)
+    gestores.sort(key=lambda g: (g["pct"] == 100, -g["pendentes"], g["nome"]))
+    gestores_completos = sum(1 for g in gestores if g["pct"] == 100)
 
-    hoje = para_fortaleza(datetime.now(timezone.utc)).date()
+    # ------------------------------------------------------------------
+    # Setores
+    # ------------------------------------------------------------------
+    lista_setores = []
+    for s in setores.values():
+        s["pct_auto"] = pct(s["auto"], s["total"])
+        s["pct_gestor"] = pct(s["gestor"], s["total"])
+        s["media"] = (s["pct_auto"] + s["pct_gestor"]) / 2
+        lista_setores.append(s)
+    lista_setores.sort(key=lambda s: (s["media"], s["nome"]))
+
+    # ------------------------------------------------------------------
+    # Prazos, ritmo e semáforo
+    # ------------------------------------------------------------------
+    def _ritmo(tipo, pendentes_n, prazo, rotulo):
+        if not pendentes_n:
+            return {"rotulo": rotulo, "nivel": "ok", "situacao": "Concluída", "pendentes": 0}
+        recentes = sum(1 for t, d in conclusoes if t == tipo and 0 <= (hoje - d).days < 7)
+        info = {"rotulo": rotulo, "pendentes": pendentes_n, "recentes": recentes, "prazo": prazo}
+        dias = (prazo - hoje).days if prazo else None
+        info["dias"] = dias
+        info["necessario"] = (
+            math.ceil(pendentes_n / (dias / 7)) if dias and dias > 0 else None
+        )
+        info["projecao"] = (
+            hoje + timedelta(days=math.ceil(pendentes_n / (recentes / 7))) if recentes else None
+        )
+        if prazo is None:
+            info["nivel"], info["situacao"] = "info", "Sem prazo definido"
+        elif dias < 0:
+            info["nivel"], info["situacao"] = "critico", "Atrasada"
+        elif info["projecao"] and info["projecao"] <= prazo:
+            info["nivel"], info["situacao"] = "ok", "No ritmo"
+        elif dias <= 7:
+            info["nivel"], info["situacao"] = "critico", "Prazo curto"
+        else:
+            info["nivel"], info["situacao"] = "atencao", "Precisa acelerar"
+        return info
+
+    pend_auto_n, pend_gestor_n = len(pendentes_auto), len(pendentes_gestor)
+    ritmo_auto = _ritmo("auto", pend_auto_n, ciclo.data_limite_autoavaliacao, "Autoavaliação")
+    ritmo_gestor = _ritmo("gestor", pend_gestor_n, ciclo.data_limite_gestor, "Avaliação do gestor")
+
+    ordem = {"ok": 0, "info": 0, "atencao": 1, "critico": 2}
+    pior = max((ritmo_auto["nivel"], ritmo_gestor["nivel"]), key=lambda n: ordem[n])
+    if not (pend_auto_n or pend_gestor_n):
+        saude = {"nivel": "ok", "rotulo": "Exercício concluído"}
+    else:
+        saude = {
+            "nivel": "ok" if pior == "info" else pior,
+            "rotulo": {"ok": "No ritmo", "info": "Em andamento", "atencao": "Atenção", "critico": "Crítico"}[pior],
+        }
 
     def _prazo_info(prazo):
         if not prazo:
@@ -308,20 +399,167 @@ def painel_monitoramento():
         dias = (prazo - hoje).days
         return {"data": prazo, "dias": dias, "atrasado": dias < 0}
 
+    def _plural(n, sing, plur):
+        return f"{n} {sing if n == 1 else plur}"
+
+    partes = []
+    if pend_auto_n:
+        partes.append(_plural(pend_auto_n, "autoavaliação", "autoavaliações"))
+    if pend_gestor_n:
+        partes.append(_plural(pend_gestor_n, "avaliação de gestor", "avaliações de gestor"))
+    if partes:
+        manchete = ("Falta " if pend_auto_n + pend_gestor_n == 1 else "Faltam ") + " e ".join(partes)
+    else:
+        manchete = "Tudo concluído neste exercício"
+
+    # Próximo prazo que ainda importa (etapa com pendência)
+    candidatos = [
+        (r["prazo"], r["rotulo"].lower())
+        for r in (ritmo_auto, ritmo_gestor)
+        if r.get("pendentes") and r.get("prazo")
+    ]
+    subtitulo = ""
+    if candidatos:
+        data_p, nome_p = min(candidatos, key=lambda c: c[0])
+        d = (data_p - hoje).days
+        quando = (
+            f"venceu há {_plural(-d, 'dia', 'dias')}" if d < 0
+            else "vence hoje" if d == 0
+            else "vence amanhã" if d == 1
+            else f"vence em {d} dias"
+        )
+        subtitulo = f"Prazo da {nome_p} {quando} ({data_p.strftime('%d/%m/%Y')})."
+
+    # Linha do tempo da JANELA DE RESPOSTA (não do ano avaliado): o exercício
+    # 2025, por exemplo, tem período 01/01–31/12/2025 mas é respondido em
+    # 2026. Mostrar as duas coisas juntas confundia, então aqui só entram
+    # o começo das respostas, os prazos e o dia de hoje.
+    marcos = []
+    criadas = [
+        para_fortaleza(a.criado_em).date() for a in avaliacoes if a.criado_em
+    ]
+    if criadas:
+        marcos.append({"rotulo": "Início das respostas", "data": min(criadas), "tipo": "marco"})
+    if ciclo.data_limite_autoavaliacao:
+        marcos.append({"rotulo": "Prazo autoavaliação", "data": ciclo.data_limite_autoavaliacao, "tipo": "prazo"})
+    if ciclo.data_limite_gestor:
+        marcos.append({"rotulo": "Prazo gestor", "data": ciclo.data_limite_gestor, "tipo": "prazo"})
+    linha_tempo = None
+    if any(m["tipo"] == "prazo" for m in marcos):
+        marcos.sort(key=lambda m: m["data"])
+        datas = [m["data"] for m in marcos] + [hoje]
+        ini, fim = min(datas), max(datas)
+        span = max((fim - ini).days, 1)
+        pos = lambda d: round(6 + 88 * (d - ini).days / span, 1)
+        anterior, nivel = None, 0
+        for m in marcos:
+            m["pos"] = pos(m["data"])
+            # marcos muito juntos: o rótulo desce pra outra linha
+            nivel = 1 - nivel if anterior is not None and m["pos"] - anterior < 20 else 0
+            m["nivel"] = nivel
+            anterior = m["pos"]
+        linha_tempo = {"marcos": marcos, "hoje_pos": pos(hoje), "inicio_pos": 6}
+
+    # ------------------------------------------------------------------
+    # Pontos de atenção (gerados a partir dos números)
+    # ------------------------------------------------------------------
+    insights = []
+
+    for r in (ritmo_auto, ritmo_gestor):
+        if not r.get("pendentes") or r["nivel"] in ("ok", "info"):
+            continue
+        if r["nivel"] == "critico" and r["dias"] is not None and r["dias"] < 0:
+            texto = (
+                f"Prazo venceu há {_plural(-r['dias'], 'dia', 'dias')} e ainda faltam "
+                f"{r['pendentes']}."
+            )
+        else:
+            texto = (
+                f"Faltam {r['pendentes']}; na última semana foram concluídas {r['recentes']}. "
+                f"Pra fechar até {r['prazo'].strftime('%d/%m')}, precisa de cerca de "
+                f"{r['necessario']} por semana."
+            )
+        insights.append({"nivel": r["nivel"], "titulo": f"{r['rotulo']} fora do ritmo", "texto": texto})
+
+    zerados = [g for g in gestores if g["concluidas"] == 0]
+    if zerados and pend_gestor_n:
+        carga = sum(g["pendentes"] for g in zerados)
+        insights.append(
+            {
+                "nivel": "atencao",
+                "titulo": f"{_plural(len(zerados), 'gestor ainda não começou', 'gestores ainda não começaram')}",
+                "texto": f"Eles seguram {carga} das {pend_gestor_n} avaliações pendentes ({pct(carga, pend_gestor_n)}%).",
+            }
+        )
+
+    if gestores and gestores[0]["pendentes"] >= 3 and pend_gestor_n:
+        g = gestores[0]
+        insights.append(
+            {
+                "nivel": "info",
+                "titulo": "Maior fila de avaliações",
+                "texto": f"{g['nome'].title()} tem {g['pendentes']} pendentes ({pct(g['pendentes'], pend_gestor_n)}% do total do gestor).",
+            }
+        )
+
+    abertos = [s for s in lista_setores if s["media"] < 100 and s["total"] >= 2]
+    if abertos and (pend_auto_n or pend_gestor_n):
+        s = abertos[0]
+        insights.append(
+            {
+                "nivel": "atencao" if s["media"] < 30 else "info",
+                "titulo": "Setor mais atrasado",
+                "texto": f"{s['nome']}: {s['pct_auto']}% das autoavaliações e {s['pct_gestor']}% das avaliações do gestor.",
+            }
+        )
+
+    if sem_avaliador:
+        insights.append(
+            {
+                "nivel": "critico",
+                "titulo": f"{_plural(len(sem_avaliador), 'pessoa sem gestor vinculado', 'pessoas sem gestor vinculado')}",
+                "texto": "Sem vínculo a avaliação do gestor não acontece. Ajustar em Vínculos.",
+            }
+        )
+
+    completos = [s for s in lista_setores if s["media"] == 100]
+    if completos:
+        insights.append(
+            {
+                "nivel": "ok",
+                "titulo": f"{_plural(len(completos), 'setor concluído', 'setores concluídos')}",
+                "texto": ", ".join(s["nome"] for s in completos[:4]) + ("…" if len(completos) > 4 else "."),
+            }
+        )
+
+    insights.sort(key=lambda i: {"critico": 0, "atencao": 1, "info": 2, "ok": 3}[i["nivel"]])
+    insights = insights[:6]
+
     resumo = {
         "total": total,
         "auto_concluida": auto_concluida,
         "gestor_concluida": gestor_concluida,
-        "pct_auto": round(100 * auto_concluida / total) if total else 0,
-        "pct_gestor": round(100 * gestor_concluida / total) if total else 0,
+        "pct_auto": pct(auto_concluida, total),
+        "pct_gestor": pct(gestor_concluida, total),
+        "pct_geral": pct(auto_concluida + gestor_concluida, 2 * total),
         "pendentes_auto": pendentes_auto,
         "pendentes_gestor": pendentes_gestor,
+        "pendentes_gestor_grupos": pendentes_gestor_grupos,
         "sem_avaliador": sem_avaliador,
         "prazo_auto": _prazo_info(ciclo.data_limite_autoavaliacao),
         "prazo_gestor": _prazo_info(ciclo.data_limite_gestor),
         "gestores_completos": gestores_completos,
-        "gestores_com_equipe": gestores_com_equipe,
-        "gestores_pendentes": gestores_pendentes,
+        "gestores_com_equipe": len(gestores),
+        "pct_gestores": pct(gestores_completos, len(gestores)),
+        "gestores": gestores,
+        "setores": lista_setores,
+        "saude": saude,
+        "manchete": manchete,
+        "subtitulo": subtitulo,
+        "ritmos": [ritmo_auto, ritmo_gestor],
+        "linha_tempo": linha_tempo,
+        "insights": insights,
+        "atualizado_em": agora.strftime("%H:%M"),
     }
 
     return render_template(
@@ -1440,6 +1678,84 @@ def alterar_nivel_manual(funcionario_id):
     return redirect(url_for("admin.progressao_nivel_detalhe", funcionario_id=funcionario.id))
 
 
+@admin_bp.route("/capacitacoes")
+def capacitacoes():
+    """Lista as capacitações de todos os funcionários (cadastradas por
+    eles mesmos em "Minhas Capacitações"). Mesmo visual da tela do
+    colaborador: ano + abas de trimestre + resumo + tabela. Na primeira
+    visita abre no trimestre atual; 'Todos' nas abas/ano mostra tudo."""
+    funcionario_id = request.args.get("funcionario_id") or None
+    ano = request.args.get("ano", type=int)
+    trimestre = request.args.get("trimestre", type=int)
+
+    if not request.args:
+        ano, trimestre = trimestre_atual()
+
+    query = Capacitacao.query.join(Funcionario, Capacitacao.funcionario_id == Funcionario.id)
+    if funcionario_id:
+        query = query.filter(Capacitacao.funcionario_id == funcionario_id)
+    if ano:
+        query = query.filter(Capacitacao.ano == ano)
+    if trimestre in (1, 2, 3, 4):
+        query = query.filter(Capacitacao.trimestre == trimestre)
+    else:
+        trimestre = None
+
+    lista = query.order_by(
+        Funcionario.nome, Capacitacao.ano.desc(), Capacitacao.trimestre.desc(),
+        Capacitacao.data_conclusao.desc().nullslast()
+    ).all()
+
+    anos = {r[0] for r in db.session.query(Capacitacao.ano).distinct().all()}
+    anos.add(trimestre_atual()[0])
+    if ano:
+        anos.add(ano)
+    anos = sorted(anos, reverse=True)
+
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+
+    total_horas = sum(c.carga_horaria or 0 for c in lista)
+    total_valor = sum((c.valor_pago_senar or 0) for c in lista)
+    total_valor_fmt = (
+        f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+
+    if ano and trimestre:
+        ini_tri, fim_tri = limites_trimestre(ano, trimestre)
+        periodo_txt = (
+            f"{trimestre}º trimestre de {ano} · "
+            f"{ini_tri.strftime('%d/%m/%Y')} a {fim_tri.strftime('%d/%m/%Y')}"
+        )
+    elif ano:
+        periodo_txt = f"Ano de {ano} · todos os trimestres"
+    elif trimestre:
+        periodo_txt = f"{trimestre}º trimestre · todos os anos"
+    else:
+        periodo_txt = "Todos os períodos"
+
+    return render_template(
+        "admin/capacitacoes.html",
+        capacitacoes=lista,
+        funcionarios=funcionarios,
+        funcionario_id_selecionado=funcionario_id,
+        anos=anos,
+        ano_selecionado=ano,
+        trimestre_selecionado=trimestre,
+        trimestres=[1, 2, 3, 4],
+        total_horas=total_horas,
+        total_valor_fmt=total_valor_fmt,
+        total_pessoas=len({c.funcionario_id for c in lista}),
+        periodo_txt=periodo_txt,
+    )
+
+
+@admin_bp.route("/capacitacoes/<int:capacitacao_id>/documento")
+def documento_capacitacao(capacitacao_id):
+    from .main import resposta_documento_capacitacao
+
+    return resposta_documento_capacitacao(Capacitacao.query.get_or_404(capacitacao_id))
+
+
 @admin_bp.route("/")
 def painel():
     total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
@@ -2397,3 +2713,122 @@ def comissao():
         presidencia_atual=presidencia_atual,
         funcionarios=funcionarios_ativos,
     )
+
+
+# ---------------------------------------------------------
+# Devolutiva de Funcionários (COM ENVIO DE EMAIL)
+# ---------------------------------------------------------
+
+def enviar_email_devolutiva(funcionario, data_devolutiva, data_limite):
+    """
+    Envia email para o funcionário informando que devolutiva foi marcada.
+    Usa o sistema de e-mail já existente no projeto (app/email_service.py),
+    que roda em segundo plano e nunca quebra a ação do admin caso falhe.
+    """
+    from ..email_service import avisar_empregado_devolutiva_marcada
+
+    if not funcionario.email:
+        current_app.logger.warning(
+            "Devolutiva marcada para %s, mas não há e-mail cadastrado.",
+            funcionario.nome,
+        )
+        return
+
+    avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite)
+
+
+@admin_bp.route("/devolutiva/funcionarios", methods=["GET"])
+def listar_funcionarios_devolutiva():
+    """Lista todos funcionários para admin marcar devolutiva."""
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    
+    lista = []
+    for func in funcionarios:
+        info = {
+            "id": str(func.id),
+            "nome": func.nome,
+            "email": func.email or "-",
+            "data_devolutiva": func.devolutiva.data_devolutiva if func.devolutiva else None,
+            "data_limite": func.devolutiva.data_limite_recorrer if func.devolutiva else None,
+            "tem_devolutiva": func.tem_devolutiva_marcada()
+        }
+        lista.append(info)
+    
+    return render_template(
+        "admin/devolutiva_funcionarios.html",
+        funcionarios=lista
+    )
+
+
+@admin_bp.route("/devolutiva/funcionario/<funcionario_id>/marcar", methods=["POST"])
+def marcar_devolutiva_funcionario(funcionario_id):
+    """Admin marca data de devolutiva para UM funcionário. Envia email automático."""
+    try:
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+    except:
+        flash("Funcionário não encontrado.", "error")
+        return redirect(request.referrer or url_for("admin.painel"))
+    
+    data_devolutiva_str = request.form.get("data_devolutiva")
+    if not data_devolutiva_str:
+        flash("Data de devolutiva é obrigatória.", "error")
+        return redirect(request.referrer or url_for("admin.listar_funcionarios_devolutiva"))
+    
+    try:
+        data_devolutiva = datetime.strptime(data_devolutiva_str, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Formato de data inválido.", "error")
+        return redirect(request.referrer or url_for("admin.listar_funcionarios_devolutiva"))
+    
+    data_limite = data_devolutiva + timedelta(days=5)
+    
+    devolutiva = DevolutivaPorFuncionario.query.filter_by(funcionario_id=funcionario_id).first()
+    
+    if devolutiva:
+        devolutiva.data_devolutiva = data_devolutiva
+        devolutiva.data_limite_recorrer = data_limite
+        devolutiva.marcado_em = datetime.now(timezone.utc)
+        devolutiva.marcado_por = session.get("email", "admin")
+        acao = "Atualizada"
+    else:
+        devolutiva = DevolutivaPorFuncionario(
+            funcionario_id=funcionario_id,
+            data_devolutiva=data_devolutiva,
+            data_limite_recorrer=data_limite,
+            marcado_em=datetime.now(timezone.utc),
+            marcado_por=session.get("email", "admin")
+        )
+        db.session.add(devolutiva)
+        acao = "Marcada"
+    
+    db.session.commit()
+    
+    enviar_email_devolutiva(funcionario, data_devolutiva, data_limite)
+    
+    flash(
+        f"✅ Devolutiva {acao} para {funcionario.nome}! "
+        f"Data: {data_devolutiva.strftime('%d/%m/%Y')} | "
+        f"Prazo: até {data_limite.strftime('%d/%m/%Y')} | "
+        f"📧 Email enviado",
+        "success"
+    )
+    
+    return redirect(request.referrer or url_for("admin.resultados"))
+def remover_devolutiva_funcionario(funcionario_id):
+    """Admin remove devolutiva marcada para um funcionário."""
+    try:
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+    except:
+        flash("Funcionário não encontrado.", "error")
+        return redirect(request.referrer or url_for("admin.painel"))
+    
+    devolutiva = DevolutivaPorFuncionario.query.filter_by(funcionario_id=funcionario_id).first()
+    
+    if devolutiva:
+        db.session.delete(devolutiva)
+        db.session.commit()
+        flash(f"Devolutiva de {funcionario.nome} removida.", "success")
+    else:
+        flash(f"{funcionario.nome} não tem devolutiva marcada.", "info")
+    
+    return redirect(url_for("admin.listar_funcionarios_devolutiva"))

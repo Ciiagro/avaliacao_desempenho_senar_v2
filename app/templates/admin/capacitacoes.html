@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Capacitações{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Capacitações</h1>
+<p class="muted">Cursos, treinamentos, oficinas e congressos cadastrados pelos próprios funcionários em "Minhas Capacitações", trimestre a trimestre.</p>
+
+<!-- Barra: funcionário + ano + trimestres -->
+<div class="cap-barra">
+    <div class="cap-filtros">
+        <form method="get" class="cap-ano">
+            <input type="hidden" name="trimestre" value="{{ trimestre_selecionado or 0 }}">
+            <select name="funcionario_id" class="cap-func" onchange="this.form.submit()" aria-label="Funcionário">
+                <option value="">Todos os funcionários</option>
+                {% for f in funcionarios %}
+                    <option value="{{ f.id }}" {% if funcionario_id_selecionado == f.id|string %}selected{% endif %}>{{ f.nome }}</option>
+                {% endfor %}
+            </select>
+            <select name="ano" onchange="this.form.submit()" aria-label="Ano">
+                <option value="">Todos os anos</option>
+                {% for a in anos %}
+                    <option value="{{ a }}" {% if a == ano_selecionado %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <nav class="cap-tabs" aria-label="Trimestre">
+            <a class="cap-tab {% if not trimestre_selecionado %}ativo{% endif %}"
+               href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, trimestre=0) }}">Todos</a>
+            {% for t in trimestres %}
+                <a class="cap-tab {% if t == trimestre_selecionado %}ativo{% endif %}"
+                   href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, trimestre=t) }}">{{ t }}º tri</a>
+            {% endfor %}
+        </nav>
+    </div>
+</div>
+
+<p class="cap-periodo muted">{{ periodo_txt }}</p>
+
+<!-- Resumo -->
+<div class="cap-resumo">
+    <div class="cap-kpi">
+        <span class="cap-kpi-valor">{{ capacitacoes|length }}</span>
+        <span class="cap-kpi-rotulo">Capacitações no período</span>
+    </div>
+    <div class="cap-kpi">
+        <span class="cap-kpi-valor">{{ total_pessoas }}</span>
+        <span class="cap-kpi-rotulo">Funcionários com capacitação</span>
+    </div>
+    <div class="cap-kpi">
+        <span class="cap-kpi-valor">{{ total_horas }}h</span>
+        <span class="cap-kpi-rotulo">Carga horária total</span>
+    </div>
+    <div class="cap-kpi">
+        <span class="cap-kpi-valor">{{ total_valor_fmt }}</span>
+        <span class="cap-kpi-rotulo">Investido pelo SENAR</span>
+    </div>
+</div>
+
+<!-- Lista -->
+<div class="tabela-container cap-lista">
+    <table class="tabela tabela-capacitacoes">
+        <thead>
+            <tr>
+                <th>Funcionário</th>
+                <th>Capacitação</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Carga</th>
+                <th>Período</th>
+                <th>Valor SENAR</th>
+                <th>Comprovante</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in capacitacoes %}
+                <tr>
+                    <td class="cap-col-func"><strong class="cap-nome">{{ c.funcionario.nome }}</strong></td>
+                    <td class="cap-col-nome">
+                        <strong class="cap-nome">{{ c.nome_curso }}</strong>
+                        {% if c.instituicao %}<div class="muted cap-sub">{{ c.instituicao }}</div>{% endif %}
+                    </td>
+                    <td>{{ c.tipo or '-' }}</td>
+                    <td>
+                        {% if c.status == 'Concluído' %}<span class="badge badge-ok">Concluído</span>
+                        {% elif c.status == 'Em andamento' %}<span class="badge badge-pending">Em andamento</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="cap-nowrap">{{ (c.carga_horaria ~ 'h') if c.carga_horaria else '-' }}</td>
+                    <td class="cap-nowrap">
+                        {% if c.data_inicio or c.data_conclusao %}
+                            {{ c.data_inicio.strftime('%d/%m') if c.data_inicio else '?' }}
+                            &rarr;
+                            {{ c.data_conclusao.strftime('%d/%m') if c.data_conclusao else '?' }}
+                        {% else %}-{% endif %}
+                        {% if not (ano_selecionado and trimestre_selecionado) %}
+                            <div class="muted cap-sub">{{ c.trimestre }}º tri/{{ c.ano }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="cap-nowrap">{{ ('R$ ' ~ c.valor_pago_senar|string) if c.valor_pago_senar else '-' }}</td>
+                    <td>
+                        {% if c.arquivo_tipo %}
+                            {% set eh_pdf = c.arquivo_tipo == 'application/pdf' %}
+                            <a class="cap-doc {{ 'cap-doc-pdf' if eh_pdf else 'cap-doc-img' }}"
+                               href="{{ url_for('admin.documento_capacitacao', capacitacao_id=c.id) }}"
+                               target="_blank" rel="noopener"
+                               data-tip="Visualizar documento" aria-label="Visualizar documento de {{ c.nome_curso }}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+                                {{ 'PDF' if eh_pdf else 'Imagem' }}
+                            </a>
+                        {% else %}<span class="muted">-</span>{% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="8" class="cap-vazio">Nenhuma capacitação encontrada neste filtro.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+/* Mesmo visual da tela "Minhas Capacitações" do colaborador */
+.cap-barra {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin: 20px 0 6px;
+}
+.cap-filtros { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cap-ano { margin: 0; display: flex; gap: 12px; flex-wrap: wrap; }
+.cap-ano select { width: auto; min-width: 96px; font-weight: 600; }
+.cap-ano select.cap-func { min-width: 260px; max-width: 100%; }
+.cap-tabs {
+    display: inline-flex; padding: 4px; gap: 4px;
+    background: #e9edf2; border-radius: 10px;
+}
+.cap-tab {
+    padding: 8px 18px; border-radius: 8px; text-decoration: none;
+    font-weight: 700; font-size: 0.9rem; color: var(--texto-muted);
+}
+.cap-tab:hover { color: var(--navy-900); }
+.cap-tab.ativo {
+    background: var(--surface); color: var(--navy-900);
+    box-shadow: var(--shadow-sm);
+}
+.cap-periodo { margin: 6px 0 18px; font-size: 0.9rem; }
+
+/* Resumo */
+.cap-resumo {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px; margin-bottom: 20px;
+}
+.cap-kpi {
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 3px solid var(--navy-800); border-radius: var(--radius);
+    padding: 16px 20px; box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: 4px;
+}
+.cap-kpi-valor { font-size: 1.7rem; font-weight: 800; color: var(--navy-900); line-height: 1.1; }
+.cap-kpi-rotulo { font-size: 0.8rem; color: var(--texto-muted); font-weight: 600; }
+
+/* Lista */
+.cap-lista { max-height: none; }
+.tabela-capacitacoes { font-size: 0.95rem; }
+.tabela-capacitacoes th { padding: 14px 12px; }
+.tabela-capacitacoes td { padding: 14px 12px; vertical-align: middle; }
+.tabela-capacitacoes th:first-child, .tabela-capacitacoes td:first-child { padding-left: 18px; }
+.tabela-capacitacoes th:last-child, .tabela-capacitacoes td:last-child { padding-right: 18px; }
+.cap-col-func { min-width: 170px; }
+.cap-col-nome { min-width: 230px; }
+.cap-nome { color: var(--navy-900); }
+.cap-sub { font-size: 0.85rem; margin-top: 2px; }
+.cap-nowrap { white-space: nowrap; }
+.cap-vazio { text-align: center; padding: 40px 16px !important; color: var(--texto-muted); }
+
+/* Botão do comprovante: ícone + rótulo (PDF / Imagem) */
+.cap-doc {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 8px; text-decoration: none;
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.02em;
+    border: 1px solid transparent; transition: filter 0.15s ease;
+}
+.cap-doc svg { width: 16px; height: 16px; }
+.cap-doc:hover { filter: brightness(0.95); }
+.cap-doc-pdf { background: var(--perigo-bg); color: var(--perigo); border-color: rgba(194, 59, 59, 0.25); }
+.cap-doc-img { background: var(--info-bg); color: var(--info); border-color: rgba(63, 111, 176, 0.25); }
+
+/* Balão com o nome da ação ao passar o mouse */
+[data-tip] { position: relative; }
+[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--navy-900); color: #fff;
+    padding: 4px 9px; border-radius: 6px;
+    font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
+    z-index: 5;
+}
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; }
+.tabela-capacitacoes tbody tr:first-child [data-tip]::after { bottom: auto; top: calc(100% + 6px); }
+
+@media (max-width: 900px) {
+    .cap-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+    .cap-resumo { grid-template-columns: 1fr; }
+    .cap-ano select.cap-func { min-width: 0; width: 100%; }
+}
+</style>
+{% endblock %}

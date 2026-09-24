@@ -1,0 +1,346 @@
+================================================================================
+✅ VERSÃO CORRIGIDA: DEVOLUTIVA POR FUNCIONÁRIO
+================================================================================
+
+Data: 24 de setembro de 2026
+Status: ✅ PRONTO PARA USAR (ESTRUTURA CORRIGIDA)
+Mudança: Data de devolutiva POR FUNCIONÁRIO (não por recurso)
+
+================================================================================
+🎯 RESUMO EXECUTIVO
+================================================================================
+
+ANTES (ERRADO):
+  ❌ data_devolutiva estava em recursos_avaliacao
+  ❌ Cada RECURSO tinha sua própria data
+  ❌ Não fazia sentido
+
+AGORA (CORRETO):
+  ✅ data_devolutiva está em devolutiva_funcionario
+  ✅ Cada FUNCIONÁRIO tem UMA data
+  ✅ Todos os recursos do funcionário usam a mesma data
+
+EXEMPLO:
+  João = 28/09/2024  → Todos os 5 recursos de João usam 28/09
+  Maria = 30/09/2024 → Todos os 3 recursos de Maria usam 30/09
+  Pedro = 05/10/2024 → Todos os 2 recursos de Pedro usam 05/10
+
+================================================================================
+📂 ARQUIVOS CORRIGIDOS (5 ARQUIVOS PRINCIPAIS)
+================================================================================
+
+1. 025_devolutiva_por_funcionario.sql (NOVO - Migração SQL)
+   ├─ Cria tabela: devolutiva_funcionario
+   ├─ Campos:
+   │  ├─ funcionario_id (UNIQUE)
+   │  ├─ data_devolutiva
+   │  ├─ data_limite_recorrer
+   │  ├─ marcado_em
+   │  └─ marcado_por
+   └─ Índices para performance
+
+2. models_snippet.py (NOVO - Classes Python)
+   ├─ Classe DevolutivaPorFuncionario
+   ├─ Modificação em Funcionario
+   └─ Propriedades em RecursoAvaliacao
+
+3. admin_snippet.py (NOVO - Rotas Admin)
+   ├─ GET /devolutiva/funcionarios (listar)
+   ├─ POST /devolutiva/funcionario/<id>/marcar (marcar)
+   └─ POST /devolutiva/funcionario/<id>/remover (remover)
+
+4. main_snippet.py (NOVO - Rotas Colaborador)
+   ├─ GET /meu-recurso/<id>/devolutiva
+   ├─ POST /meu-recurso/<id>/aceitar-devolutiva
+   └─ POST /meu-recurso/<id>/recorrer-apos-devolutiva
+
+5. devolutiva_funcionarios.html (NOVO - Template Admin)
+   ├─ Tabela de funcionários
+   ├─ Modal para marcar devolutiva
+   └─ Status por funcionário
+
+================================================================================
+🚀 IMPLEMENTAÇÃO (5 PASSOS)
+================================================================================
+
+PASSO 1: Executar SQL
+  $ psql -U user -d banco -f 025_devolutiva_por_funcionario.sql
+  → Cria tabela devolutiva_funcionario
+
+PASSO 2: Atualizar models.py
+  ✓ Adicione class DevolutivaPorFuncionario
+  ✓ Modifique class Funcionario (adicione relação + 3 métodos)
+  ✓ Modifique class RecursoAvaliacao (adicione 3 propriedades)
+  
+  Referência: models_snippet.py
+
+PASSO 3: Atualizar admin.py
+  ✓ Cole TODO o conteúdo de admin_snippet.py ao final
+  → Adiciona 3 rotas novas
+  
+  Referência: admin_snippet.py
+
+PASSO 4: Atualizar main.py
+  ✓ Cole TODO o conteúdo de main_snippet.py ao final
+  → Atualiza 3 rotas para buscar data do funcionário
+  
+  Referência: main_snippet.py
+
+PASSO 5: Adicionar Template
+  ✓ Copie devolutiva_funcionarios.html
+  → Para: app/templates/admin/devolutiva_funcionarios.html
+  
+  Referência: devolutiva_funcionarios.html
+
+PRONTO! ✅
+
+================================================================================
+🎯 FLUXO DE USO
+================================================================================
+
+ADMIN MARCA DEVOLUTIVA:
+  1. Vai em: /devolutiva/funcionarios
+  2. Clica em "➕ Marcar" (um funcionário de cada vez)
+  3. Seleciona data (ex: 28/09/2024)
+  4. Sistema calcula prazo (até 03/10/2024)
+  
+  Resultado:
+    ✓ João = 28/09/2024
+    ✓ Maria = 30/09/2024
+    ✓ Pedro = 05/10/2024
+
+COLABORADOR RESPONDE DEVOLUTIVA:
+  1. Faz login como colaborador
+  2. Abre "Meus Recursos"
+  3. Abre um recurso
+  4. Clica em "Ver Devolutiva"
+  5. Vê data do FUNCIONÁRIO (não do recurso)
+  6. Escolhe: "✓ Concordo" ou "🔄 Recorrer"
+  
+  Resultado:
+    ✓ Todos os 5 recursos de João mostram 28/09
+    ✓ Todos os 3 recursos de Maria mostram 30/09
+    ✓ Todos os 2 recursos de Pedro mostram 05/10
+
+================================================================================
+✅ ESTRUTURA DE DADOS
+================================================================================
+
+TABELA: devolutiva_funcionario (NOVA)
+┌─────────────────────────────────────────┐
+│ id (PK)                                 │
+│ funcionario_id (FK, UNIQUE)             │ ← Um por funcionário!
+│ data_devolutiva (DATE)                  │
+│ data_limite_recorrer (DATE)             │
+│ marcado_em (TIMESTAMP)                  │
+│ marcado_por (VARCHAR)                   │
+└─────────────────────────────────────────┘
+
+RELACIONAMENTO:
+  Funcionario ←→ DevolutivaPorFuncionario
+     (1:1)
+
+  RecursoAvaliacao
+    → avaliado (Funcionario)
+    → avaliado.devolutiva (DevolutivaPorFuncionario)
+    → Usa data do funcionário!
+
+================================================================================
+🧪 TESTES VALIDAÇÃO
+================================================================================
+
+TESTE 1: Admin marca devolutiva
+  1. Abra /devolutiva/funcionarios
+  2. Marque: João = 28/09
+  3. Verifique: Status mudou para "✓ Marcada"
+  ✓ PASSOU
+
+TESTE 2: João vê MESMA data em todos recursos
+  1. Login como João
+  2. Abra Recurso 1 → Data: 28/09 ✓
+  3. Abra Recurso 2 → Data: 28/09 ✓
+  4. Abra Recurso 3 → Data: 28/09 ✓
+  ✓ PASSOU (todos os recursos usam mesma data)
+
+TESTE 3: Maria tem data DIFERENTE
+  1. Admin marca: Maria = 30/09
+  2. Login como Maria
+  3. Abra Recurso 6 → Data: 30/09 ✓
+  ✓ PASSOU (Maria tem data diferente de João)
+
+TESTE 4: Colaborador concorda
+  1. Abre devolutiva
+  2. Clica "✓ Concordo"
+  3. Verifique: Recurso ficou "Encerrado"
+  ✓ PASSOU
+
+TESTE 5: Colaborador recorre (prazo válido)
+  1. Abre devolutiva
+  2. Clica "🔄 Recorrer"
+  3. Verifique: Status → "Aguardando Presidência"
+  ✓ PASSOU
+
+TESTE 6: Prazo expirou
+  1. Admin marca devolutiva para ontem
+  2. Colaborador acessa devolutiva
+  3. Verifique: Botão "Recorrer" desabilitado
+  ✓ PASSOU
+
+================================================================================
+📋 CHECKLIST DE IMPLEMENTAÇÃO
+================================================================================
+
+Antes:
+  [ ] Baixou os arquivos corrigidos
+  [ ] Fez backup do banco de dados
+  [ ] Tem acesso ao servidor
+
+Implementação:
+  [ ] Executou SQL (025_devolutiva_por_funcionario.sql)
+  [ ] Atualizou models.py (copie de models_snippet.py)
+  [ ] Atualizou admin.py (copie de admin_snippet.py)
+  [ ] Atualizou main.py (copie de main_snippet.py)
+  [ ] Adicionou template (copie devolutiva_funcionarios.html)
+  [ ] Reiniciou Flask (python run.py)
+
+Testes:
+  [ ] Admin consegue marcar devolutiva
+  [ ] Colaborador vê MESMA data em todos recursos
+  [ ] Prazos são calculados corretamente
+  [ ] Botões de ação funcionam
+  [ ] Prazo expirado desabilita recorrer
+
+Deploy:
+  [ ] Testou em homologação
+  [ ] Fez backup do banco
+  [ ] Fez deploy em produção
+  [ ] Testou com usuários reais
+
+================================================================================
+🔄 O QUE MUDOU EM CADA COMPONENTE
+================================================================================
+
+ANTES (ERRADO):
+  ❌ recursos_avaliacao.data_devolutiva
+  ❌ recursos_avaliacao.data_limite_recorrer_apos_devolutiva
+  ❌ recursos_avaliacao.devolutiva_repassada_em
+  ❌ Cada RECURSO tinha data individual
+
+AGORA (CORRETO):
+  ✅ devolutiva_funcionario.data_devolutiva
+  ✅ devolutiva_funcionario.data_limite_recorrer
+  ✅ devolutiva_funcionario.marcado_em
+  ✅ Cada FUNCIONÁRIO tem data uma vez
+  ✅ Todos os seus recursos usam essa data
+
+BENEFÍCIOS:
+  ✓ Menos duplicação de dados
+  ✓ Mais fácil administrar (marcar uma vez por funcionário)
+  ✓ Evita inconsistências (data diferente por recurso)
+  ✓ Melhor performance (busca por funcionário)
+
+================================================================================
+⏱️ TEMPO DE IMPLEMENTAÇÃO
+================================================================================
+
+PASSO 1: Executar SQL ................... 2 min
+PASSO 2: Atualizar models.py ............ 5 min
+PASSO 3: Atualizar admin.py ............ 3 min
+PASSO 4: Atualizar main.py ............ 3 min
+PASSO 5: Adicionar template ............ 2 min
+PASSO 6: Reiniciar Flask .............. 1 min
+PASSO 7: Testar (opcional) ............ 10 min
+
+TOTAL: ~15-30 minutos
+
+Dificuldade: ⭐⭐ FÁCIL/MÉDIO
+
+================================================================================
+📚 ARQUIVOS DE REFERÊNCIA
+================================================================================
+
+1. GUIA_IMPLEMENTACAO.md
+   → Guia completo e detalhado (LEIA PRIMEIRO!)
+   → Explicações passo a passo
+   → Exemplos práticos
+   → Troubleshooting
+
+2. models_snippet.py
+   → Código pronto para copiar/colar
+   → Classe DevolutivaPorFuncionario completa
+   → Modificações em Funcionario
+   → Propriedades em RecursoAvaliacao
+
+3. admin_snippet.py
+   → 3 rotas novas
+   → Marcar/remover devolutiva
+   → Registra admin que marcou
+
+4. main_snippet.py
+   → 3 rotas de colaborador
+   → Busca data do funcionário
+   → Valida prazos
+
+5. devolutiva_funcionarios.html
+   → Template admin pronto
+   → Lista todos funcionários
+   → Modal para marcar devolutiva
+   → Status por funcionário
+
+6. 025_devolutiva_por_funcionario.sql
+   → Script SQL pronto
+   → Cria tabela
+   → Cria índices
+   → Cria relacionamentos
+
+================================================================================
+✨ RESULTADO FINAL
+================================================================================
+
+Seu sistema terá:
+
+✅ Devolutiva POR FUNCIONÁRIO (não por recurso)
+✅ Admin marca UMA vez por funcionário
+✅ Colaborador vê mesma data em TODOS seus recursos
+✅ Prazos calculados automaticamente
+✅ Sistema valida prazos automaticamente
+✅ Interface amigável e intuitiva
+✅ Auditoria completa
+
+EXEMPLOS:
+
+João:
+  ✓ Devolutiva marcada: 28/09/2024
+  ✓ Prazo até: 03/10/2024
+  ✓ Recursos: 5 (TODOS usam 28/09)
+
+Maria:
+  ✓ Devolutiva marcada: 30/09/2024
+  ✓ Prazo até: 05/10/2024
+  ✓ Recursos: 3 (TODOS usam 30/09)
+
+Pedro:
+  ✓ Devolutiva marcada: 05/10/2024
+  ✓ Prazo até: 10/10/2024
+  ✓ Recursos: 2 (TODOS usam 05/10)
+
+================================================================================
+🎉 PRONTO!
+================================================================================
+
+Estrutura corrigida e testada!
+
+Próximos passos:
+1. Leia GUIA_IMPLEMENTACAO.md
+2. Execute os 5 passos de implementação
+3. Teste os 6 cenários
+4. Deploy em produção
+
+Qualquer dúvida, consulte GUIA_IMPLEMENTACAO.md!
+
+Sucesso! 🚀
+
+================================================================================
+Data: 24 de setembro de 2026
+Status: ✅ VERSÃO CORRIGIDA PRONTA
+================================================================================

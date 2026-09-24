@@ -33,6 +33,7 @@ from ..email_service import (
     avisar_comissao_novo_recurso,
     avisar_comissao_gestor_respondeu,
     avisar_comissao_empregado_aceitou,
+    avisar_comissao_empregado_recorreu,
     avisar_gestor_recurso_encaminhado,
     avisar_empregado_resposta_disponivel,
     avisar_empregado_recurso_encerrado,
@@ -385,11 +386,11 @@ def abrir_recurso():
 
 @recursos_bp.route("/recurso/<int:recurso_id>/aceitar", methods=["POST"])
 def aceitar_recurso(recurso_id):
-    """Único passo do empregado depois que a Comissão repassa a resposta
-    do gestor: confirmar recebimento e assinar eletronicamente. Isso
-    encerra o recurso na hora — não existe mais recorrer a uma instância
-    seguinte (presidência); a resposta do gestor, repassada pela Comissão,
-    já é a decisão final."""
+    """Uma das duas opções do empregado na devolutiva (depois que a
+    Comissão repassa a resposta do gestor): confirmar recebimento e
+    assinar eletronicamente, concordando com a resposta. Isso encerra o
+    recurso definitivamente. A outra opção, dentro do prazo marcado pelo
+    RH, é recorrer à presidência (ver recorrer_recurso)."""
     funcionario = _funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))
@@ -417,19 +418,37 @@ def aceitar_recurso(recurso_id):
 
 @recursos_bp.route("/recurso/<int:recurso_id>/recorrer", methods=["POST"])
 def recorrer_recurso(recurso_id):
-    """Desativada: o empregado só recorre uma única vez (quando abre o
-    recurso). Depois que o gestor responde e a Comissão repassa, o
-    empregado só confirma recebimento (ver aceitar_recurso) — não existe
-    mais uma instância seguinte (presidência) pra recorrer de novo.
+    """Depois que a Comissão repassa a resposta do gestor (a "devolutiva"),
+    o empregado tem, dentro do prazo marcado pelo RH para ele
+    (DevolutivaPorFuncionario — mesma data vale para todos os recursos
+    desse funcionário), a opção de recorrer à presidência em vez de
+    aceitar. Isso reabre o recurso na fila da Comissão (que decide se
+    encaminha à presidência), do mesmo jeito que um recurso recém-aberto."""
+    funcionario = _funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
 
-    A rota continua existindo (em vez de ser removida) só como rede de
-    segurança, caso alguém acesse um link antigo/em cache do botão que
-    existia aqui antes."""
-    flash(
-        "Não é mais possível recorrer novamente: a resposta do gestor, repassada pela "
-        "Comissão, já é a decisão final. Confirme o recebimento para encerrar o recurso.",
-        "warning",
+    recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
+    if str(recurso.avaliado_id) != str(funcionario.id) or recurso.status != RECURSO_STATUS_AGUARDANDO_FUNCIONARIO:
+        flash("Essa ação não está disponível para esse recurso.", "danger")
+        return redirect(url_for("recursos.recurso_area"))
+
+    devolutiva = funcionario.devolutiva
+    if not devolutiva or not devolutiva.pode_recorrer():
+        flash(
+            "O prazo para recorrer após a devolutiva já expirou. "
+            "Você só pode confirmar o recebimento (aceitar).",
+            "warning",
+        )
+        return redirect(url_for("recursos.recurso_area"))
+
+    recurso.status = RECURSO_STATUS_AGUARDANDO_COMISSAO_RECURSO
+    db.session.add(
+        RecursoEvento(recurso_id=recurso.id, tipo="pedido_recorrer", autor_id=funcionario.id)
     )
+    db.session.commit()
+    avisar_comissao_empregado_recorreu(recurso)
+    flash("Seu pedido para recorrer foi registrado e encaminhado à Comissão.", "success")
     return redirect(url_for("recursos.recurso_area"))
 
 

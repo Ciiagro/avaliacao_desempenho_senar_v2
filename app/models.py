@@ -1,7 +1,9 @@
 import uuid
+import calendar
 from datetime import datetime, date
 
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import deferred
 from werkzeug.security import generate_password_hash, check_password_hash
 from .extensions import db
 
@@ -55,6 +57,13 @@ class Funcionario(db.Model):
 
     cargo = db.relationship("Cargo", back_populates="funcionarios")
     setor = db.relationship("Setor", back_populates="funcionarios")
+    devolutiva = db.relationship(
+        "DevolutivaPorFuncionario",
+        uselist=False,
+        back_populates="funcionario",
+        foreign_keys="DevolutivaPorFuncionario.funcionario_id",
+        overlaps="funcionario",
+    )
 
     def __repr__(self):
         return f"<Funcionario {self.nome}>"
@@ -102,6 +111,122 @@ class Funcionario(db.Model):
             return None  # sem data cadastrada, não dá para calcular
         dias = self.dias_de_casa(referencia)
         return dias >= DIAS_MINIMOS_PARA_AVALIACAO
+
+    def tem_devolutiva_marcada(self):
+        """Verifica se tem devolutiva marcada"""
+        return self.devolutiva is not None
+
+    def pode_recorrer_apos_devolutiva(self):
+        """Verifica se pode recorrer após devolutiva (prazo válido)"""
+        if not self.devolutiva:
+            return False
+        return self.devolutiva.pode_recorrer()
+
+    def dias_restantes_recorrer(self):
+        """Retorna dias restantes para recorrer"""
+        if not self.devolutiva:
+            return None
+        return self.devolutiva.dias_restantes()
+
+
+class DevolutivaPorFuncionario(db.Model):
+    """Dados de devolutiva por funcionário."""
+
+    __tablename__ = "devolutiva_funcionario"
+
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(
+        UUID(as_uuid=True),
+        db.ForeignKey("funcionarios.id"),
+        nullable=False,
+        unique=True,
+    )
+    data_devolutiva = db.Column(db.Date, nullable=False)
+    data_limite_recorrer = db.Column(db.Date, nullable=False)
+    marcado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    marcado_por = db.Column(db.String(255))
+
+    funcionario = db.relationship(
+        "Funcionario",
+        back_populates="devolutiva",
+        foreign_keys=[funcionario_id],
+        overlaps="devolutiva",
+    )
+
+    def pode_recorrer(self):
+        """Verifica se ainda é possível recorrer."""
+        if not self.data_limite_recorrer:
+            return False
+        hoje = date.today()
+        return hoje <= self.data_limite_recorrer
+
+    def dias_restantes(self):
+        """Calcula os dias restantes para o prazo expirar."""
+        if not self.data_limite_recorrer:
+            return None
+        hoje = date.today()
+        delta = (self.data_limite_recorrer - hoje).days
+        return max(0, delta)
+
+
+TIPOS_CAPACITACAO = [
+    "Oficina",
+    "Congresso",
+    "Capacitação",
+    "Curso",
+    "Treinamento",
+    "Palestra",
+    "Certificação",
+    "Pós-graduação",
+    "Outro"
+]
+TIPOS_STATUS_CAPACITACAO = ["Concluído", "Em andamento"]
+TRIMESTRES = [1, 2, 3, 4]
+
+
+def trimestre_atual(hoje=None):
+    """Retorna (ano, trimestre) da data informada (padrão: hoje)."""
+    hoje = hoje or date.today()
+    return hoje.year, (hoje.month - 1) // 3 + 1
+
+
+def limites_trimestre(ano, trimestre):
+    """Primeiro e último dia (date) do trimestre."""
+    mes_ini = 3 * (trimestre - 1) + 1
+    mes_fim = mes_ini + 2
+    return date(ano, mes_ini, 1), date(ano, mes_fim, calendar.monthrange(ano, mes_fim)[1])
+
+
+class Capacitacao(db.Model):
+    """Cursos/treinamentos/certificações feitos pelo funcionário.
+
+    Cadastrado pelo próprio funcionário em "Minhas Capacitações"; o RH
+    (Administração) enxerga a lista de todo mundo em admin/capacitacoes.
+    """
+
+    __tablename__ = "capacitacoes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(
+        UUID(as_uuid=True), db.ForeignKey("funcionarios.id"), nullable=False
+    )
+    nome_curso = db.Column(db.Text, nullable=False)
+    instituicao = db.Column(db.Text)
+    tipo = db.Column(db.Text)
+    carga_horaria = db.Column(db.Integer)  # em horas
+    data_inicio = db.Column(db.Date)
+    data_conclusao = db.Column(db.Date)
+    observacoes = db.Column(db.Text)
+    status = db.Column(db.Text)  # "Concluído" ou "Em andamento"
+    arquivo_comprovacao = db.Column(db.Text)  # Nome do arquivo ou caminho
+    valor_pago_senar = db.Column(db.Numeric(10, 2))  # Valor pago pelo SENAR
+    arquivo_tipo = db.Column(db.Text)  # mimetype; só preenchido se o arquivo foi guardado
+    arquivo_dados = deferred(db.Column(db.LargeBinary))  # conteúdo do comprovante
+    ano = db.Column(db.Integer, nullable=False)
+    trimestre = db.Column(db.Integer, nullable=False)  # 1 a 4
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+    funcionario = db.relationship("Funcionario", foreign_keys=[funcionario_id])
 
 
 class Formulario(db.Model):
@@ -463,3 +588,5 @@ class Progressao(db.Model):
     decidido_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
 
     funcionario = db.relationship("Funcionario")
+
+

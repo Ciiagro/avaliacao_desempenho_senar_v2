@@ -2,7 +2,13 @@
 {% block title %}Administração{% endblock %}
 
 {% block content %}
-<h1>Administração</h1>
+<div class="pagina-topo">
+    <h1>Administração</h1>
+    <a class="botao botao-secundario" href="{{ url_for('admin.painel_monitoramento') }}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Painel de monitoramento
+    </a>
+</div>
 
 <div class="cards">
     <a class="card" href="{{ url_for('admin.funcionarios') }}">
@@ -21,10 +27,6 @@
         <h2>Andamento das avaliações</h2>
         <p>Veja quem já concluiu a autoavaliação e a avaliação do gestor</p>
     </a>
-    <a class="card" href="{{ url_for('admin.painel_monitoramento') }}">
-        <h2>Painel de monitoramento</h2>
-        <p>Números do exercício de longe: quantos já responderam, quem falta e o prazo</p>
-    </a>
     <a class="card" href="{{ url_for('admin.resultados') }}">
         <h2>Resultado final</h2>
         <p>Nota final (auto x0,30 + gestor x0,70) e conceito, com liberação individual para o empregado</p>
@@ -37,98 +39,238 @@
         <h2>Comissão de recursos</h2>
         <p>Defina quem faz parte da Comissão e quem é a presidência, pra decidir recursos</p>
     </a>
+    <a class="card" href="{{ url_for('admin.capacitacoes') }}">
+        <h2>Capacitações</h2>
+        <p>Veja os cursos, treinamentos e certificações cadastrados por todos os funcionários</p>
+    </a>
 </div>
 
-<h2>Ciclos de avaliação</h2>
-<form method="post" action="{{ url_for('admin.criar_ciclo') }}" class="form-inline">
-    <input type="number" name="exercicio" placeholder="Exercício (ex: 2026)" required>
-    <input type="date" name="data_inicio" title="Início do ciclo">
-    <input type="date" name="data_fim" title="Fim do ciclo">
-    <label class="muted" style="margin:0;">Prazo autoavaliação
-        <input type="date" name="data_limite_autoavaliacao">
-    </label>
-    <label class="muted" style="margin:0;">Prazo avaliação gestor
-        <input type="date" name="data_limite_gestor">
-    </label>
-    <button type="submit" class="botao">Criar ciclo</button>
-</form>
+<div class="ciclos-topo">
+    <h2>Ciclos de avaliação</h2>
+    <button type="button" class="botao" id="btn-novo-ciclo" aria-expanded="{{ 'true' if not ciclos else 'false' }}">+ Novo ciclo</button>
+</div>
 
-<table class="tabela tabela-ciclos">
-    <thead>
-        <tr>
-            <th>Exercício</th>
-            <th>Início</th>
-            <th>Fim</th>
-            <th>Prazo autoavaliação</th>
-            <th>Prazo avaliação gestor</th>
-            <th>Status</th>
-            <th>Padrão</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for ciclo in ciclos %}
+<div class="ciclo-painel" id="painel-novo-ciclo" {% if ciclos %}hidden{% endif %}>
+    <form method="post" action="{{ url_for('admin.criar_ciclo') }}">
+        <div class="ciclo-grid">
+            <label class="ciclo-campo">
+                <span>Exercício</span>
+                <input type="number" name="exercicio" placeholder="Ex: 2026" required>
+            </label>
+            <label class="ciclo-campo">
+                <span>Início do ciclo</span>
+                <input type="date" name="data_inicio">
+            </label>
+            <label class="ciclo-campo">
+                <span>Fim do ciclo</span>
+                <input type="date" name="data_fim">
+            </label>
+            <label class="ciclo-campo">
+                <span>Prazo autoavaliação</span>
+                <input type="date" name="data_limite_autoavaliacao">
+            </label>
+            <label class="ciclo-campo">
+                <span>Prazo avaliação gestor</span>
+                <input type="date" name="data_limite_gestor">
+            </label>
+        </div>
+        <div class="ciclo-acoes">
+            <button type="submit" class="botao">Criar ciclo</button>
+            <button type="button" class="botao botao-secundario" id="btn-cancelar-ciclo">Cancelar</button>
+        </div>
+    </form>
+</div>
+
+<div class="tabela-container ciclos-lista">
+    <table class="tabela tabela-ciclos">
+        <thead>
             <tr>
-                <td>{{ ciclo.exercicio }}</td>
-                <td>{{ ciclo.data_inicio.strftime('%d/%m/%Y') if ciclo.data_inicio else '-' }}</td>
-                <td>{{ ciclo.data_fim.strftime('%d/%m/%Y') if ciclo.data_fim else '-' }}</td>
-                <td>{{ ciclo.data_limite_autoavaliacao.strftime('%d/%m/%Y') if ciclo.data_limite_autoavaliacao else '-' }}</td>
-                <td>{{ ciclo.data_limite_gestor.strftime('%d/%m/%Y') if ciclo.data_limite_gestor else '-' }}</td>
-                <td>{{ ciclo.status }}</td>
-                <td class="col-padrao">
-                    {% if ciclo.padrao %}
-                        <span class="badge-padrao">✔ Padrão</span>
-                    {% else %}
-                        <span class="muted">—</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <div class="acoes-vinculo acoes-ciclo">
-                        <button type="button" class="botao botao-secundario botao-pequeno botao-ciclo botao-editar-prazos" data-ciclo-id="{{ ciclo.id }}">Editar</button>
-                        {% if not ciclo.padrao %}
-                            <form method="post" action="{{ url_for('admin.definir_ciclo_padrao', ciclo_id=ciclo.id) }}" style="display:inline;">
-                                <button type="submit" class="botao botao-secundario botao-pequeno botao-ciclo">Definir padrão</button>
-                            </form>
-                        {% endif %}
-                        {% if ciclo.status == 'aberto' %}
-                            <form method="post" action="{{ url_for('admin.encerrar_ciclo', ciclo_id=ciclo.id) }}" style="display:inline;">
-                                <button type="submit" class="botao botao-secundario botao-pequeno botao-ciclo">Encerrar</button>
-                            </form>
+                <th>Exercício</th>
+                <th>Período do ciclo</th>
+                <th>Prazo autoavaliação</th>
+                <th>Prazo avaliação gestor</th>
+                <th>Status</th>
+                <th class="centro">Padrão</th>
+                <th class="ciclo-th-acoes">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ciclo in ciclos %}
+                <tr class="{{ 'linha-ciclo-padrao' if ciclo.padrao else '' }}">
+                    <td><strong class="ciclo-exercicio">{{ ciclo.exercicio }}</strong></td>
+                    <td>
+                        {% if ciclo.data_inicio or ciclo.data_fim %}
+                            {{ ciclo.data_inicio.strftime('%d/%m/%Y') if ciclo.data_inicio else '?' }}
+                            &rarr;
+                            {{ ciclo.data_fim.strftime('%d/%m/%Y') if ciclo.data_fim else '?' }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ ciclo.data_limite_autoavaliacao.strftime('%d/%m/%Y') if ciclo.data_limite_autoavaliacao else '-' }}</td>
+                    <td>{{ ciclo.data_limite_gestor.strftime('%d/%m/%Y') if ciclo.data_limite_gestor else '-' }}</td>
+                    <td>
+                        {% if ciclo.status == 'aberto' %}<span class="badge badge-ok">Aberto</span>
+                        {% else %}<span class="badge badge-new">{{ ciclo.status|capitalize }}</span>{% endif %}
+                    </td>
+                    <td class="col-padrao">
+                        {% if ciclo.padrao %}
+                            <span class="badge-padrao">✔ Padrão</span>
                         {% else %}
-                            <form method="post" action="{{ url_for('admin.reabrir_ciclo', ciclo_id=ciclo.id) }}" style="display:inline;">
-                                <button type="submit" class="botao botao-secundario botao-pequeno botao-ciclo">Reabrir</button>
-                            </form>
+                            <span class="muted">—</span>
                         {% endif %}
-                    </div>
-                </td>
-            </tr>
-            <tr class="linha-edicao-prazos" data-edicao-prazos="{{ ciclo.id }}" style="display:none;">
-                <td colspan="8">
-                    <form method="post" action="{{ url_for('admin.editar_prazos_ciclo', ciclo_id=ciclo.id) }}" class="form-inline">
-                        <label class="muted" style="margin:0;">Exercício
-                            <input type="number" name="exercicio" value="{{ ciclo.exercicio }}" style="width:90px;">
-                        </label>
-                        <label class="muted" style="margin:0;">Início
-                            <input type="date" name="data_inicio" value="{{ ciclo.data_inicio.isoformat() if ciclo.data_inicio else '' }}">
-                        </label>
-                        <label class="muted" style="margin:0;">Fim
-                            <input type="date" name="data_fim" value="{{ ciclo.data_fim.isoformat() if ciclo.data_fim else '' }}">
-                        </label>
-                        <label class="muted" style="margin:0;">Prazo autoavaliação
-                            <input type="date" name="data_limite_autoavaliacao" value="{{ ciclo.data_limite_autoavaliacao.isoformat() if ciclo.data_limite_autoavaliacao else '' }}">
-                        </label>
-                        <label class="muted" style="margin:0;">Prazo avaliação gestor
-                            <input type="date" name="data_limite_gestor" value="{{ ciclo.data_limite_gestor.isoformat() if ciclo.data_limite_gestor else '' }}">
-                        </label>
-                        <button type="submit" class="botao botao-pequeno">Salvar</button>
-                        <button type="button" class="botao botao-secundario botao-pequeno botao-cancelar-prazos" data-ciclo-id="{{ ciclo.id }}">Cancelar</button>
-                    </form>
-                </td>
-            </tr>
-        {% endfor %}
-    </tbody>
-</table>
+                    </td>
+                    <td class="ciclo-col-acoes">
+                        <div class="ciclo-icones">
+                            <button type="button" class="botao-icone botao-icone-secundario botao-editar-prazos"
+                                    data-ciclo-id="{{ ciclo.id }}" data-tip="Editar" aria-label="Editar ciclo {{ ciclo.exercicio }}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            </button>
+                            {% if not ciclo.padrao %}
+                                <form method="post" action="{{ url_for('admin.definir_ciclo_padrao', ciclo_id=ciclo.id) }}" class="ciclo-inline">
+                                    <button type="submit" class="botao-icone botao-icone-secundario" data-tip="Definir como padrão"
+                                            aria-label="Definir ciclo {{ ciclo.exercicio }} como padrão">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if ciclo.status == 'aberto' %}
+                                <form method="post" action="{{ url_for('admin.encerrar_ciclo', ciclo_id=ciclo.id) }}" class="ciclo-inline"
+                                      onsubmit="return confirm('Encerrar o ciclo {{ ciclo.exercicio }}?');">
+                                    <button type="submit" class="botao-icone botao-icone-secundario" data-tip="Encerrar ciclo"
+                                            aria-label="Encerrar ciclo {{ ciclo.exercicio }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    </button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="{{ url_for('admin.reabrir_ciclo', ciclo_id=ciclo.id) }}" class="ciclo-inline">
+                                    <button type="submit" class="botao-icone botao-icone-secundario" data-tip="Reabrir ciclo"
+                                            aria-label="Reabrir ciclo {{ ciclo.exercicio }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                <tr class="linha-edicao-prazos" data-edicao-prazos="{{ ciclo.id }}" style="display:none;">
+                    <td colspan="7" class="ciclo-edicao">
+                        <form method="post" action="{{ url_for('admin.editar_prazos_ciclo', ciclo_id=ciclo.id) }}">
+                            <div class="ciclo-grid">
+                                <label class="ciclo-campo">
+                                    <span>Exercício</span>
+                                    <input type="number" name="exercicio" value="{{ ciclo.exercicio }}">
+                                </label>
+                                <label class="ciclo-campo">
+                                    <span>Início</span>
+                                    <input type="date" name="data_inicio" value="{{ ciclo.data_inicio.isoformat() if ciclo.data_inicio else '' }}">
+                                </label>
+                                <label class="ciclo-campo">
+                                    <span>Fim</span>
+                                    <input type="date" name="data_fim" value="{{ ciclo.data_fim.isoformat() if ciclo.data_fim else '' }}">
+                                </label>
+                                <label class="ciclo-campo">
+                                    <span>Prazo autoavaliação</span>
+                                    <input type="date" name="data_limite_autoavaliacao" value="{{ ciclo.data_limite_autoavaliacao.isoformat() if ciclo.data_limite_autoavaliacao else '' }}">
+                                </label>
+                                <label class="ciclo-campo">
+                                    <span>Prazo avaliação gestor</span>
+                                    <input type="date" name="data_limite_gestor" value="{{ ciclo.data_limite_gestor.isoformat() if ciclo.data_limite_gestor else '' }}">
+                                </label>
+                            </div>
+                            <div class="ciclo-acoes">
+                                <button type="submit" class="botao botao-pequeno">Salvar</button>
+                                <button type="button" class="botao botao-secundario botao-pequeno botao-cancelar-prazos" data-ciclo-id="{{ ciclo.id }}">Cancelar</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="muted" style="text-align:center; padding:32px;">Nenhum ciclo criado ainda.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.pagina-topo {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+}
+.pagina-topo h1 { margin-bottom: 0; }
+
+.ciclos-topo {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin: 32px 0 14px;
+}
+.ciclos-topo h2 { margin: 0; border: none; padding: 0; }
+
+.ciclo-painel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow-sm);
+    padding: 20px 24px; margin-bottom: 20px;
+}
+.ciclo-painel[hidden] { display: none; }
+.ciclo-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.ciclo-campo { display: flex; flex-direction: column; gap: 6px; margin: 0; min-width: 0; text-transform: none; letter-spacing: 0; }
+.ciclo-campo > span {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--texto-muted);
+}
+.ciclo-acoes { display: flex; gap: 10px; margin-top: 18px; }
+
+/* Tabela de ciclos */
+.ciclos-lista { max-height: none; }
+.tabela-ciclos { font-size: 0.92rem; }
+.tabela-ciclos th { padding: 14px 14px; }
+.tabela-ciclos td { padding: 14px; }
+.tabela-ciclos th:first-child, .tabela-ciclos td:first-child { padding-left: 20px; }
+.tabela-ciclos th:last-child, .tabela-ciclos td:last-child { padding-right: 20px; }
+.ciclo-exercicio { font-size: 1.05rem; color: var(--navy-900); }
+.linha-ciclo-padrao, .tabela .linha-ciclo-padrao:nth-child(even) { background: #f1f8f4; }
+.ciclo-th-acoes { text-align: right !important; }
+.ciclo-col-acoes { width: 1%; }
+.ciclo-icones { display: flex; gap: 8px; justify-content: flex-end; }
+.ciclo-inline { display: inline; margin: 0; }
+.ciclo-icones .botao-icone { width: 34px; height: 34px; }
+.ciclo-icones .botao-icone svg { width: 16px; height: 16px; }
+.ciclo-edicao { background: #f7f9fb; padding: 20px 20px !important; }
+
+/* Balão com o nome da ação ao passar o mouse */
+[data-tip] { position: relative; }
+[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--navy-900); color: #fff;
+    padding: 4px 9px; border-radius: 6px;
+    font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
+    z-index: 5;
+}
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; }
+.tabela-ciclos tbody tr:first-child [data-tip]::after { bottom: auto; top: calc(100% + 6px); }
+.tabela-ciclos .ciclo-col-acoes [data-tip]::after { left: auto; right: 0; transform: none; }
+
+@media (max-width: 760px) {
+    .pagina-topo .botao { width: 100%; justify-content: center; }
+}
+</style>
+
 <script>
+    (function () {
+        var painel = document.getElementById('painel-novo-ciclo');
+        var btn = document.getElementById('btn-novo-ciclo');
+        var cancelar = document.getElementById('btn-cancelar-ciclo');
+        function alternar(abrir) {
+            painel.hidden = !abrir;
+            btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+        }
+        btn.addEventListener('click', function () { alternar(painel.hidden); });
+        cancelar.addEventListener('click', function () { alternar(false); });
+    })();
+
     document.querySelectorAll('.botao-editar-prazos').forEach(function (botao) {
         botao.addEventListener('click', function () {
             var id = botao.getAttribute('data-ciclo-id');

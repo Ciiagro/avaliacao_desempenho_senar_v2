@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Marcar Devolutiva - Admin{% endblock %}
+
+{% block content %}
+<h1>📅 Marcar Devolutiva por Funcionário</h1>
+
+<p style="color: var(--text-muted); margin-bottom: 24px;">
+    Defina uma data de devolutiva para CADA funcionário.
+    Todos os recursos abertos daquele funcionário usarão essa data.
+</p>
+
+<!-- Tabela de Funcionários -->
+<div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: var(--bg-secondary); border-bottom: 2px solid var(--border);">
+                    <th style="padding: 12px; text-align: left; font-weight: 600;">Funcionário</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600;">Email</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600;">Data Devolutiva</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600;">Prazo Limite</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600;">Status</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for func in funcionarios %}
+                    <tr style="border-bottom: 1px solid var(--border); hover: {background: var(--bg-secondary);}">
+                        <td style="padding: 12px;">
+                            <strong>{{ func.nome }}</strong>
+                        </td>
+                        <td style="padding: 12px;">
+                            {{ func.email }}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            {% if func.data_devolutiva %}
+                                <span style="font-weight: 600; color: var(--success);">
+                                    {{ func.data_devolutiva.strftime('%d/%m/%Y') }}
+                                </span>
+                            {% else %}
+                                <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            {% if func.data_limite %}
+                                <span style="font-weight: 600;">
+                                    {{ func.data_limite.strftime('%d/%m/%Y') }}
+                                </span>
+                            {% else %}
+                                <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            {% if func.tem_devolutiva %}
+                                <span class="badge badge-success">✓ Marcada</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚠ Pendente</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            <button 
+                                type="button" 
+                                class="botao botao-pequeno"
+                                onclick="abrirFormulario('{{ func.id }}', '{{ func.nome }}', '{{ func.data_devolutiva.strftime('%Y-%m-%d') if func.data_devolutiva else '' }}')">
+                                {% if func.tem_devolutiva %}
+                                    🔄 Alterar
+                                {% else %}
+                                    ➕ Marcar
+                                {% endif %}
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal/Formulário -->
+<div id="modal-devolutiva" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 24px; border-radius: 8px; max-width: 400px; width: 90%;">
+        <h2 id="modal-titulo" style="margin-top: 0;">Marcar Devolutiva</h2>
+        
+        <form method="post" id="form-devolutiva">
+            <input type="hidden" id="funcionario_id" name="funcionario_id">
+            
+            <div style="margin-bottom: 16px;">
+                <label for="data_devolutiva" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                    Data de Devolutiva:
+                </label>
+                <input 
+                    type="date" 
+                    id="data_devolutiva" 
+                    name="data_devolutiva"
+                    required
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px;">
+                <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                    O prazo para recorrer será calculado automaticamente (data + 5 dias)
+                </small>
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="botao botao-success" style="flex: 1;">
+                    ✓ Marcar Devolutiva
+                </button>
+                <button type="button" class="botao botao-secondary" onclick="fecharFormulario()" style="flex: 1;">
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .botao-pequeno {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    
+    .botao-success {
+        background: var(--success);
+        color: white;
+    }
+    
+    .botao-success:hover {
+        background: var(--success-dark, #28a745);
+    }
+    
+    .botao-secondary {
+        background: var(--border);
+        color: var(--text);
+    }
+    
+    .botao-secondary:hover {
+        background: var(--bg-secondary);
+    }
+    
+    #modal-devolutiva {
+        display: none;
+    }
+    
+    #modal-devolutiva.ativo {
+        display: flex;
+    }
+</style>
+
+<script>
+function abrirFormulario(funcionario_id, nome, data_atual) {
+    document.getElementById('funcionario_id').value = funcionario_id;
+    document.getElementById('data_devolutiva').value = data_atual;
+    
+    if (data_atual) {
+        document.getElementById('modal-titulo').textContent = `Alterar Devolutiva de ${nome}`;
+    } else {
+        document.getElementById('modal-titulo').textContent = `Marcar Devolutiva de ${nome}`;
+    }
+    
+    document.getElementById('modal-devolutiva').classList.add('ativo');
+}
+
+function fecharFormulario() {
+    document.getElementById('modal-devolutiva').classList.remove('ativo');
+}
+
+document.getElementById('form-devolutiva').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const funcionario_id = document.getElementById('funcionario_id').value;
+    const data_devolutiva = document.getElementById('data_devolutiva').value;
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/devolutiva/funcionario/${funcionario_id}/marcar`;
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'data_devolutiva';
+    input.value = data_devolutiva;
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+});
+
+// Fechar modal ao clicar fora
+document.getElementById('modal-devolutiva').addEventListener('click', function(e) {
+    if (e.target === this) {
+        fecharFormulario();
+    }
+});
+</script>
+
+{% endblock %}
