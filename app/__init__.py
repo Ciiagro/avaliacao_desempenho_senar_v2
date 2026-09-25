@@ -19,11 +19,13 @@ def create_app():
     from .routes.avaliacoes import avaliacoes_bp
     from .routes.admin import admin_bp
     from .routes.recursos import recursos_bp
+    from .routes.painel import painel_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(avaliacoes_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(recursos_bp)
+    app.register_blueprint(painel_bp)
 
     @app.context_processor
     def injetar_funcionario_logado():

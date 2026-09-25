@@ -13,32 +13,42 @@
 
     /* ---------- Hero ---------- */
     .mon-hero { display: grid; grid-template-columns: 260px 1fr; gap: 36px; background: var(--navy-900); color: #e8f1f1; border-radius: 16px; padding: 30px 34px; margin: 18px 0 16px; }
-    .mon-aneis { position: relative; width: 220px; height: 220px; margin: 0 auto; }
-    .mon-aneis svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .mon-aneis circle { fill: none; stroke-linecap: round; }
-    .mon-anel-fundo { stroke: rgba(255, 255, 255, 0.11); }
-    .mon-anel { stroke-dasharray: var(--len) 1000; animation: mon-desenha 1.1s cubic-bezier(.2,.7,.2,1) both; }
+
+    /* ---------- Status geral (donut) ---------- */
+    .mon-status-titulo { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 1rem; color: #fff; margin: 0 0 16px; letter-spacing: -0.01em; }
+    .mon-donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .mon-donut { position: relative; width: 168px; height: 168px; flex: 0 0 auto; margin: 0 auto; }
+    .mon-donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .mon-donut circle { fill: none; stroke-linecap: round; }
+    .mon-donut-fundo { stroke: rgba(255, 255, 255, 0.12); }
+    .mon-donut-arc { stroke-dasharray: var(--len) 1000; animation: mon-desenha 1.1s cubic-bezier(.2,.7,.2,1) both; }
     @keyframes mon-desenha { from { stroke-dasharray: 0 1000; } }
-    .mon-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .mon-centro b { font-family: "Manrope", sans-serif; font-size: 2.6rem; line-height: 1; color: #fff; }
-    .mon-centro span { font-size: 0.8rem; color: #9fbcbc; margin-top: 4px; }
-    .mon-legenda { grid-column: 1; display: grid; gap: 12px; margin-top: 8px; }
-    .mon-leg { display: grid; grid-template-columns: 12px 1fr auto; gap: 4px 10px; align-items: baseline; }
-    .mon-leg i { width: 12px; height: 12px; border-radius: 4px; align-self: center; }
-    .mon-leg strong { font-family: "Manrope", sans-serif; font-size: 1.25rem; color: #fff; }
-    .mon-leg small { grid-column: 2 / 4; color: #9fbcbc; }
+    .mon-donut-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .mon-donut-centro b { font-family: "Manrope", sans-serif; font-size: 2.1rem; line-height: 1; color: #fff; }
+    .mon-donut-centro span { font-size: 0.76rem; color: #9fbcbc; margin-top: 4px; }
+    .mon-donut-legenda { display: grid; gap: 10px; }
+    .mon-donut-leg { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; color: #d7e6e6; white-space: nowrap; }
+    .mon-donut-leg i { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+    .mon-donut-leg b { color: #fff; margin-left: 14px; font-weight: 700; }
 
     .mon-pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; background: rgba(255,255,255,0.1); }
     .mon-pill::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
     .mon-pill.ok { color: #6fdc9b; } .mon-pill.atencao { color: #f4bf55; } .mon-pill.critico { color: #ff8f8f; } .mon-pill.info { color: #9fd0e8; }
     .mon-manchete { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 1.85rem; line-height: 1.2; color: #fff; margin: 14px 0 6px; letter-spacing: -0.02em; }
-    .mon-sub { color: #b6cccc; margin: 0 0 22px; }
-    .mon-ritmos { display: grid; gap: 10px; }
-    .mon-ritmo { background: rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: 1.3fr repeat(3, 1fr); gap: 8px 16px; align-items: center; }
-    .mon-ritmo h3 { margin: 0; color: #fff; font-size: 0.95rem; }
-    .mon-ritmo .mon-chip { font-size: 0.78rem; font-weight: 700; }
-    .mon-ritmo .ok { color: #6fdc9b; } .mon-ritmo .atencao { color: #f4bf55; } .mon-ritmo .critico { color: #ff8f8f; } .mon-ritmo .info { color: #9fd0e8; }
-    .mon-ritmo dl { margin: 0; } .mon-ritmo dt { font-size: 0.75rem; color: #9fbcbc; } .mon-ritmo dd { margin: 0; font-weight: 700; color: #fff; }
+    .mon-sub { color: #b6cccc; margin: 0 0 20px; }
+
+    /* ---------- KPIs rápidos ---------- */
+    .mon-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .mon-kpi { background: rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 16px; display: flex; gap: 10px; align-items: flex-start; }
+    .mon-kpi-ico { font-size: 1.25rem; line-height: 1.2; flex: 0 0 auto; }
+    .mon-kpi-titulo { display: block; font-size: 0.74rem; font-weight: 600; color: #b6cccc; margin: 0 0 4px; text-transform: none; }
+    .mon-kpi-linha { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    .mon-kpi-num { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 1.55rem; color: #fff; line-height: 1; }
+    .mon-kpi-sub { font-size: 0.74rem; color: #9fbcbc; }
+    .mon-kpi-barra { height: 5px; border-radius: 99px; background: rgba(255,255,255,0.14); margin-top: 8px; overflow: hidden; }
+    .mon-kpi-barra i { display: block; height: 100%; border-radius: 99px; }
+    .mon-kpi-prazo-data { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 1.15rem; color: #fff; display: block; }
+    .mon-kpi-prazo-dias { display: inline-block; margin-top: 8px; background: rgba(111, 220, 155, 0.16); color: #6fdc9b; font-weight: 700; font-size: 0.78rem; padding: 4px 10px; border-radius: 8px; }
 
     /* ---------- Linha do tempo ---------- */
     .mon-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 26px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
@@ -66,6 +76,30 @@
     .mon-ins.ok { border-color: var(--sucesso); background: var(--sucesso-bg); }
     .mon-ins b { display: block; color: var(--navy-900); margin-bottom: 2px; }
     .mon-ins span { font-size: 0.88rem; color: var(--texto); }
+
+    /* ---------- Ranking de setores ---------- */
+    .mon-ranks { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+    .mon-rank-card h3 { margin: 0 0 4px; font-size: 1.05rem; color: var(--navy-900); }
+    .mon-rank-card > p.muted { margin: 0 0 14px; font-size: 0.85rem; }
+    .mon-rank-table { width: 100%; border-collapse: collapse; }
+    .mon-rank-table th { text-align: left; font-size: 0.76rem; color: var(--texto-muted); font-weight: 600; padding: 0 8px 8px; border-bottom: 1px solid var(--border); }
+    .mon-rank-table th.num, .mon-rank-table td.num { text-align: right; }
+    .mon-rank-table td { padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 0.88rem; vertical-align: middle; }
+    .mon-rank-table tr:last-child td { border-bottom: 0; }
+    .mon-rank-pos { width: 30px; }
+    .mon-rank-medalha { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: #fff; }
+    .mon-rank-medalha.p1 { background: #e3b23c; }
+    .mon-rank-medalha.p2 { background: #b7bec4; }
+    .mon-rank-medalha.p3 { background: #b06a3a; }
+    .mon-rank-pos b { color: var(--texto-muted); font-weight: 600; padding-left: 8px; }
+    .mon-rank-setor { font-weight: 600; color: var(--navy-800); }
+    .mon-rank-concl { color: var(--texto-muted); white-space: nowrap; }
+    .mon-rank-pct-cel { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .mon-rank-bar { width: 60px; height: 8px; border-radius: 99px; background: #eaefef; overflow: hidden; }
+    .mon-rank-bar i { display: block; height: 100%; border-radius: 99px; }
+    .mon-rank-bar.auto i { background: var(--navy-600); }
+    .mon-rank-bar.gestor i { background: var(--gold); }
+    .mon-rank-pct { font-weight: 700; min-width: 34px; color: var(--navy-800); }
 
     /* ---------- Setores ---------- */
     .mon-setor { display: grid; grid-template-columns: minmax(150px, 260px) 1fr 84px; gap: 6px 16px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 8px; font: inherit; cursor: pointer; color: var(--texto); }
@@ -101,34 +135,26 @@
     .mon-g-corpo div { display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid var(--border); }
     .mon-g-corpo .ok { color: var(--sucesso); font-weight: 600; } .mon-g-corpo .pend { color: var(--perigo); font-weight: 600; }
 
-    /* ---------- Quem falta ---------- */
-    .mon-abas { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
-    .mon-abas button { border: 0; background: none; padding: 10px 14px; font: inherit; font-weight: 600; color: var(--texto-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-    .mon-abas button[aria-selected="true"] { color: var(--navy-800); border-color: var(--gold); }
-    .mon-abas em { font-style: normal; background: #e9eff0; border-radius: 99px; padding: 1px 9px; font-size: 0.78rem; margin-left: 6px; }
-    .mon-ferramentas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-    .mon-ferramentas input[type=search] { flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: 8px; font: inherit; }
-    .mon-btn { border: 1px solid var(--navy-700); background: var(--surface); color: var(--navy-800); padding: 8px 14px; border-radius: 8px; font: inherit; font-weight: 600; font-size: 0.86rem; cursor: pointer; }
-    .mon-btn:hover { background: var(--navy-800); color: #fff; }
-    .mon-filtro { display: inline-flex; align-items: center; gap: 8px; background: var(--aviso-bg); border-radius: 99px; padding: 4px 6px 4px 12px; font-size: 0.82rem; }
-    .mon-filtro button { border: 0; background: var(--gold); color: #fff; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; }
-    .mon-lista { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
-    .mon-lista li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--surface); }
-    .mon-lista b { display: block; color: var(--navy-800); font-size: 0.88rem; }
-    .mon-lista small { color: var(--texto-muted); }
-    .mon-grupos { max-height: 520px; overflow-y: auto; display: grid; gap: 12px; padding-right: 4px; }
-    .mon-grupo { border: 1px solid var(--border); border-left: 5px solid var(--gold); border-radius: 10px; background: var(--surface); padding: 12px 14px; }
-    .mon-grupo header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-    .mon-grupo header b { color: var(--navy-900); font-size: 0.95rem; }
-    .mon-grupo header span { font-size: 0.8rem; font-weight: 700; color: var(--aviso); background: var(--aviso-bg); border-radius: 99px; padding: 2px 10px; white-space: nowrap; }
-    .mon-grupo .mon-lista { max-height: none; overflow: visible; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-    .mon-grupo .mon-lista li { background: #fafbfb; }
-    .mon-vazio { color: var(--texto-muted); padding: 18px 4px; }
+    /* ---------- Próximas ações / Principais alertas ---------- */
+    .mon-duplo { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+    .mon-acoes h3, .mon-alertas h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 1.05rem; }
+    .mon-acoes > p.muted, .mon-alertas > p.muted { margin: 0 0 14px; font-size: 0.85rem; }
+    .mon-alertas h3 { color: var(--perigo); }
+    .mon-acao-item, .mon-alerta-item { display: flex; align-items: flex-start; gap: 10px; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+    .mon-acao-item:last-child, .mon-alerta-item:last-child { margin-bottom: 0; }
+    .mon-acao-item b { display: block; color: var(--navy-900); font-size: 0.9rem; }
+    .mon-acao-item small { font-size: 0.85rem; color: var(--texto); }
+    .mon-acao-ico, .mon-alerta-ico { font-size: 1.05rem; line-height: 1.3; flex: 0 0 auto; }
+    .mon-acao-item.ok { background: var(--sucesso-bg); }
+    .mon-acao-item.laranja { background: var(--aviso-bg); }
+    .mon-acao-item.azul { background: var(--info-bg); }
+    .mon-acao-item.azul2 { background: #e7eef8; }
+    .mon-alerta-item { background: var(--perigo-bg); }
+    .mon-alerta-item span { font-size: 0.87rem; color: var(--perigo); font-weight: 600; }
 
     .mon button:focus-visible, .mon summary:focus-visible, .mon input:focus-visible, .mon select:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
     @media (max-width: 860px) {
         .mon-hero { grid-template-columns: 1fr; padding: 24px 20px; }
-        .mon-ritmo { grid-template-columns: 1fr 1fr; }
         .mon-setor { grid-template-columns: 1fr 70px; } .mon-setor .mon-barras { grid-column: 1 / 3; grid-row: 2; }
     }
     @media (prefers-reduced-motion: reduce) { .mon-anel { animation: none; } }
@@ -160,26 +186,36 @@
 {% if not ciclo %}
     <p class="flash flash-warning">Nenhum ciclo cadastrado ainda.</p>
 {% else %}
+    {% set total_setores = resumo.setores|length %}
+    {% set setores_zerados = resumo.setores|selectattr('media', 'equalto', 0)|list %}
+    {% set setores_acima_50 = resumo.setores|selectattr('media', 'greaterthan', 50)|list %}
+    {% set prazos_pendentes = [] %}
+    {% if resumo.prazo_auto and resumo.pendentes_auto %}{{ prazos_pendentes.append(resumo.prazo_auto) or "" }}{% endif %}
+    {% if resumo.prazo_gestor and resumo.pendentes_gestor %}{{ prazos_pendentes.append(resumo.prazo_gestor) or "" }}{% endif %}
+    {% set prazo_final = (prazos_pendentes|sort(attribute='data', reverse=true)|first) if prazos_pendentes else None %}
+    {% set nomes_pendentes = (resumo.pendentes_auto + resumo.pendentes_gestor + resumo.sem_avaliador)|map(attribute='nome')|unique|list %}
+    {% set faltam_concluir = nomes_pendentes|length %}
+    {% set pct_faltam = ((100 * faltam_concluir / resumo.total)|round|int) if resumo.total else 0 %}
+
     {# ---------------- Hero ---------------- #}
     <section class="mon-hero">
         <div>
-            <div class="mon-aneis" role="img" aria-label="Autoavaliações {{ resumo.pct_auto }}% e avaliações do gestor {{ resumo.pct_gestor }}% concluídas">
-                <svg viewBox="0 0 220 220">
-                    <circle class="mon-anel-fundo" cx="110" cy="110" r="96" stroke-width="15"/>
-                    <circle class="mon-anel" cx="110" cy="110" r="96" stroke-width="15" stroke="var(--mon-auto)" style="--len: {{ (603.2 * resumo.pct_auto / 100)|round(1) }}px"/>
-                    <circle class="mon-anel-fundo" cx="110" cy="110" r="73" stroke-width="15"/>
-                    <circle class="mon-anel" cx="110" cy="110" r="73" stroke-width="15" stroke="var(--mon-gestor)" style="--len: {{ (458.7 * resumo.pct_gestor / 100)|round(1) }}px"/>
-                </svg>
-                <div class="mon-centro"><b>{{ resumo.pct_geral }}%</b><span>concluído</span></div>
-            </div>
-            <div class="mon-legenda">
-                <div class="mon-leg">
-                    <i style="background:var(--mon-auto)"></i><span>Autoavaliação</span><strong>{{ resumo.auto_concluida }} / {{ resumo.total }}</strong>
-                    <small>{{ resumo.pct_auto }}% concluída</small>
+            <h3 class="mon-status-titulo">Status geral</h3>
+            <div class="mon-donut-wrap">
+                <div class="mon-donut" role="img" aria-label="{{ resumo.status_geral.pct_concluidas }}% concluído, {{ resumo.status_geral.pct_em_andamento }}% em andamento, {{ resumo.status_geral.pct_nao_iniciadas }}% não iniciado">
+                    <svg viewBox="0 0 220 220">
+                        <circle class="mon-donut-fundo" cx="110" cy="110" r="96" stroke-width="16"/>
+                        <circle class="mon-donut-arc" cx="110" cy="110" r="96" stroke-width="16" stroke="var(--sucesso)" style="--len: {{ (603.2 * resumo.status_geral.pct_concluidas / 100)|round(1) }}px"/>
+                        {% if resumo.status_geral.em_andamento %}
+                            <circle class="mon-donut-arc" cx="110" cy="110" r="96" stroke-width="16" stroke="var(--gold)" style="--len: {{ (603.2 * resumo.status_geral.pct_em_andamento / 100)|round(1) }}px; stroke-dashoffset: -{{ (603.2 * resumo.status_geral.pct_concluidas / 100)|round(1) }}px;"/>
+                        {% endif %}
+                    </svg>
+                    <div class="mon-donut-centro"><b>{{ resumo.status_geral.pct_concluidas }}%</b><span>concluído</span></div>
                 </div>
-                <div class="mon-leg">
-                    <i style="background:var(--mon-gestor)"></i><span>Avaliação do gestor</span><strong>{{ resumo.gestor_concluida }} / {{ resumo.total }}</strong>
-                    <small>{{ resumo.pct_gestor }}% concluída · {{ resumo.gestores_completos }} de {{ resumo.gestores_com_equipe }} gestores fecharam a equipe</small>
+                <div class="mon-donut-legenda">
+                    <div class="mon-donut-leg"><i style="background:var(--sucesso)"></i>Concluídas<b>{{ resumo.status_geral.concluidas }} ({{ resumo.status_geral.pct_concluidas }}%)</b></div>
+                    <div class="mon-donut-leg"><i style="background:var(--gold)"></i>Em andamento<b>{{ resumo.status_geral.em_andamento }} ({{ resumo.status_geral.pct_em_andamento }}%)</b></div>
+                    <div class="mon-donut-leg"><i style="background:rgba(255,255,255,0.35)"></i>Não iniciadas<b>{{ resumo.status_geral.nao_iniciadas }} ({{ resumo.status_geral.pct_nao_iniciadas }}%)</b></div>
                 </div>
             </div>
         </div>
@@ -188,22 +224,42 @@
             <span class="mon-pill {{ resumo.saude.nivel }}">{{ resumo.saude.rotulo }}</span>
             <h2 class="mon-manchete">{{ resumo.manchete }}</h2>
             <p class="mon-sub">{{ resumo.subtitulo }}</p>
-            <div class="mon-ritmos">
-                {% for r in resumo.ritmos %}
-                    <div class="mon-ritmo">
-                        <div>
-                            <h3>{{ r.rotulo }}</h3>
-                            <span class="mon-chip {{ r.nivel }}">{{ r.situacao }}</span>
-                        </div>
-                        {% if r.pendentes %}
-                            <dl><dt>Última semana</dt><dd>{{ r.recentes }} concluída{{ '' if r.recentes == 1 else 's' }}</dd></dl>
-                            <dl><dt>Necessário</dt><dd>{% if r.necessario %}~{{ r.necessario }}/semana{% elif r.dias is not none and r.dias < 0 %}prazo vencido{% else %}—{% endif %}</dd></dl>
-                            <dl><dt>No ritmo atual</dt><dd>{% if r.projecao %}termina {{ r.projecao.strftime('%d/%m') }}{% else %}sem projeção{% endif %}</dd></dl>
+            <div class="mon-kpis">
+                <div class="mon-kpi">
+                    <span class="mon-kpi-ico">📝</span>
+                    <div>
+                        <b class="mon-kpi-titulo">Autoavaliações concluídas</b>
+                        <div class="mon-kpi-linha"><span class="mon-kpi-num">{{ resumo.auto_concluida }}</span><span class="mon-kpi-sub">{{ resumo.pct_auto }}% do total</span></div>
+                        <div class="mon-kpi-barra"><i style="width: {{ resumo.pct_auto }}%; background: var(--mon-auto);"></i></div>
+                    </div>
+                </div>
+                <div class="mon-kpi">
+                    <span class="mon-kpi-ico">🧑‍💼</span>
+                    <div>
+                        <b class="mon-kpi-titulo">Avaliações de gestor concluídas</b>
+                        <div class="mon-kpi-linha"><span class="mon-kpi-num">{{ resumo.gestor_concluida }}</span><span class="mon-kpi-sub">{{ resumo.pct_gestor }}% do total</span></div>
+                        <div class="mon-kpi-barra"><i style="width: {{ resumo.pct_gestor }}%; background: var(--mon-gestor);"></i></div>
+                    </div>
+                </div>
+                <div class="mon-kpi">
+                    <span class="mon-kpi-ico">🕐</span>
+                    <div>
+                        <b class="mon-kpi-titulo">Faltam concluir</b>
+                        <div class="mon-kpi-linha"><span class="mon-kpi-num">{{ faltam_concluir }}</span><span class="mon-kpi-sub">{{ pct_faltam }}% do total</span></div>
+                    </div>
+                </div>
+                <div class="mon-kpi">
+                    <span class="mon-kpi-ico">📆</span>
+                    <div>
+                        <b class="mon-kpi-titulo">Prazo final</b>
+                        {% if prazo_final %}
+                            <span class="mon-kpi-prazo-data">{{ prazo_final.data.strftime('%d/%m/%Y') }}</span>
+                            <span class="mon-kpi-prazo-dias">{{ prazo_final.dias }} dias restantes</span>
                         {% else %}
-                            <dl style="grid-column: 2 / 5;"><dt>Todos concluíram</dt><dd>Nenhuma pendência</dd></dl>
+                            <span class="mon-kpi-prazo-data">Sem prazo pendente</span>
                         {% endif %}
                     </div>
-                {% endfor %}
+                </div>
             </div>
         </div>
     </section>
@@ -226,35 +282,70 @@
     </section>
     {% endif %}
 
-    {# ---------------- Pontos de atenção ---------------- #}
-    {% if resumo.insights %}
-    <section class="mon-card">
-        <h2>O que merece atenção</h2>
-        <p class="muted">Gerado a partir dos números atuais do exercício.</p>
-        <div class="mon-insights">
-            {% for i in resumo.insights %}
-                <div class="mon-ins {{ i.nivel }}"><b>{{ i.titulo }}</b><span>{{ i.texto }}</span></div>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
+    {# ---------------- Ranking de setores ---------------- #}
+    {% if resumo.setores %}
+    <div class="mon-ranks">
+        <section class="mon-card mon-rank-card">
+            <h3>Ranking de autoavaliações</h3>
+            <p class="muted">Setores com maior percentual de conclusão.</p>
+            <table class="mon-rank-table">
+                <thead>
+                    <tr><th class="num">#</th><th>Setor</th><th class="num">Concluídas</th><th class="num">%</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in resumo.setores|sort(attribute='pct_auto', reverse=true) %}
+                        <tr>
+                            <td class="mon-rank-pos">
+                                {% if loop.index == 1 %}<span class="mon-rank-medalha p1">🏆</span>
+                                {% elif loop.index == 2 %}<span class="mon-rank-medalha p2">2</span>
+                                {% elif loop.index == 3 %}<span class="mon-rank-medalha p3">3</span>
+                                {% else %}<b>{{ loop.index }}</b>{% endif %}
+                            </td>
+                            <td class="mon-rank-setor">{{ s.nome }}</td>
+                            <td class="num mon-rank-concl">{{ s.auto }}/{{ s.total }}</td>
+                            <td class="num">
+                                <span class="mon-rank-pct-cel">
+                                    <span class="mon-rank-bar auto"><i style="width: {{ s.pct_auto }}%"></i></span>
+                                    <span class="mon-rank-pct">{{ s.pct_auto }}%</span>
+                                </span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
 
-    {# ---------------- Setores ---------------- #}
-    <section class="mon-card">
-        <h2>Progresso por setor</h2>
-        <p class="muted">Os mais atrasados aparecem primeiro. Clique num setor pra ver quem falta nele.</p>
-        <div class="mon-chave"><span><i style="background:var(--navy-600)"></i>Autoavaliação</span><span><i style="background:var(--gold)"></i>Avaliação do gestor</span></div>
-        {% for s in resumo.setores %}
-            <button type="button" class="mon-setor" data-setor="{{ s.nome }}">
-                <span class="nome">{{ s.nome }}</span>
-                <span class="mon-barras">
-                    <span class="mon-barra a"><i style="width: {{ s.pct_auto }}%"></i></span>
-                    <span class="mon-barra g"><i style="width: {{ s.pct_gestor }}%"></i></span>
-                </span>
-                <span class="num">{{ s.auto }}/{{ s.total }} auto<br>{{ s.gestor }}/{{ s.total }} gestor</span>
-            </button>
-        {% endfor %}
-    </section>
+        <section class="mon-card mon-rank-card">
+            <h3>Ranking de avaliações de gestor</h3>
+            <p class="muted">Setores com maior percentual de conclusão.</p>
+            <table class="mon-rank-table">
+                <thead>
+                    <tr><th class="num">#</th><th>Setor</th><th class="num">Concluídas</th><th class="num">%</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in resumo.setores|sort(attribute='pct_gestor', reverse=true) %}
+                        <tr>
+                            <td class="mon-rank-pos">
+                                {% if loop.index == 1 %}<span class="mon-rank-medalha p1">🏆</span>
+                                {% elif loop.index == 2 %}<span class="mon-rank-medalha p2">2</span>
+                                {% elif loop.index == 3 %}<span class="mon-rank-medalha p3">3</span>
+                                {% else %}<b>{{ loop.index }}</b>{% endif %}
+                            </td>
+                            <td class="mon-rank-setor">{{ s.nome }}</td>
+                            <td class="num mon-rank-concl">{{ s.gestor }}/{{ s.total }}</td>
+                            <td class="num">
+                                <span class="mon-rank-pct-cel">
+                                    <span class="mon-rank-bar gestor"><i style="width: {{ s.pct_gestor }}%"></i></span>
+                                    <span class="mon-rank-pct">{{ s.pct_gestor }}%</span>
+                                </span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+    {% endif %}
 
     {# ---------------- Gestores ---------------- #}
     {% if resumo.gestores %}
@@ -291,51 +382,52 @@
     </section>
     {% endif %}
 
-    {# ---------------- Quem falta ---------------- #}
-    <section class="mon-card" id="mon-falta">
-        <h2>Quem falta</h2>
-        <p class="muted">Busque por nome, setor ou gestor. Dá pra copiar a lista pra mandar a cobrança.</p>
-        <div class="mon-abas" role="tablist">
-            <button type="button" role="tab" data-aba="auto" aria-selected="true">Autoavaliação<em>{{ resumo.pendentes_auto|length }}</em></button>
-            <button type="button" role="tab" data-aba="gestor" aria-selected="false">Avaliação do gestor<em>{{ resumo.pendentes_gestor|length }}</em></button>
-            {% if resumo.sem_avaliador %}
-                <button type="button" role="tab" data-aba="sem" aria-selected="false">Sem gestor vinculado<em>{{ resumo.sem_avaliador|length }}</em></button>
-            {% endif %}
-        </div>
-        <div class="mon-ferramentas">
-            <input type="search" id="mon-busca" placeholder="Buscar nome, setor ou gestor…" aria-label="Buscar">
-            <span class="mon-filtro" id="mon-filtro" hidden><span id="mon-filtro-txt"></span><button type="button" id="mon-filtro-x" aria-label="Limpar filtro de setor">&times;</button></span>
-            <button type="button" class="mon-btn" id="mon-copiar">Copiar lista</button>
-        </div>
+    {# ---------------- Próximas ações / Principais alertas ---------------- #}
+    <div class="mon-duplo">
+        <section class="mon-card mon-acoes">
+            <h3>🕐 Próximas ações</h3>
+            <p class="muted">O que precisa ser feito para manter o cronograma.</p>
+            <div class="mon-acao-item ok">
+                <span class="mon-acao-ico">✅</span>
+                <div><b>Concluir autoavaliação</b><small>{{ resumo.pendentes_auto|length }} pessoa{{ '' if resumo.pendentes_auto|length == 1 else 's' }} ainda {{ 'não concluiu' if resumo.pendentes_auto|length == 1 else 'não concluíram' }}.</small></div>
+            </div>
+            <div class="mon-acao-item laranja">
+                <span class="mon-acao-ico">👤</span>
+                <div><b>Realizar avaliação de gestor</b><small>{{ resumo.pendentes_gestor|length }} avaliaç{{ 'ão' if resumo.pendentes_gestor|length == 1 else 'ões' }} de gestor ainda pendente{{ '' if resumo.pendentes_gestor|length == 1 else 's' }}.</small></div>
+            </div>
+            <div class="mon-acao-item azul">
+                <span class="mon-acao-ico">📅</span>
+                <div><b>Acompanhar prazos</b><small>{% if prazo_final %}Prazo final em {{ prazo_final.data.strftime('%d/%m/%Y') }} ({{ prazo_final.dias }} dias){% else %}Nenhum prazo pendente no momento{% endif %}.</small></div>
+            </div>
+            <div class="mon-acao-item azul2">
+                <span class="mon-acao-ico">👥</span>
+                <div><b>Cobrar setores com baixo andamento</b><small>{{ setores_zerados|length }} de {{ total_setores }} setores ainda com 0% de conclusão.</small></div>
+            </div>
+        </section>
 
-        {% macro painel(chave, itens, ativo) %}
-            <ul class="mon-lista" data-painel="{{ chave }}" {% if not ativo %}hidden{% endif %}>
-                {% for f in itens %}
-                    <li data-setor="{{ f.setor }}" data-busca="{{ (f.nome ~ ' ' ~ f.setor ~ ' ' ~ (f.gestor or ''))|lower }}" data-texto="{{ f.nome }} — {{ f.setor }}{% if f.gestor %} (gestor: {{ f.gestor }}){% endif %}">
-                        <b>{{ f.nome }}</b>
-                        <small>{{ f.setor }}{% if f.gestor %} · gestor: {{ f.gestor }}{% endif %}</small>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endmacro %}
-        {{ painel('auto', resumo.pendentes_auto, true) }}
-        <div class="mon-grupos" data-painel="gestor" hidden>
-            {% for g in resumo.pendentes_gestor_grupos %}
-                <section class="mon-grupo" data-gestor="{{ g.gestor }}">
-                    <header><b>{{ g.gestor }}</b><span class="mon-grupo-n">{{ g.pessoas|length }} pendente{{ '' if g.pessoas|length == 1 else 's' }}</span></header>
-                    <ul class="mon-lista">
-                        {% for f in g.pessoas %}
-                            <li data-setor="{{ f.setor }}" data-busca="{{ (f.nome ~ ' ' ~ f.setor ~ ' ' ~ g.gestor)|lower }}" data-texto="{{ f.nome }} — {{ f.setor }}">
-                                <b>{{ f.nome }}</b><small>{{ f.setor }}</small>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </section>
-            {% endfor %}
-        </div>
-        {% if resumo.sem_avaliador %}{{ painel('sem', resumo.sem_avaliador, false) }}{% endif %}
-        <p class="mon-vazio" id="mon-vazio" hidden>Ninguém por aqui com esse filtro.</p>
-    </section>
+        <section class="mon-card mon-alertas">
+            <h3>🔔 Principais alertas</h3>
+            <p class="muted">Pontos que precisam de atenção imediata.</p>
+            <div class="mon-alerta-item">
+                <span class="mon-alerta-ico">❗</span>
+                <span>{{ 100 - resumo.pct_geral }}% das avaliações ainda não foram concluídas.</span>
+            </div>
+            <div class="mon-alerta-item">
+                <span class="mon-alerta-ico">❗</span>
+                <span>{{ setores_zerados|length }} setor{{ '' if setores_zerados|length == 1 else 'es' }} ainda não {{ 'iniciou' if setores_zerados|length == 1 else 'iniciaram' }} nenhuma avaliação.</span>
+            </div>
+            {% if prazo_final %}
+            <div class="mon-alerta-item">
+                <span class="mon-alerta-ico">❗</span>
+                <span>Prazo final em {{ prazo_final.data.strftime('%d/%m/%Y') }} ({{ prazo_final.dias }} dias restantes).</span>
+            </div>
+            {% endif %}
+            <div class="mon-alerta-item">
+                <span class="mon-alerta-ico">❗</span>
+                <span>Apenas {{ setores_acima_50|length }} setor{{ '' if setores_acima_50|length == 1 else 'es' }} com mais de 50% de conclusão.</span>
+            </div>
+        </section>
+    </div>
 
     <p class="muted">
         Pra ver detalhes de cada avaliação, baixar PDFs ou agir em cima de uma pessoa específica, use a
@@ -344,71 +436,6 @@
 
 <script>
 (function () {
-    var abaAtual = "auto", setorAtual = "";
-    var busca = document.getElementById("mon-busca");
-    var vazio = document.getElementById("mon-vazio");
-
-    function aplicar() {
-        var termo = busca.value.trim().toLowerCase(), visiveis = 0;
-        document.querySelectorAll("[data-painel]").forEach(function (painel) {
-            var ativo = painel.dataset.painel === abaAtual;
-            painel.hidden = !ativo;
-            if (!ativo) return;
-            painel.querySelectorAll("li").forEach(function (li) {
-                var ok = (!termo || li.dataset.busca.indexOf(termo) > -1) && (!setorAtual || li.dataset.setor === setorAtual);
-                li.hidden = !ok;
-                if (ok) visiveis++;
-            });
-            painel.querySelectorAll(".mon-grupo").forEach(function (g) {
-                var n = g.querySelectorAll("li:not([hidden])").length;
-                g.hidden = n === 0;
-                g.querySelector(".mon-grupo-n").textContent = n + (n === 1 ? " pendente" : " pendentes");
-            });
-        });
-        vazio.hidden = visiveis > 0;
-        var chip = document.getElementById("mon-filtro");
-        chip.hidden = !setorAtual;
-        document.getElementById("mon-filtro-txt").textContent = "Setor: " + setorAtual;
-    }
-
-    document.querySelectorAll("[data-aba]").forEach(function (b) {
-        b.addEventListener("click", function () {
-            abaAtual = b.dataset.aba;
-            document.querySelectorAll("[data-aba]").forEach(function (x) { x.setAttribute("aria-selected", x === b ? "true" : "false"); });
-            aplicar();
-        });
-    });
-    busca.addEventListener("input", aplicar);
-    document.getElementById("mon-filtro-x").addEventListener("click", function () { setorAtual = ""; aplicar(); });
-    document.querySelectorAll(".mon-setor").forEach(function (b) {
-        b.addEventListener("click", function () {
-            setorAtual = b.dataset.setor;
-            aplicar();
-            document.getElementById("mon-falta").scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-    });
-
-    document.getElementById("mon-copiar").addEventListener("click", function () {
-        var btn = this, linhas = [];
-        var painel = document.querySelector('[data-painel="' + abaAtual + '"]');
-        var grupos = painel.querySelectorAll(".mon-grupo:not([hidden])");
-        if (painel.classList.contains("mon-grupos")) {
-            grupos.forEach(function (g) {
-                var itens = g.querySelectorAll("li:not([hidden])");
-                linhas.push(g.dataset.gestor + " (" + itens.length + " pendente" + (itens.length === 1 ? "" : "s") + "):");
-                itens.forEach(function (li) { linhas.push("- " + li.dataset.texto); });
-                linhas.push("");
-            });
-        } else {
-            painel.querySelectorAll("li:not([hidden])").forEach(function (li) { linhas.push(li.dataset.texto); });
-        }
-        var texto = linhas.join("\n").trim();
-        var total = painel.querySelectorAll("li:not([hidden])").length;
-        var pronto = function () { btn.textContent = "Copiado (" + total + ")"; setTimeout(function () { btn.textContent = "Copiar lista"; }, 2000); };
-        if (navigator.clipboard) { navigator.clipboard.writeText(texto).then(pronto); }
-        else { var t = document.createElement("textarea"); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); pronto(); }
-    });
-
     var gPend = document.getElementById("mon-g-pend"), gTodos = document.getElementById("mon-g-todos"), gBox = document.getElementById("mon-gestores");
     if (gBox) {
         function modo(soPend) {

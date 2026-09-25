@@ -203,6 +203,26 @@
             var filtroConcluidos = document.getElementById('filtro-concluidos');
             var linhas = document.querySelectorAll('#tabela-resultados tbody tr[data-busca]');
 
+            var CHAVE_BUSCA = 'resultados-filtro-busca';
+            var CHAVE_CONCLUIDOS = 'resultados-filtro-concluidos';
+            var CHAVE_SCROLL = 'resultados-scroll-y';
+
+            function salvarFiltros() {
+                try {
+                    sessionStorage.setItem(CHAVE_BUSCA, input.value || '');
+                    sessionStorage.setItem(CHAVE_CONCLUIDOS, filtroConcluidos.checked ? '1' : '0');
+                } catch (e) {}
+            }
+
+            function restaurarFiltros() {
+                try {
+                    var busca = sessionStorage.getItem(CHAVE_BUSCA);
+                    var concluidos = sessionStorage.getItem(CHAVE_CONCLUIDOS);
+                    if (busca) input.value = busca;
+                    if (concluidos === '1') filtroConcluidos.checked = true;
+                } catch (e) {}
+            }
+
             function aplicarFiltros() {
                 var termo = (input.value || '').trim().toLowerCase();
                 var somenteConcluidos = filtroConcluidos.checked;
@@ -213,10 +233,35 @@
                     var passaConcluido = !somenteConcluidos || concluido;
                     linha.style.display = (passaBusca && passaConcluido) ? '' : 'none';
                 });
+                salvarFiltros();
             }
+
+            // Ao carregar a página (inclusive depois de liberar, bloquear ou
+            // marcar devolutiva, que recarregam a tela), volta a busca e o
+            // checkbox pro que estava antes, em vez de mostrar todo mundo.
+            restaurarFiltros();
+            aplicarFiltros();
 
             if (input) input.addEventListener('input', aplicarFiltros);
             if (filtroConcluidos) filtroConcluidos.addEventListener('change', aplicarFiltros);
+
+            // Guarda a posição de rolagem antes de qualquer ação da tabela
+            // (liberar, bloquear, marcar devolutiva) que recarrega a página,
+            // e volta pro mesmo ponto depois — em vez de voltar pro topo.
+            document.querySelectorAll('#tabela-resultados form, #form-devolutiva').forEach(function (form) {
+                form.addEventListener('submit', function () {
+                    try { sessionStorage.setItem(CHAVE_SCROLL, String(window.scrollY)); } catch (e) {}
+                });
+            });
+            (function () {
+                try {
+                    var y = sessionStorage.getItem(CHAVE_SCROLL);
+                    if (y !== null) {
+                        sessionStorage.removeItem(CHAVE_SCROLL);
+                        window.scrollTo(0, parseInt(y, 10) || 0);
+                    }
+                } catch (e) {}
+            })();
         })();
     </script>
 {% endif %}

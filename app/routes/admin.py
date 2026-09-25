@@ -270,6 +270,7 @@ def painel_monitoramento():
     # ------------------------------------------------------------------
     pendentes_auto, pendentes_gestor, sem_avaliador = [], [], []
     auto_concluida = gestor_concluida = total = 0
+    auto_em_andamento = gestor_em_andamento = 0
     setores = {}  # nome -> contagens
     equipes = {}  # avaliador_id -> [{nome, ok}]
 
@@ -294,6 +295,8 @@ def painel_monitoramento():
             auto_concluida += 1
             st["auto"] += 1
         else:
+            if av_auto:
+                auto_em_andamento += 1
             pendentes_auto.append(linha)
 
         if not avaliador:
@@ -306,9 +309,26 @@ def painel_monitoramento():
                 gestor_concluida += 1
                 st["gestor"] += 1
             else:
+                if av_gestor:
+                    gestor_em_andamento += 1
                 pendentes_gestor.append(linha)
 
     pct = lambda parte, todo: round(100 * parte / todo) if todo else 0
+
+    # Status geral (visão em 3 fatias, pra bater com a tela de Andamento):
+    # cada pessoa tem 2 "eventos" (auto + gestor), cada evento tá concluído,
+    # em andamento (rascunho salvo) ou não iniciado (nenhum registro ainda).
+    status_geral = {
+        "concluidas": auto_concluida + gestor_concluida,
+        "em_andamento": auto_em_andamento + gestor_em_andamento,
+    }
+    status_geral["total"] = 2 * total
+    status_geral["nao_iniciadas"] = max(
+        status_geral["total"] - status_geral["concluidas"] - status_geral["em_andamento"], 0
+    )
+    status_geral["pct_concluidas"] = pct(status_geral["concluidas"], status_geral["total"])
+    status_geral["pct_em_andamento"] = pct(status_geral["em_andamento"], status_geral["total"])
+    status_geral["pct_nao_iniciadas"] = pct(status_geral["nao_iniciadas"], status_geral["total"])
 
     # Pendências da avaliação do gestor agrupadas por gestor (quem precisa
     # agir), do que tem mais gente pendente pro que tem menos.
@@ -559,6 +579,7 @@ def painel_monitoramento():
         "ritmos": [ritmo_auto, ritmo_gestor],
         "linha_tempo": linha_tempo,
         "insights": insights,
+        "status_geral": status_geral,
         "atualizado_em": agora.strftime("%H:%M"),
     }
 

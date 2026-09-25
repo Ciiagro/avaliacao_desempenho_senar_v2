@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Monitoramento - SENAR Ceará</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f5f5f5;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header e divider */
+        .header {
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        .divider {
+            display: flex;
+            gap: 4px;
+            height: 4px;
+            margin-bottom: 24px;
+        }
+
+        .divider-orange {
+            flex: 1;
+            background-color: #f39c12;
+        }
+
+        .divider-blue {
+            flex: 1;
+            background-color: #2b7fa8;
+        }
+
+        /* Controles */
+        .controls {
+            background: white;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            flex-wrap: wrap;
+        }
+
+        .controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+        }
+
+        .controls .timestamp {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .controls input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            background-color: #1a4d52;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #0d3035;
+        }
+
+        /* Painel principal verde */
+        .panel-main {
+            background: linear-gradient(135deg, #1a4d52 0%, #2d7a80 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .panel-main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .progress-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: conic-gradient(#4ecdc4 0deg 32.4deg, rgba(255,255,255,0.15) 32.4deg 360deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 auto;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            opacity: 0.9;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel-section {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 16px;
+        }
+
+        .panel-section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4ecdc4;
+            margin-bottom: 8px;
+        }
+
+        .status-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .status-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+
+        .status-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .status-subtitle {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .alert-badge {
+            display: inline-block;
+            background-color: #f39c12;
+            color: #1a4d52;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        /* Prazos de resposta */
+        .prazos-section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .prazos-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+
+        .prazos-section > p {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 20px;
+        }
+
+        .timeline {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #e0e0e0;
+            z-index: 1;
+        }
+
+        .timeline-point {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            position: relative;
+            z-index: 2;
+        }
+
+        .timeline-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: white;
+            border: 2px solid #f39c12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+
+        .timeline-dot.active {
+            background-color: #1a4d52;
+            border-color: #1a4d52;
+        }
+
+        .timeline-dot.active::after {
+            content: '✓';
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .timeline-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1a1a1a;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .timeline-date {
+            font-size: 11px;
+            color: #999;
+            text-align: center;
+        }
+
+        .timeline-badge {
+            position: absolute;
+            top: -20px;
+            background-color: #1a4d52;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* Grid de Rankings */
+        .rankings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .rankings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .ranking-section {
+            background: white;
+            padding: 24px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .ranking-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+
+        .ranking-section > p {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 16px;
+        }
+
+        .ranking-table {
+            width: 100%;
+        }
+
+        .ranking-table thead {
+            background-color: #f5f5f5;
+        }
+
+        .ranking-table th {
+            padding: 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1a4d52;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .ranking-table td {
+            padding: 12px;
+            font-size: 13px;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .rank-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #f39c12;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .rank-number.medal {
+            background: none;
+            font-size: 18px;
+        }
+
+        .progress-bar-small {
+            background-color: #e0e0e0;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            min-width: 100px;
+        }
+
+        .progress-fill-teal {
+            height: 100%;
+            background-color: #2d7a80;
+            border-radius: 4px;
+        }
+
+        .progress-fill-orange {
+            height: 100%;
+            background-color: #f39c12;
+            border-radius: 4px;
+        }
+
+        .progress-percentage {
+            font-weight: 600;
+            color: #1a4d52;
+        }
+
+        /* Progresso por setor */
+        .progresso-setor-section {
+            background: white;
+            padding: 24px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .progresso-setor-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+
+        .progresso-setor-section > p {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 16px;
+        }
+
+        .legenda-progresso {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .legenda-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legenda-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .legenda-box.teal {
+            background-color: #2d7a80;
+        }
+
+        .legenda-box.orange {
+            background-color: #f39c12;
+        }
+
+        .setor-item {
+            margin-bottom: 20px;
+        }
+
+        .setor-nome {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a4d52;
+            margin-bottom: 8px;
+        }
+
+        .barras-duplas {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .barra-dupla {
+            flex: 1;
+            display: flex;
+            gap: 2px;
+        }
+
+        .barra-dupla-item {
+            height: 12px;
+            border-radius: 2px;
+            flex: 1;
+        }
+
+        .setor-contador {
+            font-size: 11px;
+            color: #999;
+            min-width: 80px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Painel de Monitoramento</h1>
+            <p>Como está o exercício, o que está travando e quem precisa ser cobrado.</p>
+            <div class="divider">
+                <div class="divider-orange"></div>
+                <div class="divider-orange"></div>
+                <div class="divider-blue"></div>
+            </div>
+        </div>
+
+        <!-- Controles -->
+        <div class="controls">
+            <select>
+                <option>Exercício 2025 (aberto)</option>
+            </select>
+            <span class="timestamp">Atualizado às 08:47</span>
+            <label>
+                <input type="checkbox" checked>
+                ATUALIZAR SOZINHO
+            </label>
+            <button class="btn">Atualizar agora</button>
+        </div>
+
+        <!-- Painel Principal -->
+        <div class="panel-main">
+            <div>
+                <div class="progress-circle">9%</div>
+                <div class="progress-text">concluído</div>
+            </div>
+
+            <div class="panel-content">
+                <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                    <span class="alert-badge">⚠️ Atenção</span>
+                </div>
+
+                <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">Faltam 36 autoavaliações e 35 avaliações de gestor</h2>
+                <p style="font-size: 13px; opacity: 0.9;">Prazo da autoavaliação vence em 26 dias (21/10/2026).</p>
+
+                <div class="panel-section" style="margin-top: 16px;">
+                    <div class="panel-title">Autoavaliação</div>
+                    <div class="status-row">
+                        <div class="status-item">
+                            <span class="status-label">Última semana</span>
+                            <span class="status-value">3 concluídas</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Necessário</span>
+                            <span class="status-value">~10/semana</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">No ritmo atual</span>
+                            <span class="status-value">termina 18/12</span>
+                        </div>
+                    </div>
+                    <span class="alert-badge">Precisa acelerar</span>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">Avaliação do gestor</div>
+                    <div class="status-row">
+                        <div class="status-item">
+                            <span class="status-label">Última semana</span>
+                            <span class="status-value">4 concluídas</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Necessário</span>
+                            <span class="status-value">~7/semana</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">No ritmo atual</span>
+                            <span class="status-value">termina 26/11</span>
+                        </div>
+                    </div>
+                    <span class="alert-badge">Precisa acelerar</span>
+                </div>
+
+                <div class="panel-section" style="border-bottom: none;">
+                    <div style="display: flex; gap: 16px; font-size: 12px;">
+                        <div>
+                            <span style="display: inline-block; width: 12px; height: 12px; background-color: #4ecdc4; border-radius: 2px; margin-right: 6px;"></span>
+                            Autoavaliação <span style="font-weight: 600;">3 / 39</span><br/>
+                            <span style="opacity: 0.8;">8% concluída</span>
+                        </div>
+                        <div>
+                            <span style="display: inline-block; width: 12px; height: 12px; background-color: #f39c12; border-radius: 2px; margin-right: 6px;"></span>
+                            Avaliação do gestor <span style="font-weight: 600;">4 / 39</span><br/>
+                            <span style="opacity: 0.8;">10% concluída - 2 de 11 gestores fecharam a equipe</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prazos de resposta -->
+        <div class="prazos-section">
+            <h3>Prazos de resposta</h3>
+            <p>Exercício 2025 (período avaliado: 01/01/2025 a 31/12/2025). A linha mostra só a janela em que as avaliações são respondidas.</p>
+
+            <div class="timeline">
+                <div class="timeline-point">
+                    <div class="timeline-badge">Hoje</div>
+                    <div class="timeline-dot active"></div>
+                    <div class="timeline-label">Início das respostas</div>
+                    <div class="timeline-date">24/09/2026</div>
+                </div>
+
+                <div class="timeline-point">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-label">Prazo autoavaliação</div>
+                    <div class="timeline-date">21/10/2026</div>
+                </div>
+
+                <div class="timeline-point">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-label">Prazo gestor</div>
+                    <div class="timeline-date">30/10/2026</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- O que merece atenção REMOVIDO -->
+
+        <!-- Rankings lado a lado -->
+        <div class="rankings-grid">
+            <!-- Ranking Autoavaliações -->
+            <div class="ranking-section">
+                <h3>Ranking de autoavaliações</h3>
+                <p>Setores com maior percentual de conclusão.</p>
+                
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Setor</th>
+                            <th>Concluídas</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><div class="rank-number medal">🥇</div></td>
+                            <td>Coordenação da Tecnologia da Informação</td>
+                            <td>2/3</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-teal" style="width: 67%"></div></div></td>
+                            <td><span class="progress-percentage">67%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number medal">2</div></td>
+                            <td>Assessoria Jurídica</td>
+                            <td>0/2</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-teal" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number medal">3</div></td>
+                            <td>Coordenação de Compras</td>
+                            <td>0/2</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-teal" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number">4</div></td>
+                            <td>Coordenação de Contabilidade</td>
+                            <td>0/2</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-teal" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number">5</div></td>
+                            <td>Coordenação de Execução Financeira</td>
+                            <td>0/3</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-teal" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Ranking Avaliações de Gestor -->
+            <div class="ranking-section">
+                <h3>Ranking de avaliações de gestor</h3>
+                <p>Setores com maior percentual de conclusão.</p>
+                
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Setor</th>
+                            <th>Concluídas</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><div class="rank-number medal">🥇</div></td>
+                            <td>Coordenação da Tecnologia da Informação</td>
+                            <td>2/3</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-orange" style="width: 67%"></div></div></td>
+                            <td><span class="progress-percentage">67%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number medal">2</div></td>
+                            <td>Assessoria Jurídica</td>
+                            <td>0/2</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-orange" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number medal">3</div></td>
+                            <td>Coordenação de Compras</td>
+                            <td>0/2</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-orange" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number">4</div></td>
+                            <td>Coordenação de Contabilidade</td>
+                            <td>0/2</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-orange" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                        <tr>
+                            <td><div class="rank-number">5</div></td>
+                            <td>Coordenação de Execução Financeira</td>
+                            <td>0/3</td>
+                            <td><div class="progress-bar-small"><div class="progress-fill-orange" style="width: 0%"></div></div></td>
+                            <td><span class="progress-percentage">0%</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Progresso por setor -->
+        <div class="progresso-setor-section">
+            <h3>Progresso por setor</h3>
+            <p>Os mais atrasados aparecem primeiro. Clique num setor pra ver quem falta nele.</p>
+
+            <div class="legenda-progresso">
+                <div class="legenda-item">
+                    <div class="legenda-box teal"></div>
+                    <span>Autoavaliação</span>
+                </div>
+                <div class="legenda-item">
+                    <div class="legenda-box orange"></div>
+                    <span>Avaliação do gestor</span>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Assessoria Jurídica</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/2 auto<br/>0/2 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Coordenação de Compras</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/2 auto<br/>0/2 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Coordenação de Contabilidade</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/2 auto<br/>0/2 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Coordenação de Execução Financeira</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/3 auto<br/>0/3 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Coordenação de FPR/PS</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/8 auto<br/>0/8 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Presidência Conselho Adm.</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/2 auto<br/>0/2 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Superintendência</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/2 auto<br/>0/2 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Diretoria Adm. Financeira</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #2d7a80;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">1/6 auto<br/>0/6 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Diretoria Técnica</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #2d7a80;"></div>
+                        <div class="barra-dupla-item" style="background-color: #2d7a80;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                        <div class="barra-dupla-item" style="background-color: #e0e0e0;"></div>
+                    </div>
+                    <div class="setor-contador">0/9 auto<br/>2/9 gestor</div>
+                </div>
+            </div>
+
+            <div class="setor-item">
+                <div class="setor-nome">Coordenação da Tecnologia da Informação</div>
+                <div class="barras-duplas">
+                    <div class="barra-dupla">
+                        <div class="barra-dupla-item" style="background-color: #2d7a80;"></div>
+                        <div class="barra-dupla-item" style="background-color: #2d7a80;"></div>
+                        <div class="barra-dupla-item" style="background-color: #2d7a80;"></div>
+                        <div class="barra-dupla-item" style="background-color: #f39c12;"></div>
+                        <div class="barra-dupla-item" style="background-color: #f39c12;"></div>
+                        <div class="barra-dupla-item" style="background-color: #f39c12;"></div>
+                    </div>
+                    <div class="setor-contador">2/3 auto<br/>2/3 gestor</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
