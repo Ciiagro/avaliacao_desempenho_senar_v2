@@ -28,7 +28,9 @@ from ..models import (
 )
 from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, prazo_dias_corridos
 from ..resultado_final_service import montar_dados_resultado_final
-from ..pdf_recurso import gerar_pdf_recurso
+# gerar_pdf_recurso é importado dentro de recurso_pdf() e
+# recurso_comissao_pdf() (reportlab só precisa carregar quando alguém
+# realmente baixa o PDF do recurso).
 from ..email_service import (
     avisar_comissao_novo_recurso,
     avisar_comissao_gestor_respondeu,
@@ -454,6 +456,7 @@ def recorrer_recurso(recurso_id):
 
 @recursos_bp.route("/recurso/<int:recurso_id>/pdf")
 def recurso_pdf(recurso_id):
+    from ..pdf_recurso import gerar_pdf_recurso
     """Comprovante em PDF do recurso encerrado: motivo, resposta do gestor,
     resultado final e a assinatura eletrônica do empregado confirmando o
     recebimento."""
@@ -794,6 +797,7 @@ def recurso_comissao_pdf(recurso_id):
     pra Comissão puxar direto do histórico do recurso, sem precisar pedir
     pro empregado reenviar. Só faz sentido pegar depois que o recurso
     estiver encerrado (antes disso ainda pode mudar)."""
+    from ..pdf_recurso import gerar_pdf_recurso
     recurso = RecursoAvaliacao.query.get_or_404(recurso_id)
     if recurso.status != RECURSO_STATUS_ENCERRADO:
         flash("Esse recurso ainda não foi encerrado.", "warning")

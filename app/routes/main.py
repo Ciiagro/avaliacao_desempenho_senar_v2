@@ -19,8 +19,9 @@ from ..models import (
 )
 from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, adicionar_dias_uteis, para_fortaleza
 from ..resultado_final_service import montar_dados_resultado_final
-from ..pdf_resultado_final import gerar_pdf_resultado_final
-from ..excel_resultado_final import gerar_excel_resultado_final
+# gerar_pdf_resultado_final e gerar_excel_resultado_final são importados dentro
+# das próprias rotas que os usam (reportlab/openpyxl são pesados pra importar
+# e a maioria das páginas do site — login, minha área, etc. — não precisa deles).
 
 main_bp = Blueprint("main", __name__)
 
@@ -640,6 +641,7 @@ def meu_resultado_ciencia(ciclo_id):
 
 @main_bp.route("/meu-resultado/<int:ciclo_id>/pdf")
 def meu_resultado_pdf(ciclo_id):
+    from ..pdf_resultado_final import gerar_pdf_resultado_final
     funcionario = funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))
@@ -676,6 +678,7 @@ def meu_resultado_pdf(ciclo_id):
 
 @main_bp.route("/meu-resultado/<int:ciclo_id>/excel")
 def meu_resultado_excel(ciclo_id):
+    from ..excel_resultado_final import gerar_excel_resultado_final
     funcionario = funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))

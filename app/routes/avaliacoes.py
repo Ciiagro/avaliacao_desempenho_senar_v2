@@ -10,7 +10,8 @@ from ..models import (
     RespostaFator,
     CicloAvaliacao,
 )
-from ..pdf_avaliacao import gerar_pdf_avaliacao
+# gerar_pdf_avaliacao é importado dentro de baixar_pdf() (reportlab só
+# precisa carregar quando alguém realmente baixa um PDF).
 
 avaliacoes_bp = Blueprint("avaliacoes", __name__)
 
@@ -44,6 +45,7 @@ def _pode_ver_avaliacao(avaliacao, meu_id):
 
 @avaliacoes_bp.route("/avaliacao/<uuid:avaliacao_id>/pdf")
 def baixar_pdf(avaliacao_id):
+    from ..pdf_avaliacao import gerar_pdf_avaliacao
     avaliacao = Avaliacao.query.get_or_404(avaliacao_id)
     meu_id = session.get("funcionario_id")
 

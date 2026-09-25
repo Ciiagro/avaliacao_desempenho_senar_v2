@@ -3,7 +3,6 @@ import unicodedata
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
-import pandas as pd
 from sqlalchemy.orm import aliased, joinedload
 from flask import (
     Blueprint,
@@ -18,9 +17,6 @@ from flask import (
 )
 
 from ..extensions import db
-from ..pdf_avaliacao import gerar_pdf_avaliacao
-from ..pdf_resultado_final import gerar_pdf_resultado_final, gerar_pdf_resultado_final_lista
-from ..excel_resultado_final import gerar_excel_resultado_final, gerar_excel_resultado_final_lista
 from ..resultado_final_service import montar_dados_resultado_final
 from ..progressao_service import (
     calcular_situacao_par,
@@ -103,6 +99,7 @@ def logout():
 
 @admin_bp.route("/avaliacao/<uuid:avaliacao_id>/pdf")
 def baixar_pdf_avaliacao(avaliacao_id):
+    from ..pdf_avaliacao import gerar_pdf_avaliacao
     avaliacao = Avaliacao.query.get_or_404(avaliacao_id)
     if avaliacao.status != "concluida":
         flash("Essa avaliação ainda não foi concluída.", "warning")
@@ -760,6 +757,7 @@ def detalhe_resultado(avaliado_id):
 def exportar_resultados_excel():
     """Baixa a planilha consolidada de todos os funcionários do ciclo, no
     mesmo formato usado pela empresa (MAT, NOME, ADMISSÃO, NOTA, CONCEITO)."""
+    from ..excel_resultado_final import gerar_excel_resultado_final_lista
     ciclo_id_param = request.args.get("ciclo_id")
     if ciclo_id_param:
         ciclo = CicloAvaliacao.query.get_or_404(int(ciclo_id_param))
@@ -791,6 +789,7 @@ def exportar_resultados_pdf():
     """Baixa o PDF consolidado de todos os funcionários do ciclo, com a
     lista MAT/NOME/ADMISSÃO/NOTA/CONCEITO e a tabela de referência x real
     dos conceitos."""
+    from ..pdf_resultado_final import gerar_pdf_resultado_final_lista
     ciclo_id_param = request.args.get("ciclo_id")
     if ciclo_id_param:
         ciclo = CicloAvaliacao.query.get_or_404(int(ciclo_id_param))
@@ -819,6 +818,7 @@ def exportar_resultados_pdf():
 
 @admin_bp.route("/resultados/<uuid:avaliado_id>/pdf")
 def baixar_resultado_pdf(avaliado_id):
+    from ..pdf_resultado_final import gerar_pdf_resultado_final
     ciclo_id = request.args.get("ciclo_id")
     ciclo = CicloAvaliacao.query.get_or_404(int(ciclo_id))
     avaliado = Funcionario.query.get_or_404(avaliado_id)
@@ -839,6 +839,7 @@ def baixar_resultado_pdf(avaliado_id):
 
 @admin_bp.route("/resultados/<uuid:avaliado_id>/excel")
 def baixar_resultado_excel(avaliado_id):
+    from ..excel_resultado_final import gerar_excel_resultado_final
     ciclo_id = request.args.get("ciclo_id")
     ciclo = CicloAvaliacao.query.get_or_404(int(ciclo_id))
     avaliado = Funcionario.query.get_or_404(avaliado_id)
@@ -1111,6 +1112,7 @@ def exportar_progressao_nivel():
     """Exporta a tabela de Progressão de Nível pra Excel: notas de 2023,
     2024, 2025, o par de anos que vale pra cada pessoa, e a decisão/situação
     atual — pra dar pra ver e conferir fora do sistema."""
+    import pandas as pd
     linhas = _linhas_progressao_nivel()
 
     rotulo_decisao = {
@@ -1257,6 +1259,7 @@ def importar_progressao_nivel():
     Fluxo simples: lê, casa e já grava — sem tela de conferência prévia. Ao
     final, avisa quem não foi encontrado e quem foi casado só pelo nome.
     """
+    import pandas as pd
     arquivo = request.files.get("arquivo")
     if not arquivo or arquivo.filename == "":
         flash("Selecione um arquivo para importar.", "danger")
@@ -1923,6 +1926,7 @@ def funcionarios():
 @admin_bp.route("/funcionarios/exportar")
 def exportar_funcionarios():
     """Exporta a lista de funcionários cadastrados para Excel."""
+    import pandas as pd
     lista = Funcionario.query.order_by(Funcionario.nome).all()
 
     def status_login(f):
@@ -2136,6 +2140,7 @@ def importar_funcionarios():
     nome, nivel_hierarquico (Empregado/Gestor/Superintendente - obrigatório, decide o formulário),
     cargo (opcional, cargo real - criado automaticamente se não existir), email (opcional), matricula (opcional)
     """
+    import pandas as pd
     arquivo = request.files.get("arquivo")
     if not arquivo or arquivo.filename == "":
         flash("Selecione um arquivo para importar.", "danger")
@@ -2433,6 +2438,7 @@ def vinculos():
 @admin_bp.route("/vinculos/exportar")
 def exportar_vinculos():
     """Exporta os vínculos do ciclo selecionado (ou aberto) para Excel, respeitando a busca por nome do avaliado (q)."""
+    import pandas as pd
     ciclo = _ciclo_selecionado_ou_aberto()
     if not ciclo:
         flash("Crie um ciclo de avaliação antes de exportar vínculos.", "danger")
@@ -2528,6 +2534,7 @@ def importar_vinculos():
     Importa vínculos via planilha (.xlsx/.csv) com as colunas:
     avaliado, avaliador  (nomes exatamente como cadastrados em funcionarios.nome)
     """
+    import pandas as pd
     ciclo = _ciclo_selecionado_ou_aberto()
     if not ciclo:
         flash("Crie um ciclo de avaliação antes de importar vínculos.", "danger")

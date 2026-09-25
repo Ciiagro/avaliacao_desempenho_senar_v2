@@ -149,7 +149,7 @@
                         <div class="funcionario-subinfo muted">{{ f.setor.nome if f.setor else 'Sem setor' }}</div>
                         <div class="funcionario-subinfo muted">Adm.: {{ f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '-' }}</div>
                         {% if not f.ativo and f.data_demissao %}
-                            <div class="funcionario-subinfo muted">Demissão: {{ f.data_demissao.strftime('%d/%m/%Y') }}</div>
+                            <div class="funcionario-subinfo muted">Desligamento: {{ f.data_demissao.strftime('%d/%m/%Y') }}</div>
                         {% endif %}
                     </td>
                     <td>
