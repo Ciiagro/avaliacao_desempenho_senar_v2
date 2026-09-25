@@ -753,6 +753,40 @@ fieldset[disabled] .botao, fieldset[disabled] button {
     cursor: not-allowed;
 }
 
+/* Seção recolhível (ex: "Adicionar funcionário" na tela de Funcionários) */
+.secao-recolhivel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+}
+.secao-recolhivel-titulo {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 18px;
+    font-weight: 700;
+    color: var(--texto);
+    user-select: none;
+}
+.secao-recolhivel-titulo::-webkit-details-marker { display: none; }
+.secao-recolhivel-seta {
+    margin-left: auto;
+    font-size: 1.2rem;
+    color: var(--texto-muted);
+    transition: transform 0.15s ease;
+}
+.secao-recolhivel[open] > .secao-recolhivel-titulo .secao-recolhivel-seta { transform: rotate(90deg); }
+.secao-recolhivel-titulo:hover { background: #f5f6f8; border-radius: var(--radius); }
+.secao-recolhivel-corpo {
+    padding: 0 18px 18px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -20,65 +20,76 @@
     </div>
 </div>
 
-<h2>Cadastrar um funcionário</h2>
-{% if not setores %}
-    <p class="flash flash-warning">
-        Nenhum setor cadastrado ainda. Cadastre pelo menos um em
-        <a href="{{ url_for('admin.setores') }}">Administração &gt; Setores</a> (opcional, mas recomendado).
-    </p>
-{% endif %}
-<form method="post" class="form-grid">
-    <input type="text" name="nome" placeholder="Nome completo" required>
-    <input type="text" name="cargo_nome" placeholder="Cargo (ex: Assistente Administrativo)" list="lista-cargos">
-    <datalist id="lista-cargos">
-        {% for cargo in cargos %}
-            <option value="{{ cargo.nome }}">
-        {% endfor %}
-    </datalist>
-    <select name="setor_id">
-        <option value="">Setor (opcional)...</option>
-        {% for setor in setores %}
-            <option value="{{ setor.id }}">{{ setor.nome }}</option>
-        {% endfor %}
-    </select>
-    <select name="nivel_hierarquico" required>
-        <option value="">Nível hierárquico (define o formulário)...</option>
-        {% for nivel in niveis %}
-            <option value="{{ nivel }}">{{ nivel }}</option>
-        {% endfor %}
-    </select>
-    <input type="email" name="email" placeholder="E-mail (opcional)">
-    <input type="text" name="matricula" placeholder="Matrícula (opcional)">
-    <input type="text" name="cpf" placeholder="CPF (opcional)">
-    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
-        Data de nascimento
-        <input type="date" name="data_nascimento">
-    </label>
-    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
-        Data de admissão
-        <input type="date" name="data_admissao">
-    </label>
-    <select name="sexo">
-        <option value="">Sexo (opcional)...</option>
-        {% for opcao in opcoes_sexo %}
-            <option value="{{ opcao }}">{{ opcao }}</option>
-        {% endfor %}
-    </select>
-    <input type="text" name="salario" placeholder="Salário (opcional)">
-    <select name="elegivel_avaliacao">
-        <option value="auto">Elegível p/ avaliação: Automático (pela data de admissão)</option>
-        <option value="sim">Elegível p/ avaliação: Forçar Sim</option>
-        <option value="nao">Elegível p/ avaliação: Forçar Não</option>
-    </select>
-    <button type="submit" class="botao">Cadastrar</button>
-</form>
+{% set erro_cadastro = get_flashed_messages(category_filter=["danger"]) %}
+<details id="secao-adicionar-funcionario" class="secao-recolhivel" {% if erro_cadastro or not lista %}open{% endif %}>
+    <summary class="secao-recolhivel-titulo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 5v14M5 12h14"/></svg>
+        Adicionar funcionário
+        <span class="secao-recolhivel-seta" aria-hidden="true">&rsaquo;</span>
+    </summary>
 
-<h2>Importar em lote (.xlsx ou .csv)</h2>
-<p class="muted" style="font-size:0.78rem; line-height:1.4;">Colunas esperadas: <code>nome</code>, <code>nivel_hierarquico</code> (obrigatório — Empregado / Gestor / Superintendente, decide qual formulário é usado), <code>cargo</code> (opcional — cargo real da pessoa, ex: Assistente Administrativo; é criado automaticamente se não existir), <code>setor</code> (opcional — é criado automaticamente se não existir), <code>email</code>, <code>matricula</code>, <code>cpf</code> (opcional), <code>data_nascimento</code> (opcional — AAAA-MM-DD), <code>data_admissao</code> (opcional — AAAA-MM-DD), <code>sexo</code> (opcional — Feminino / Masculino / Outro), <code>salario</code> (opcional), <code>elegivel_avaliacao</code> (opcional — Sim / Não; se vazio, calcula automaticamente pela data de admissão, exigindo 1 ano de casa).</p>
-<form method="post" action="{{ url_for('admin.importar_funcionarios') }}" enctype="multipart/form-data" class="form-inline">
-    <input type="file" name="arquivo" accept=".xlsx,.csv" required>
-    <button type="submit" class="botao">Importar</button>
-</form>
+    <div class="secao-recolhivel-corpo">
+        <h2 style="margin-top:0;">Cadastrar um funcionário</h2>
+        {% if not setores %}
+            <p class="flash flash-warning">
+                Nenhum setor cadastrado ainda. Cadastre pelo menos um em
+                <a href="{{ url_for('admin.setores') }}">Administração &gt; Setores</a> (opcional, mas recomendado).
+            </p>
+        {% endif %}
+        <form method="post" class="form-grid">
+            <input type="text" name="nome" placeholder="Nome completo" required>
+            <input type="text" name="cargo_nome" placeholder="Cargo (ex: Assistente Administrativo)" list="lista-cargos">
+            <datalist id="lista-cargos">
+                {% for cargo in cargos %}
+                    <option value="{{ cargo.nome }}">
+                {% endfor %}
+            </datalist>
+            <select name="setor_id">
+                <option value="">Setor (opcional)...</option>
+                {% for setor in setores %}
+                    <option value="{{ setor.id }}">{{ setor.nome }}</option>
+                {% endfor %}
+            </select>
+            <select name="nivel_hierarquico" required>
+                <option value="">Nível hierárquico (define o formulário)...</option>
+                {% for nivel in niveis %}
+                    <option value="{{ nivel }}">{{ nivel }}</option>
+                {% endfor %}
+            </select>
+            <input type="email" name="email" placeholder="E-mail (opcional)">
+            <input type="text" name="matricula" placeholder="Matrícula (opcional)">
+            <input type="text" name="cpf" placeholder="CPF (opcional)">
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
+                Data de nascimento
+                <input type="date" name="data_nascimento">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--texto-muted, #555);">
+                Data de admissão
+                <input type="date" name="data_admissao">
+            </label>
+            <select name="sexo">
+                <option value="">Sexo (opcional)...</option>
+                {% for opcao in opcoes_sexo %}
+                    <option value="{{ opcao }}">{{ opcao }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="salario" placeholder="Salário (opcional)">
+            <select name="elegivel_avaliacao">
+                <option value="auto">Elegível p/ avaliação: Automático (pela data de admissão)</option>
+                <option value="sim">Elegível p/ avaliação: Forçar Sim</option>
+                <option value="nao">Elegível p/ avaliação: Forçar Não</option>
+            </select>
+            <button type="submit" class="botao">Cadastrar</button>
+        </form>
+
+        <h2>Importar em lote (.xlsx ou .csv)</h2>
+        <p class="muted" style="font-size:0.78rem; line-height:1.4;">Colunas esperadas: <code>nome</code>, <code>nivel_hierarquico</code> (obrigatório — Empregado / Gestor / Superintendente, decide qual formulário é usado), <code>cargo</code> (opcional — cargo real da pessoa, ex: Assistente Administrativo; é criado automaticamente se não existir), <code>setor</code> (opcional — é criado automaticamente se não existir), <code>email</code>, <code>matricula</code>, <code>cpf</code> (opcional), <code>data_nascimento</code> (opcional — AAAA-MM-DD), <code>data_admissao</code> (opcional — AAAA-MM-DD), <code>sexo</code> (opcional — Feminino / Masculino / Outro), <code>salario</code> (opcional), <code>elegivel_avaliacao</code> (opcional — Sim / Não; se vazio, calcula automaticamente pela data de admissão, exigindo 1 ano de casa).</p>
+        <form method="post" action="{{ url_for('admin.importar_funcionarios') }}" enctype="multipart/form-data" class="form-inline">
+            <input type="file" name="arquivo" accept=".xlsx,.csv" required>
+            <button type="submit" class="botao">Importar</button>
+        </form>
+    </div>
+</details>
 
 {% if setor_filtro %}
     <p class="flash flash-warning" style="display:inline-block;">
@@ -95,25 +106,20 @@
 
 <div class="tabela-toolbar">
     <input type="search" id="busca-funcionario" placeholder="Buscar por nome, cargo, setor ou nível hierárquico...">
-    <div class="filtros-andamento">
-        <a href="{{ url_for('admin.funcionarios', status='ativos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
-           class="botao-filtro {% if status_filtro == 'ativos' %}ativo{% endif %}">Só ativos</a>
-        <a href="{{ url_for('admin.funcionarios', status='inativos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
-           class="botao-filtro {% if status_filtro == 'inativos' %}ativo{% endif %}">Inativos</a>
-        <a href="{{ url_for('admin.funcionarios', status='todos', setor_id=setor_filtro.id if setor_filtro else None, elegivel=elegivel_filtro) }}"
-           class="botao-filtro {% if status_filtro == 'todos' %}ativo{% endif %}">Todos</a>
+    <div class="filtros-andamento" id="filtros-status">
+        <button type="button" class="botao-filtro {% if status_filtro == 'ativos' %}ativo{% endif %}" data-status="ativos">Só ativos</button>
+        <button type="button" class="botao-filtro {% if status_filtro == 'inativos' %}ativo{% endif %}" data-status="inativos">Inativos</button>
+        <button type="button" class="botao-filtro {% if status_filtro == 'todos' %}ativo{% endif %}" data-status="todos">Todos</button>
         <span style="width:1px; background:#dcdfe6; align-self:stretch; margin:0 2px;"></span>
         <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; padding:0 8px;">
-            <input
-                type="checkbox"
-                {% if elegivel_filtro == 'sim' %}checked{% endif %}
-                onchange="location.href = this.checked
-                    ? '{{ url_for('admin.funcionarios', status=status_filtro, setor_id=setor_filtro.id if setor_filtro else None, elegivel='sim') }}'
-                    : '{{ url_for('admin.funcionarios', status=status_filtro, setor_id=setor_filtro.id if setor_filtro else None, elegivel='todos') }}';"
-            >
+            <input type="checkbox" id="checkbox-elegivel" {% if elegivel_filtro == 'sim' %}checked{% endif %}>
             Só elegíveis
         </label>
     </div>
+    <a href="#secao-adicionar-funcionario" id="link-adicionar-funcionario" class="botao">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:-3px; margin-right:4px;"><path d="M12 5v14M5 12h14"/></svg>
+        Adicionar funcionário
+    </a>
     <button type="button" id="botao-sensiveis" class="botao botao-secundario">Mostrar dados sensíveis</button>
     <a href="{{ url_for('admin.exportar_funcionarios') }}" class="botao">Exportar para Excel</a>
 </div>
@@ -136,7 +142,11 @@
         </thead>
         <tbody>
             {% for f in lista %}
-                <tr class="linha-funcionario {% if not f.ativo %}linha-inativa{% endif %}" data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else '') ~ ' ' ~ (f.nivel_hierarquico or ''))|lower }}">
+                {% set eleg = f.is_elegivel_avaliacao() %}
+                <tr class="linha-funcionario {% if not f.ativo %}linha-inativa{% endif %}"
+                    data-busca="{{ (f.nome ~ ' ' ~ (f.cargo.nome if f.cargo else '') ~ ' ' ~ (f.setor.nome if f.setor else '') ~ ' ' ~ (f.nivel_hierarquico or ''))|lower }}"
+                    data-ativo="{{ '1' if f.ativo else '0' }}"
+                    data-elegivel="{{ 'sim' if eleg else ('nao' if eleg is not none else '-') }}">
                     <td>
                         <div class="funcionario-nome">
                             {{ f.nome }}
@@ -158,7 +168,6 @@
                         {% else %}-{% endif %}
                     </td>
                     <td style="text-align:center;">
-                        {% set eleg = f.is_elegivel_avaliacao() %}
                         {% if eleg is none %}-
                         {% elif eleg %}<span class="badge badge-elegivel-sim">Sim</span>
                         {% else %}<span class="badge badge-elegivel-nao">Não</span>
@@ -198,15 +207,51 @@
 
 <script>
 (function () {
+    var linkAdicionar = document.getElementById('link-adicionar-funcionario');
+    var secaoAdicionar = document.getElementById('secao-adicionar-funcionario');
+    if (linkAdicionar && secaoAdicionar) {
+        linkAdicionar.addEventListener('click', function (evento) {
+            evento.preventDefault();
+            secaoAdicionar.open = true;
+            secaoAdicionar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            var primeiroCampo = secaoAdicionar.querySelector('input[name="nome"]');
+            if (primeiroCampo) {
+                window.setTimeout(function () { primeiroCampo.focus(); }, 350);
+            }
+        });
+    }
+
     var busca = document.getElementById('busca-funcionario');
     var linhas = document.querySelectorAll('#tabela-funcionarios .linha-funcionario');
-    busca.addEventListener('input', function () {
+    var botoesStatus = document.querySelectorAll('#filtros-status .botao-filtro');
+    var checkboxElegivel = document.getElementById('checkbox-elegivel');
+    var statusAtual = document.querySelector('#filtros-status .botao-filtro.ativo');
+    statusAtual = statusAtual ? statusAtual.dataset.status : 'ativos';
+
+    function aplicarFiltros() {
         var termo = busca.value.trim().toLowerCase();
+        var soElegiveis = checkboxElegivel.checked;
         linhas.forEach(function (linha) {
-            var visivel = !termo || linha.dataset.busca.indexOf(termo) !== -1;
-            linha.style.display = visivel ? '' : 'none';
+            var passaBusca = !termo || linha.dataset.busca.indexOf(termo) !== -1;
+            var passaStatus = statusAtual === 'todos'
+                || (statusAtual === 'ativos' && linha.dataset.ativo === '1')
+                || (statusAtual === 'inativos' && linha.dataset.ativo === '0');
+            var passaElegivel = !soElegiveis || linha.dataset.elegivel === 'sim';
+            linha.style.display = (passaBusca && passaStatus && passaElegivel) ? '' : 'none';
+        });
+    }
+
+    botoesStatus.forEach(function (botao) {
+        botao.addEventListener('click', function () {
+            statusAtual = botao.dataset.status;
+            botoesStatus.forEach(function (b) { b.classList.remove('ativo'); });
+            botao.classList.add('ativo');
+            aplicarFiltros();
         });
     });
+    checkboxElegivel.addEventListener('change', aplicarFiltros);
+    busca.addEventListener('input', aplicarFiltros);
+    aplicarFiltros();
 
     var botaoSensiveis = document.getElementById('botao-sensiveis');
     var container = document.getElementById('tabela-funcionarios-container');

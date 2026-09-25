@@ -1884,7 +1884,8 @@ def funcionarios():
         return redirect(url_for("admin.funcionarios"))
 
     setor_id_filtro = request.args.get("setor_id")
-    status_filtro = request.args.get("status", "ativos")  # ativos (padrão) | inativos | todos
+    status_filtro = request.args.get("status", "ativos")  # ativos (padrão) | inativos | todos — só usado pra estado inicial do filtro em JS
+    elegivel_filtro = request.args.get("elegivel", "todos")  # sim | todos — idem
     consulta = Funcionario.query
     setor_filtro = None
     if setor_id_filtro:
@@ -1894,19 +1895,15 @@ def funcionarios():
     # Contagens pro card de resumo — respeitam o filtro de setor (se houver),
     # mas mostram os três números lado a lado independente de qual status
     # está selecionado no momento.
-    consulta_base_contagem = Funcionario.query
-    if setor_id_filtro:
-        consulta_base_contagem = consulta_base_contagem.filter_by(setor_id=setor_id_filtro)
-    total_ativos = consulta_base_contagem.filter_by(ativo=True).count()
-    total_inativos = consulta_base_contagem.filter_by(ativo=False).count()
+    total_ativos = consulta.filter_by(ativo=True).count()
+    total_inativos = consulta.filter_by(ativo=False).count()
 
-    if status_filtro == "ativos":
-        consulta = consulta.filter_by(ativo=True)
-    elif status_filtro == "inativos":
-        consulta = consulta.filter_by(ativo=False)
-    # "todos" não filtra por status
-
+    # A lista sempre traz todo mundo (respeitando só o filtro de setor): quem
+    # decide o que fica visível de fato — status, elegibilidade e busca por
+    # texto — é o JS no template, sem precisar recarregar a página a cada
+    # clique (a contagem acima é a única coisa calculada no servidor).
     lista = consulta.order_by(Funcionario.nome).all()
+
     cargos = Cargo.query.order_by(Cargo.nome).all()
     setores = Setor.query.order_by(Setor.nome).all()
     return render_template(
@@ -1920,6 +1917,7 @@ def funcionarios():
         opcoes_sexo=OPCOES_SEXO,
         setor_filtro=setor_filtro,
         status_filtro=status_filtro,
+        elegivel_filtro=elegivel_filtro,
     )
 
 
