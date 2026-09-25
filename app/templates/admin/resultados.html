@@ -26,7 +26,7 @@
     <div class="tabela-toolbar">
         <input type="search" id="busca-resultados" placeholder="Buscar por nome...">
         <label class="checkbox-inline" style="margin-left:16px; font-weight:normal;">
-            <input type="checkbox" id="filtro-concluidos"> Mostrar somente quem já concluiu
+            <input type="checkbox" id="filtro-concluidos" checked> Mostrar somente quem já concluiu
         </label>
         <a class="botao botao-secundario" style="margin-left:auto;"
            href="{{ url_for('admin.exportar_resultados_pdf', ciclo_id=ciclo.id) }}">
@@ -219,7 +219,12 @@
                     var busca = sessionStorage.getItem(CHAVE_BUSCA);
                     var concluidos = sessionStorage.getItem(CHAVE_CONCLUIDOS);
                     if (busca) input.value = busca;
+                    // Se já existe uma escolha salva nesta aba (marcado ou
+                    // desmarcado), respeita ela. Se não existe nada salvo
+                    // ainda (primeira vez), mantém o padrão marcado que já
+                    // vem no HTML.
                     if (concluidos === '1') filtroConcluidos.checked = true;
+                    else if (concluidos === '0') filtroConcluidos.checked = false;
                 } catch (e) {}
             }
 
