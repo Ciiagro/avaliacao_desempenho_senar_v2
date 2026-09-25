@@ -414,7 +414,7 @@ def avisar_prazo_ciencia_resultado(funcionario, dias_restantes, prazo):
 
 def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite):
     """Devolutiva marcada para o funcionário: aviso com a data e o prazo
-    que ele tem para concordar ou recorrer à presidência."""
+    que ele tem para concordar ou recorrer."""
     dias = (data_limite - data_devolutiva).days
     _enviar_email(
         _email_funcionario(funcionario),
@@ -424,7 +424,7 @@ def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limit
             f"A data de devolutiva da sua avaliação foi marcada para "
             f"{data_devolutiva.strftime('%d/%m/%Y')}.",
             f"Você terá até {data_limite.strftime('%d/%m/%Y')} ({dias} dias) para "
-            f"concordar com a resposta ou recorrer à presidência.",
+            f"concordar com a resposta ou recorrer.",
         ],
         link_url=_link_empregado(),
         link_texto="Acessar meus recursos",

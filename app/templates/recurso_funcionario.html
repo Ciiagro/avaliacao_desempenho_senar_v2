@@ -10,7 +10,7 @@
         Indique claramente quais itens da avaliação você não concorda e o motivo de cada um —
         isso ajuda o gestor e a Comissão a analisar seu caso com mais precisão. Depois de aberto,
         o gestor revê a avaliação; se ele mantiver a nota e você continuar sem concordar, a
-        Comissão encaminha o caso para a presidência decidir.
+        Comissão encaminha o caso para decisão final.
     </p>
     <h2>Abrir recurso</h2>
     {% for ciclo in ciclos_sem_recurso %}
@@ -95,9 +95,9 @@ document.addEventListener('submit', function (e) {
             {% elif r.status == 'aguardando_comissao_fechamento' %}
                 <span class="badge badge-pending">Aguardando a Comissão confirmar o encerramento</span>
             {% elif r.status == 'aguardando_comissao_recurso' %}
-                <span class="badge badge-pending">Aguardando a Comissão encaminhar à presidência</span>
+                <span class="badge badge-pending">Aguardando a Comissão encaminhar para decisão final</span>
             {% elif r.status == 'aguardando_presidencia' %}
-                <span class="badge badge-pending">Aguardando decisão da presidência</span>
+                <span class="badge badge-pending">Aguardando decisão final</span>
             {% else %}
                 <span class="badge badge-ok">Encerrado</span>
             {% endif %}
@@ -158,9 +158,9 @@ document.addEventListener('submit', function (e) {
                     {% elif e.tipo == 'pedido_recorrer' %}
                         Você pediu pra recorrer novamente{% if e.texto %}: "{{ e.texto }}"{% endif %}
                     {% elif e.tipo == 'encaminhamento_comissao' %}
-                        A Comissão encaminhou para a presidência: "{{ e.texto }}"
+                        A Comissão encaminhou para decisão final: "{{ e.texto }}"
                     {% elif e.tipo == 'decisao_presidencia' %}
-                        A presidência {{ 'acatou o recurso e revisou a avaliação' if e.decisao == 'acatado' else 'não acatou o recurso' }}: "{{ e.texto }}"
+                        {{ 'O recurso foi acatado e a avaliação foi revisada' if e.decisao == 'acatado' else 'O recurso não foi acatado' }}: "{{ e.texto }}"
                     {% elif e.tipo == 'aceite_funcionario' %}
                         Empregado confirmou o recebimento &mdash; recurso finalizado.
                     {% endif %}
@@ -212,7 +212,7 @@ document.addEventListener('submit', function (e) {
                 {% elif fechado_por_presidencia %}
                     <div class="flash flash-warning">
                         <p style="margin:0 0 10px;">
-                            Seu recurso foi encerrado com a decisão final da presidência.
+                            Seu recurso foi encerrado com a decisão final.
                             Dê ciência de que você tomou conhecimento.
                         </p>
                         <form method="post" action="{{ url_for('recursos.recurso_dar_ciencia', recurso_id=r.id) }}">
