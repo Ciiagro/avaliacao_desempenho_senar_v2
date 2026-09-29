@@ -302,6 +302,35 @@ def _parse_carga_horaria_form():
     return int(round(valor)) if valor is not None else None
 
 
+def _erro_campos_obrigatorios(tem_comprovante):
+    """Todos os campos da capacitação são obrigatórios (menos observações).
+    O valor pago pelo SENAR pode ser 0, mas não pode ficar em branco."""
+    f = request.form
+    faltando = []
+    if not f.get("nome_curso", "").strip():
+        faltando.append("nome do curso")
+    if not f.get("instituicao", "").strip():
+        faltando.append("instituição")
+    if not f.get("tipo"):
+        faltando.append("tipo")
+    if not f.get("status"):
+        faltando.append("status")
+    if _parse_decimal_form("carga_horaria") is None:
+        faltando.append("carga horária")
+    if not _parse_data_form("data_inicio"):
+        faltando.append("data de início")
+    if not _parse_data_form("data_conclusao"):
+        faltando.append("data de conclusão")
+    valor = _parse_decimal_form("valor_pago_senar")
+    if valor is None or valor < 0:
+        faltando.append("valor pago pelo SENAR (informe 0 se não houve custo)")
+    if not tem_comprovante:
+        faltando.append("comprovante (certificado ou prova de que está cursando)")
+    if faltando:
+        return "Preencha todos os campos obrigatórios: " + ", ".join(faltando) + "."
+    return None
+
+
 def _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao):
     """Mensagem de erro se as datas saírem do trimestre; senão None."""
     ini_tri, fim_tri = limites_trimestre(ano, trimestre)
@@ -351,8 +380,10 @@ def minhas_capacitacoes():
 
     if request.method == "POST":
         nome_curso = request.form.get("nome_curso", "").strip()
-        if not nome_curso:
-            flash("Informe o nome do curso/capacitação.", "danger")
+        arquivo_enviado = request.files.get("arquivo_comprovacao")
+        erro_campos = _erro_campos_obrigatorios(bool(arquivo_enviado and arquivo_enviado.filename))
+        if erro_campos:
+            flash(erro_campos, "danger")
             return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
 
         carga_horaria = _parse_carga_horaria_form()
@@ -444,8 +475,12 @@ def editar_minha_capacitacao(capacitacao_id):
 
     if request.method == "POST":
         nome_curso = request.form.get("nome_curso", "").strip()
-        if not nome_curso:
-            flash("Informe o nome do curso/capacitação.", "danger")
+        arquivo_enviado = request.files.get("arquivo_comprovacao")
+        vai_enviar_novo = bool(arquivo_enviado and arquivo_enviado.filename)
+        continua_com_atual = bool(capacitacao.arquivo_tipo) and not request.form.get("remover_arquivo")
+        erro_campos = _erro_campos_obrigatorios(vai_enviar_novo or continua_com_atual)
+        if erro_campos:
+            flash(erro_campos, "danger")
             return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
 
         data_inicio = _parse_data_form("data_inicio")
@@ -526,6 +561,108 @@ def excluir_minha_capacitacao(capacitacao_id):
     db.session.commit()
     flash("Capacitação removida.", "success")
     return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+
+
+def _sou_gestor_de(funcionario, avaliado_id):
+    """Verifica se `funcionario` já foi (ou é) avaliador de gestor dessa
+    pessoa em algum ciclo — é o que dá a ele o direito de ver as
+    capacitações dela. Não trava pelo ciclo estar aberto, senão o gestor
+    perde o acesso assim que o exercício fecha."""
+    return (
+        VinculoAvaliacao.query.filter_by(
+            avaliador_id=funcionario.id, avaliado_id=avaliado_id
+        ).first()
+        is not None
+    )
+
+
+@main_bp.route("/minha-equipe/<uuid:avaliado_id>/capacitacoes")
+def capacitacoes_da_equipe(avaliado_id):
+    """Tela só de leitura pro gestor ver os cursos/capacitações que uma
+    pessoa da sua equipe já cadastrou em "Minhas Capacitações"."""
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+
+    avaliado = Funcionario.query.get_or_404(avaliado_id)
+    if not _sou_gestor_de(funcionario, avaliado.id):
+        abort(403)
+
+    ano = request.args.get("ano", type=int)
+    trimestre = request.args.get("trimestre", type=int)
+    if not request.args:
+        ano, trimestre = trimestre_atual()
+
+    query = Capacitacao.query.filter_by(funcionario_id=avaliado.id)
+    if ano:
+        query = query.filter(Capacitacao.ano == ano)
+    if trimestre in (1, 2, 3, 4):
+        query = query.filter(Capacitacao.trimestre == trimestre)
+    else:
+        trimestre = None
+
+    lista = query.order_by(
+        Capacitacao.ano.desc(),
+        Capacitacao.trimestre.desc(),
+        Capacitacao.data_conclusao.desc().nullslast(),
+    ).all()
+
+    anos = {
+        r[0]
+        for r in db.session.query(Capacitacao.ano)
+        .filter(Capacitacao.funcionario_id == avaliado.id)
+        .distinct()
+        .all()
+    }
+    anos.add(trimestre_atual()[0])
+    if ano:
+        anos.add(ano)
+    anos = sorted(anos, reverse=True)
+
+    total_horas = sum(c.carga_horaria or 0 for c in lista)
+    total_valor = sum((c.valor_pago_senar or 0) for c in lista)
+    total_valor_fmt = (
+        f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+
+    if ano and trimestre:
+        ini_tri, fim_tri = limites_trimestre(ano, trimestre)
+        periodo_txt = (
+            f"{trimestre}º trimestre de {ano} · "
+            f"{ini_tri.strftime('%d/%m/%Y')} a {fim_tri.strftime('%d/%m/%Y')}"
+        )
+    elif ano:
+        periodo_txt = f"Ano de {ano} · todos os trimestres"
+    elif trimestre:
+        periodo_txt = f"{trimestre}º trimestre · todos os anos"
+    else:
+        periodo_txt = "Todos os períodos"
+
+    return render_template(
+        "capacitacoes_equipe.html",
+        avaliado=avaliado,
+        capacitacoes=lista,
+        anos=anos,
+        ano_selecionado=ano,
+        trimestre_selecionado=trimestre,
+        trimestres=[1, 2, 3, 4],
+        total_horas=total_horas,
+        total_valor_fmt=total_valor_fmt,
+        periodo_txt=periodo_txt,
+    )
+
+
+@main_bp.route("/minha-equipe/capacitacoes/<int:capacitacao_id>/documento")
+def documento_capacitacao_equipe(capacitacao_id):
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+
+    capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
+    if not _sou_gestor_de(funcionario, capacitacao.funcionario_id):
+        abort(403)
+
+    return resposta_documento_capacitacao(capacitacao)
 
 
 def _resultado_liberado_do_ciclo(funcionario, ciclo_id):

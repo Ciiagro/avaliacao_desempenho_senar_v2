@@ -1796,6 +1796,19 @@ def painel():
 # ---------------------------------------------------------
 # Funcionários
 # ---------------------------------------------------------
+def _funcionario_com_email(email, ignorar_id=None):
+    """Devolve o Funcionario que já usa esse e-mail (sem diferenciar maiúsculas
+    de minúsculas), ou None. O e-mail é o login do sistema e o destino dos
+    avisos, então não pode se repetir entre pessoas diferentes."""
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    consulta = Funcionario.query.filter(db.func.lower(db.func.trim(Funcionario.email)) == email)
+    if ignorar_id is not None:
+        consulta = consulta.filter(Funcionario.id != ignorar_id)
+    return consulta.first()
+
+
 @admin_bp.route("/funcionarios", methods=["GET", "POST"])
 def funcionarios():
     if request.method == "POST":
@@ -1838,8 +1851,15 @@ def funcionarios():
                 flash("Salário inválido.", "danger")
                 return redirect(url_for("admin.funcionarios"))
 
+        outro = _funcionario_com_email(email)
         if not nome or not nivel_hierarquico:
             flash("Nome e nível hierárquico são obrigatórios.", "danger")
+        elif outro:
+            flash(
+                f"O e-mail {email} já está cadastrado para {outro.nome}. "
+                f"Cada colaborador precisa ter um e-mail diferente.",
+                "danger",
+            )
         else:
             cargo_id = None
             if cargo_nome:
@@ -2085,6 +2105,15 @@ def editar_funcionario(funcionario_id):
             flash("Nome e nível hierárquico são obrigatórios.", "danger")
             return redirect(url_for("admin.editar_funcionario", funcionario_id=funcionario_id))
 
+        outro = _funcionario_com_email(email, ignorar_id=funcionario.id)
+        if outro:
+            flash(
+                f"O e-mail {email} já está cadastrado para {outro.nome}. "
+                f"Cada colaborador precisa ter um e-mail diferente.",
+                "danger",
+            )
+            return redirect(url_for("admin.editar_funcionario", funcionario_id=funcionario_id))
+
         cargo_id = None
         if cargo_nome:
             cargo = Cargo.query.filter(db.func.lower(Cargo.nome) == cargo_nome.lower()).first()
@@ -2160,6 +2189,13 @@ def importar_funcionarios():
 
     criados, erros = 0, []
     senhas_geradas = []
+    # e-mails que já existem no sistema (nome de quem usa) — e, durante a
+    # importação, também os já vistos mais acima na própria planilha
+    emails_em_uso = {
+        f.email.strip().lower(): f.nome
+        for f in Funcionario.query.filter(Funcionario.email.isnot(None)).all()
+        if f.email.strip()
+    }
     for i, row in df.iterrows():
         nome = str(row.get("nome", "")).strip()
         if not nome or nome.lower() == "nan":
@@ -2256,6 +2292,15 @@ def importar_funcionarios():
                 elegivel_avaliacao = False
 
         email_valor = str(email).strip() if pd.notna(email) else None
+        email_valor = email_valor or None
+        if email_valor:
+            dono = emails_em_uso.get(email_valor.lower())
+            if dono:
+                erros.append(
+                    f"Linha {i + 2}: o e-mail '{email_valor}' já pertence a {dono} — {nome} não foi importado"
+                )
+                continue
+            emails_em_uso[email_valor.lower()] = nome
         senha_temp = gerar_senha_temporaria()
         novo = Funcionario(
             nome=nome,
@@ -2753,14 +2798,17 @@ def enviar_email_devolutiva(funcionario, data_devolutiva, data_limite):
     """
     from ..email_service import avisar_empregado_devolutiva_marcada
 
-    if not funcionario.email:
+    if not funcionario.email or not funcionario.email.strip():
         current_app.logger.warning(
             "Devolutiva marcada para %s, mas não há e-mail cadastrado.",
             funcionario.nome,
         )
-        return
+        return "sem_email"
 
-    avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite)
+    ok = avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite)
+    # `is not False`: versões antigas do email_service devolvem None (sem informar
+    # o resultado) — nesse caso mantém o comportamento antigo (considera enviado).
+    return "falhou" if ok is False else "enviado"
 
 
 @admin_bp.route("/devolutiva/funcionarios", methods=["GET"])
@@ -2806,7 +2854,8 @@ def marcar_devolutiva_funcionario(funcionario_id):
         flash("Formato de data inválido.", "error")
         return redirect(request.referrer or url_for("admin.listar_funcionarios_devolutiva"))
     
-    data_limite = data_devolutiva + timedelta(days=5)
+    # 5 dias ÚTEIS (pula sábado e domingo) a partir da data da devolutiva.
+    data_limite = adicionar_dias_uteis(data_devolutiva, 5)
     
     devolutiva = DevolutivaPorFuncionario.query.filter_by(funcionario_id=funcionario_id).first()
     
@@ -2829,17 +2878,32 @@ def marcar_devolutiva_funcionario(funcionario_id):
     
     db.session.commit()
     
-    enviar_email_devolutiva(funcionario, data_devolutiva, data_limite)
-    
-    flash(
-        f"✅ Devolutiva {acao} para {funcionario.nome}! "
+    resultado_email = enviar_email_devolutiva(funcionario, data_devolutiva, data_limite)
+
+    resumo = (
+        f"Devolutiva {acao.lower()} para {funcionario.nome}! "
         f"Data: {data_devolutiva.strftime('%d/%m/%Y')} | "
-        f"Prazo: até {data_limite.strftime('%d/%m/%Y')} | "
-        f"📧 Email enviado",
-        "success"
+        f"Prazo: até {data_limite.strftime('%d/%m/%Y')}"
     )
+    if resultado_email == "enviado":
+        flash(f"✅ {resumo} | 📧 E-mail enviado para {funcionario.email.strip()}", "success")
+    elif resultado_email == "sem_email":
+        flash(
+            f"⚠️ {resumo}. Mas {funcionario.nome} não tem e-mail cadastrado, "
+            f"então o aviso NÃO foi enviado.",
+            "warning",
+        )
+    else:
+        flash(
+            f"⚠️ {resumo}. Mas o e-mail NÃO pôde ser enviado — confira a configuração "
+            f"de e-mail (MAIL_USERNAME / MAIL_APP_PASSWORD) e o log do servidor.",
+            "warning",
+        )
     
     return redirect(request.referrer or url_for("admin.resultados"))
+
+
+@admin_bp.route("/devolutiva/funcionario/<funcionario_id>/remover", methods=["POST"])
 def remover_devolutiva_funcionario(funcionario_id):
     """Admin remove devolutiva marcada para um funcionário."""
     try:

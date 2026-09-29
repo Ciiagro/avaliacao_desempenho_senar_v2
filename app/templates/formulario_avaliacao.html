@@ -66,24 +66,20 @@
     <h2>Parte II</h2>
 
     <label for="pontos_fortes">Pontos fortes</label>
-    <textarea id="pontos_fortes" name="pontos_fortes" rows="3">{{ avaliacao.pontos_fortes if avaliacao else '' }}</textarea>
+    <textarea id="pontos_fortes" name="pontos_fortes" rows="5" style="min-height:112px; line-height:1.5; resize:vertical;">{{ avaliacao.pontos_fortes if avaliacao else '' }}</textarea>
 
     <label for="oportunidades_desenvolvimento">Oportunidade de desenvolvimento</label>
-    <textarea id="oportunidades_desenvolvimento" name="oportunidades_desenvolvimento" rows="3">{{ avaliacao.oportunidades_desenvolvimento if avaliacao else '' }}</textarea>
+    <textarea id="oportunidades_desenvolvimento" name="oportunidades_desenvolvimento" rows="5" style="min-height:112px; line-height:1.5; resize:vertical;">{{ avaliacao.oportunidades_desenvolvimento if avaliacao else '' }}</textarea>
 
-    <div class="grid-2">
-        <div>
-            <label for="plano_acao">Plano de desenvolvimento &mdash; Ação</label>
-            <textarea id="plano_acao" name="plano_acao" rows="4"
-                      placeholder="Descreva o(s) plano(s) de ação. Para cada um, especifique o prazo (ex: 15 dias, 1 mês, semestral, anual, ou uma data específica).">{{ avaliacao.plano_acao if avaliacao else '' }}</textarea>
-            <p class="muted" style="margin-top:4px; font-size:0.85em;">
-                Se houver mais de um plano de ação, descreva cada um com o respectivo prazo (dias, mês, semestral, anual etc).
-            </p>
-        </div>
-    </div>
+    <label for="plano_acao">Plano de desenvolvimento &mdash; Ação</label>
+    <textarea id="plano_acao" name="plano_acao" rows="6" style="min-height:132px; line-height:1.5; resize:vertical;"
+              placeholder="Descreva o(s) plano(s) de ação. Para cada um, especifique o prazo (ex: 15 dias, 1 mês, semestral, anual, ou uma data específica).">{{ avaliacao.plano_acao if avaliacao else '' }}</textarea>
+    <p class="muted" style="margin-top:4px; font-size:0.85em;">
+        Se houver mais de um plano de ação, descreva cada um com o respectivo prazo (dias, mês, semestral, anual etc).
+    </p>
 
     <label for="resultados_alcancados">Resultados alcançados durante o ano</label>
-    <textarea id="resultados_alcancados" name="resultados_alcancados" rows="3">{{ avaliacao.resultados_alcancados if avaliacao else '' }}</textarea>
+    <textarea id="resultados_alcancados" name="resultados_alcancados" rows="5" style="min-height:112px; line-height:1.5; resize:vertical;">{{ avaliacao.resultados_alcancados if avaliacao else '' }}</textarea>
 
     {% if avaliacao and avaliacao.status == 'concluida' and avaliacao.assinado_por %}
         <p class="muted" style="margin-top:20px;">

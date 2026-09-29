@@ -40,6 +40,15 @@
         <p class="muted">As datas de início e conclusão precisam estar dentro do {{ trimestre }}º trimestre de {{ ano }}.</p>
     </div>
 
+    <div class="cap-aviso" role="note">
+        <strong>Como comprovar a capacitação</strong>
+        <ul>
+            <li><b>Cursos de curta duração:</b> apresente o <b>certificado</b> de conclusão.</li>
+            <li><b>Cursos de longa duração:</b> o <b>certificado</b> deve ser apresentado ao final do curso. Enquanto estiver em andamento, anexe um <b>comprovante de que você está realizando o curso</b> (declaração de matrícula ou de frequência).</li>
+        </ul>
+        <p>Todos os campos são obrigatórios, exceto as observações. Se o SENAR não pagou nada, informe <b>0</b> no valor.</p>
+    </div>
+
     <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="ano" value="{{ ano }}">
         <input type="hidden" name="trimestre" value="{{ trimestre }}">
@@ -51,7 +60,7 @@
             </label>
             <label class="cap-campo cap-3">
                 <span>Instituição</span>
-                <input type="text" name="instituicao">
+                <input type="text" name="instituicao" required>
             </label>
 
             <label class="cap-campo cap-2">
@@ -63,34 +72,34 @@
             </label>
             <label class="cap-campo cap-2">
                 <span>Status</span>
-                <select name="status">
+                <select name="status" required>
                     <option value="">Selecione...</option>
                     {% for s in status_options %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
                 </select>
             </label>
             <label class="cap-campo cap-2">
                 <span>Carga horária (h)</span>
-                <input type="number" name="carga_horaria" min="0" step="0.5">
+                <input type="number" name="carga_horaria" min="0" step="0.5" required>
             </label>
 
             <label class="cap-campo cap-2">
                 <span>Início</span>
-                <input type="date" name="data_inicio" id="data_inicio"
+                <input type="date" name="data_inicio" id="data_inicio" required
                        min="{{ inicio_trimestre.isoformat() }}" max="{{ fim_trimestre.isoformat() }}">
             </label>
             <label class="cap-campo cap-2">
                 <span>Conclusão</span>
-                <input type="date" name="data_conclusao" id="data_conclusao"
+                <input type="date" name="data_conclusao" id="data_conclusao" required
                        min="{{ inicio_trimestre.isoformat() }}" max="{{ fim_trimestre.isoformat() }}">
             </label>
             <label class="cap-campo cap-2">
                 <span>Valor pago pelo SENAR (R$)</span>
-                <input type="number" name="valor_pago_senar" min="0" step="0.01">
+                <input type="number" name="valor_pago_senar" min="0" step="0.01" placeholder="0,00 se não houve custo" required>
             </label>
 
             <label class="cap-campo cap-3">
-                <span>Comprovante (PDF, JPG ou PNG, até 4 MB)</span>
-                <input type="file" name="arquivo_comprovacao" id="arquivo_comprovacao" accept=".pdf,.jpg,.jpeg,.png">
+                <span>Comprovante: certificado ou prova de que está cursando (PDF, JPG ou PNG, até 4 MB)</span>
+                <input type="file" name="arquivo_comprovacao" id="arquivo_comprovacao" accept=".pdf,.jpg,.jpeg,.png" required>
             </label>
             <label class="cap-campo cap-3">
                 <span>Observações (opcional)</span>
@@ -157,7 +166,7 @@
                             {{ c.data_conclusao.strftime('%d/%m') if c.data_conclusao else '?' }}
                         {% else %}-{% endif %}
                     </td>
-                    <td class="cap-nowrap">{{ ('R$ ' ~ c.valor_pago_senar|string) if c.valor_pago_senar else '-' }}</td>
+                    <td class="cap-nowrap">{{ ('R$ ' ~ c.valor_pago_senar|string) if c.valor_pago_senar is not none else '-' }}</td>
                     <td>
                         {% if c.arquivo_tipo %}
                             {% set eh_pdf = c.arquivo_tipo == 'application/pdf' %}

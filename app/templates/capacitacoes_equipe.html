@@ -1,22 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Capacitações{% endblock %}
+{% block title %}Capacitações de {{ avaliado.nome }}{% endblock %}
 
 {% block content %}
-<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
-<h1>Capacitações</h1>
-<p class="muted">Cursos, treinamentos, oficinas e congressos cadastrados pelos próprios funcionários em "Minhas Capacitações", trimestre a trimestre.</p>
+<a href="{{ url_for('main.minha_area') }}" class="back-link">&larr; Minha área</a>
+<h1>Capacitações de {{ avaliado.nome }}</h1>
+<p class="muted">Cursos, treinamentos, oficinas e congressos que {{ avaliado.nome.split(' ')[0] }} cadastrou em "Minhas Capacitações", trimestre a trimestre.</p>
 
-<!-- Barra: funcionário + ano + trimestres -->
+<!-- Barra: ano + trimestres -->
 <div class="cap-barra">
     <div class="cap-filtros">
         <form method="get" class="cap-ano">
             <input type="hidden" name="trimestre" value="{{ trimestre_selecionado or 0 }}">
-            <select name="funcionario_id" class="cap-func" onchange="this.form.submit()" aria-label="Funcionário">
-                <option value="">Todos os funcionários</option>
-                {% for f in funcionarios %}
-                    <option value="{{ f.id }}" {% if funcionario_id_selecionado == f.id|string %}selected{% endif %}>{{ f.nome }}</option>
-                {% endfor %}
-            </select>
             <select name="ano" onchange="this.form.submit()" aria-label="Ano">
                 <option value="">Todos os anos</option>
                 {% for a in anos %}
@@ -26,10 +20,10 @@
         </form>
         <nav class="cap-tabs" aria-label="Trimestre">
             <a class="cap-tab {% if not trimestre_selecionado %}ativo{% endif %}"
-               href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, trimestre=0) }}">Todos</a>
+               href="{{ url_for('main.capacitacoes_da_equipe', avaliado_id=avaliado.id, ano=ano_selecionado, trimestre=0) }}">Todos</a>
             {% for t in trimestres %}
                 <a class="cap-tab {% if t == trimestre_selecionado %}ativo{% endif %}"
-                   href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, trimestre=t) }}">{{ t }}º tri</a>
+                   href="{{ url_for('main.capacitacoes_da_equipe', avaliado_id=avaliado.id, ano=ano_selecionado, trimestre=t) }}">{{ t }}º tri</a>
             {% endfor %}
         </nav>
     </div>
@@ -42,10 +36,6 @@
     <div class="cap-kpi">
         <span class="cap-kpi-valor">{{ capacitacoes|length }}</span>
         <span class="cap-kpi-rotulo">Capacitações no período</span>
-    </div>
-    <div class="cap-kpi">
-        <span class="cap-kpi-valor">{{ total_pessoas }}</span>
-        <span class="cap-kpi-rotulo">Funcionários com capacitação</span>
     </div>
     <div class="cap-kpi">
         <span class="cap-kpi-valor">{{ total_horas }}h</span>
@@ -62,7 +52,6 @@
     <table class="tabela tabela-capacitacoes">
         <thead>
             <tr>
-                <th>Funcionário</th>
                 <th>Capacitação</th>
                 <th>Tipo</th>
                 <th>Status</th>
@@ -75,7 +64,6 @@
         <tbody>
             {% for c in capacitacoes %}
                 <tr>
-                    <td class="cap-col-func"><strong class="cap-nome">{{ c.funcionario.nome }}</strong></td>
                     <td class="cap-col-nome">
                         <strong class="cap-nome">{{ c.nome_curso }}</strong>
                         {% if c.instituicao %}<div class="muted cap-sub">{{ c.instituicao }}</div>{% endif %}
@@ -102,7 +90,7 @@
                         {% if c.arquivo_tipo %}
                             {% set eh_pdf = c.arquivo_tipo == 'application/pdf' %}
                             <a class="cap-doc {{ 'cap-doc-pdf' if eh_pdf else 'cap-doc-img' }}"
-                               href="{{ url_for('admin.documento_capacitacao', capacitacao_id=c.id) }}"
+                               href="{{ url_for('main.documento_capacitacao_equipe', capacitacao_id=c.id) }}"
                                target="_blank" rel="noopener"
                                data-tip="Visualizar documento" aria-label="Visualizar documento de {{ c.nome_curso }}">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
@@ -113,7 +101,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="8" class="cap-vazio">Nenhuma capacitação encontrada neste filtro.</td>
+                    <td colspan="7" class="cap-vazio">Nenhuma capacitação encontrada neste filtro.</td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -121,7 +109,8 @@
 </div>
 
 <style>
-/* Mesmo visual da tela "Minhas Capacitações" do colaborador */
+/* Mesmo visual da tela "Minhas Capacitações" / admin, só que sem o
+   seletor de funcionário (essa tela já é de uma pessoa só). */
 .cap-barra {
     display: flex; align-items: center; justify-content: space-between;
     gap: 16px; flex-wrap: wrap; margin: 20px 0 6px;
@@ -129,7 +118,6 @@
 .cap-filtros { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .cap-ano { margin: 0; display: flex; gap: 12px; flex-wrap: wrap; }
 .cap-ano select { width: auto; min-width: 96px; font-weight: 600; }
-.cap-ano select.cap-func { min-width: 260px; max-width: 100%; }
 .cap-tabs {
     display: inline-flex; padding: 4px; gap: 4px;
     background: #e9edf2; border-radius: 10px;
@@ -147,7 +135,7 @@
 
 /* Resumo */
 .cap-resumo {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px; margin-bottom: 20px;
 }
 .cap-kpi {
@@ -166,7 +154,6 @@
 .tabela-capacitacoes td { padding: 14px 12px; vertical-align: middle; }
 .tabela-capacitacoes th:first-child, .tabela-capacitacoes td:first-child { padding-left: 18px; }
 .tabela-capacitacoes th:last-child, .tabela-capacitacoes td:last-child { padding-right: 18px; }
-.cap-col-func { min-width: 170px; }
 .cap-col-nome { min-width: 230px; }
 .cap-nome { color: var(--navy-900); }
 .cap-sub { font-size: 0.85rem; margin-top: 2px; }
@@ -205,7 +192,6 @@
 }
 @media (max-width: 560px) {
     .cap-resumo { grid-template-columns: 1fr; }
-    .cap-ano select.cap-func { min-width: 0; width: 100%; }
 }
 </style>
 {% endblock %}

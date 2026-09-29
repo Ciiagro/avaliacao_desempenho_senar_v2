@@ -98,6 +98,12 @@
                                href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=linha.avaliado.id, avaliador_id=funcionario.id, tipo='gestor') }}">
                                 {% if linha.status == 'concluida' %}Ver{% else %}Avaliar{% endif %}
                             </a>
+                            <a class="botao-icone botao-icone-secundario"
+                               href="{{ url_for('main.capacitacoes_da_equipe', avaliado_id=linha.avaliado.id) }}"
+                               title="Ver capacitações"
+                               aria-label="Ver capacitações de {{ linha.avaliado.nome }}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+                            </a>
                             {% if linha.status == 'concluida' and linha.avaliacao %}
                                 <a class="botao-icone botao-icone-secundario"
                                    href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=linha.avaliacao.id) }}"

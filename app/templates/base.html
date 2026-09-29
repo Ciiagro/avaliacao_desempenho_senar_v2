@@ -26,9 +26,9 @@
                 {% else %}
                     <a href="{{ url_for('recursos.recurso_area') }}">Recurso</a>
                 {% endif %}
-                {% if funcionario_eh_gestor %}
+                {% if funcionario_eh_gestor and recursos_pendentes_gestor %}
                     <a href="{{ url_for('recursos.recurso_gestor_area') }}">
-                        Recursos a responder{% if recursos_pendentes_gestor %} <span class="badge badge-pending">{{ recursos_pendentes_gestor }}</span>{% endif %}
+                        Recursos a responder <span class="badge badge-pending">{{ recursos_pendentes_gestor }}</span>
                     </a>
                 {% endif %}
                 {% if funcionario_atual.eh_presidencia %}

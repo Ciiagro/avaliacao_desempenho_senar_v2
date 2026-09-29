@@ -24,6 +24,16 @@
 .cap-check { flex-direction: row; align-items: center; gap: 8px; }
 .cap-check input { width: auto; }
 .cap-check span { text-transform: none; letter-spacing: 0; font-size: 0.9rem; font-weight: 600; color: var(--texto); }
+/* Aviso de como comprovar a capacitação */
+.cap-aviso {
+    background: var(--info-bg); border: 1px solid rgba(63, 111, 176, 0.25);
+    border-left: 4px solid var(--info); border-radius: 8px;
+    padding: 12px 16px; margin: 0 0 18px; font-size: 0.9rem; color: var(--texto);
+}
+.cap-aviso strong { display: block; margin-bottom: 4px; color: var(--navy-900); }
+.cap-aviso ul { margin: 4px 0 8px; padding-left: 20px; }
+.cap-aviso li { margin: 2px 0; }
+.cap-aviso p { margin: 0; }
 @media (max-width: 760px) {
     .cap-grid { grid-template-columns: 1fr; }
     .cap-2, .cap-3, .cap-6 { grid-column: auto; }
