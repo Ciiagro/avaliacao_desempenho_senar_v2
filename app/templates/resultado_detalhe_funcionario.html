@@ -110,7 +110,7 @@
                 {% if prazo_ciencia < agora %}
                     <strong>Prazo vencido em {{ prazo_ciencia.strftime('%d/%m/%Y') }}.</strong>
                 {% else %}
-                    <strong>Prazo até {{ prazo_ciencia.strftime('%d/%m/%Y') }}</strong> (5 dias úteis a partir da liberação)
+                    <strong>Prazo até {{ prazo_ciencia.strftime('%d/%m/%Y') }}</strong> (5 dias úteis a partir da {{ prazo_base }})
                 {% endif %}
             {% endif %}
             para você dar ciência do recebimento desta avaliação: informe se aceita o

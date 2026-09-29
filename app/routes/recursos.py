@@ -241,6 +241,8 @@ def recurso_area():
     if not funcionario:
         return redirect(url_for("main.login"))
 
+    from .main import prazo_ciencia, prazo_ciencia_base
+
     registros_liberados = ResultadoFinal.query.filter_by(
         avaliado_id=funcionario.id, liberado=True
     ).all()
@@ -259,9 +261,10 @@ def recurso_area():
             continue
         if _pode_abrir_novo_recurso(registro.ciclo_id, funcionario.id):
             ciclo = CicloAvaliacao.query.get(registro.ciclo_id)
-            ciclo.prazo_abrir_recurso = prazo_dias_corridos(
-                registro.liberado_em, PRAZO_RECURSO_FUNCIONARIO_DIAS
-            )
+            # Mesmo prazo da ciência: 5 dias úteis a partir da devolutiva
+            # (ou da liberação, se a devolutiva ainda não foi marcada).
+            ciclo.prazo_abrir_recurso = prazo_ciencia(registro)
+            ciclo.prazo_base = prazo_ciencia_base(registro)
             ciclo.fatores = fatores_funcionario
             ciclos_sem_recurso.append(ciclo)
 

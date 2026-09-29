@@ -17,7 +17,7 @@ from ..models import (
     trimestre_atual,
     limites_trimestre,
 )
-from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, adicionar_dias_uteis, para_fortaleza
+from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, adicionar_dias_uteis, para_fortaleza, FUSO_FORTALEZA
 from ..resultado_final_service import montar_dados_resultado_final
 # gerar_pdf_resultado_final e gerar_excel_resultado_final são importados dentro
 # das próprias rotas que os usam (reportlab/openpyxl são pesados pra importar
@@ -673,11 +673,37 @@ def _resultado_liberado_do_ciclo(funcionario, ciclo_id):
     ).first()
 
 
+def _devolutiva_do_registro(registro):
+    """Devolutiva marcada pra esse avaliado (ou None se ainda não foi)."""
+    avaliado = registro.avaliado if registro else None
+    devolutiva = avaliado.devolutiva if avaliado else None
+    if devolutiva and devolutiva.data_limite_recorrer:
+        return devolutiva
+    return None
+
+
+def prazo_ciencia_base(registro):
+    """Diz de onde o prazo está sendo contado ('devolutiva' ou 'liberação'),
+    pra as telas mostrarem o texto certo."""
+    return "devolutiva" if _devolutiva_do_registro(registro) else "liberação"
+
+
 def prazo_ciencia(registro):
-    """Data-limite (5 dias úteis a partir da liberação) pro avaliado dar
-    ciência do resultado final — aceitando ou recorrendo. Conta os dias
-    úteis pelo calendário de Fortaleza/CE, não pelo UTC."""
-    if not registro or not registro.liberado_em:
+    """Data-limite pro avaliado dar ciência do resultado final (aceitando ou
+    recorrendo) e também pra abrir recurso.
+
+    - Se a devolutiva já foi marcada: vale a data-limite dela (5 dias úteis a
+      partir da data da devolutiva), até o fim desse dia.
+    - Se ainda não foi marcada: 5 dias úteis a partir da liberação do
+      resultado.
+    Conta os dias úteis pelo calendário de Fortaleza/CE, não pelo UTC."""
+    if not registro:
+        return None
+    devolutiva = _devolutiva_do_registro(registro)
+    if devolutiva:
+        limite = devolutiva.data_limite_recorrer
+        return datetime(limite.year, limite.month, limite.day, 23, 59, 59, tzinfo=FUSO_FORTALEZA)
+    if not registro.liberado_em:
         return None
     liberado_local = para_fortaleza(registro.liberado_em)
     return adicionar_dias_uteis(liberado_local, PRAZO_CIENCIA_DIAS_UTEIS)
@@ -727,6 +753,7 @@ def meu_resultado_detalhe(ciclo_id):
         funcionario=funcionario,
         dados=dados,
         prazo_ciencia=prazo_ciencia(registro),
+        prazo_base=prazo_ciencia_base(registro),
         agora=datetime.now(timezone.utc),
         recurso_atual=recurso_atual,
     )
