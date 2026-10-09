@@ -287,7 +287,7 @@
     <div class="mon-ranks">
         <section class="mon-card mon-rank-card">
             <h3>Ranking de autoavaliações</h3>
-            <p class="muted">Setores com maior percentual de conclusão.</p>
+            <p class="muted">Percentual de conclusão por setor, contando as pessoas que <b>trabalham</b> em cada setor (não as equipes que cada gestor avalia).</p>
             <table class="mon-rank-table">
                 <thead>
                     <tr><th class="num">#</th><th>Setor</th><th class="num">Concluídas</th><th class="num">%</th></tr>
@@ -317,7 +317,7 @@
 
         <section class="mon-card mon-rank-card">
             <h3>Ranking de avaliações de gestor</h3>
-            <p class="muted">Setores com maior percentual de conclusão.</p>
+            <p class="muted">Percentual de pessoas de cada setor que já foram avaliadas pelo gestor delas (o gestor pode ser de outro setor).</p>
             <table class="mon-rank-table">
                 <thead>
                     <tr><th class="num">#</th><th>Setor</th><th class="num">Concluídas</th><th class="num">%</th></tr>
@@ -353,7 +353,7 @@
         <div class="mon-cab">
             <div>
                 <h2>Gestores e suas equipes</h2>
-                <p class="muted" style="margin:0;">Cada quadradinho é uma pessoa da equipe; verde = já avaliada. Clique pra abrir.</p>
+                <p class="muted" style="margin:0;">Aqui é por gestor: o número é a equipe que ele avalia, mesmo que as pessoas sejam de outros setores. Cada quadradinho é uma pessoa; verde = já avaliada. Clique pra abrir.</p>
             </div>
             <div class="mon-seg" role="group" aria-label="Filtro de gestores">
                 <button type="button" id="mon-g-pend" aria-pressed="true">Com pendência ({{ resumo.gestores|length - resumo.gestores_completos }})</button>
@@ -368,7 +368,7 @@
                             <b>{{ g.nome }}</b>
                             <span style="color: {% if g.pct == 100 %}var(--sucesso){% elif g.concluidas == 0 %}var(--perigo){% else %}var(--aviso){% endif %};">{{ g.concluidas }}/{{ g.total }}</span>
                         </div>
-                        <p class="mon-g-setor">{{ g.setor or '—' }}</p>
+                        <p class="mon-g-setor">{{ g.setor or '—' }} · avalia {{ g.total }} {{ 'pessoa' if g.total == 1 else 'pessoas' }}</p>
                         <div class="mon-segs">{% for p in g.pessoas|sort(attribute='ok', reverse=true) %}<i class="{{ 'ok' if p.ok else '' }}"></i>{% endfor %}</div>
                     </summary>
                     <div class="mon-g-corpo">

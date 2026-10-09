@@ -19,6 +19,8 @@ from ..models import (
 )
 from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, adicionar_dias_uteis, para_fortaleza, FUSO_FORTALEZA
 from ..resultado_final_service import montar_dados_resultado_final
+from .. import senhas as regras_senha
+from .. import email_service
 # gerar_pdf_resultado_final e gerar_excel_resultado_final são importados dentro
 # das próprias rotas que os usam (reportlab/openpyxl são pesados pra importar
 # e a maioria das páginas do site — login, minha área, etc. — não precisa deles).
@@ -67,18 +69,29 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         senha = request.form.get("senha", "")
-        funcionario = (
-            Funcionario.query.filter(
-                db.func.lower(Funcionario.email) == email, Funcionario.ativo.is_(True)
-            ).first()
-            if email
-            else None
-        )
+        funcionario = regras_senha.buscar_funcionario_ativo_por_email(email)
+
+        if funcionario:
+            minutos = regras_senha.minutos_de_bloqueio_restantes(funcionario)
+            if minutos:
+                flash(
+                    f"Muitas tentativas erradas. Tente de novo em {minutos} minuto(s) "
+                    f"ou use \"Esqueci minha senha\".",
+                    "danger",
+                )
+                return render_template("login.html")
+
         if funcionario and funcionario.checar_senha(senha):
+            regras_senha.limpar_tentativas_login(funcionario)
+            db.session.commit()
             session["funcionario_id"] = str(funcionario.id)
             if funcionario.senha_provisoria:
                 return redirect(url_for("main.trocar_senha"))
             return redirect(url_for("main.minha_area"))
+
+        if funcionario:
+            regras_senha.registrar_login_errado(funcionario)
+            db.session.commit()
         flash("E-mail ou senha incorretos.", "danger")
     return render_template("login.html")
 
@@ -101,20 +114,89 @@ def trocar_senha():
         senha_nova = request.form.get("senha_nova", "")
         senha_confirmar = request.form.get("senha_confirmar", "")
 
+        erro_senha_nova = regras_senha.validar_senha_nova(senha_nova, funcionario)
         if not funcionario.checar_senha(senha_atual):
             flash("Senha atual incorreta.", "danger")
-        elif len(senha_nova) < 6:
-            flash("A nova senha precisa ter pelo menos 6 caracteres.", "danger")
+        elif erro_senha_nova:
+            flash(erro_senha_nova, "danger")
+        elif senha_nova == senha_atual:
+            flash("A nova senha precisa ser diferente da senha atual.", "danger")
         elif senha_nova != senha_confirmar:
             flash("A confirmação não bate com a nova senha.", "danger")
         else:
             funcionario.set_senha(senha_nova)
             funcionario.senha_provisoria = False
+            regras_senha.invalidar_tokens_pendentes(funcionario)
             db.session.commit()
             flash("Senha alterada com sucesso.", "success")
             return redirect(url_for("main.minha_area"))
 
     return render_template("trocar_senha.html", forcado=funcionario.senha_provisoria)
+
+
+# Mesma resposta, exista o e-mail ou não: assim ninguém usa este formulário
+# para descobrir quem tem cadastro no sistema.
+_MSG_ESQUECI = (
+    "Se esse e-mail estiver cadastrado, enviamos um link para criar uma nova senha. "
+    "Ele vale por {minutos} minutos. Confira também a caixa de spam."
+)
+
+
+@main_bp.route("/esqueci-senha", methods=["GET", "POST"])
+def esqueci_senha():
+    if request.method == "POST":
+        funcionario = regras_senha.buscar_funcionario_ativo_por_email(
+            request.form.get("email", "")
+        )
+        if funcionario:
+            token = regras_senha.criar_token_redefinicao(funcionario)
+            db.session.commit()
+            if token:
+                link = url_for("main.redefinir_senha", token=token, _external=True)
+                email_service.avisar_redefinicao_senha(
+                    funcionario, link, regras_senha.TOKEN_VALIDADE_MINUTOS
+                )
+        flash(_MSG_ESQUECI.format(minutos=regras_senha.TOKEN_VALIDADE_MINUTOS), "success")
+        return redirect(url_for("main.esqueci_senha"))
+    return render_template("esqueci_senha.html")
+
+
+@main_bp.route("/redefinir-senha/<token>", methods=["GET", "POST"])
+def redefinir_senha(token):
+    registro = regras_senha.buscar_token_valido(token)
+    if not registro:
+        flash("Este link venceu ou já foi usado. Peça um novo.", "danger")
+        return redirect(url_for("main.esqueci_senha"))
+
+    funcionario = Funcionario.query.get(registro.funcionario_id)
+    if not funcionario or not funcionario.ativo:
+        flash("Este link venceu ou já foi usado. Peça um novo.", "danger")
+        return redirect(url_for("main.esqueci_senha"))
+
+    if request.method == "POST":
+        senha_nova = request.form.get("senha_nova", "")
+        senha_confirmar = request.form.get("senha_confirmar", "")
+        erro = regras_senha.validar_senha_nova(senha_nova, funcionario)
+        if erro:
+            flash(erro, "danger")
+        elif senha_nova != senha_confirmar:
+            flash("A confirmação não bate com a nova senha.", "danger")
+        elif not regras_senha.consumir_token(token):
+            # outro clique/aba usou o link no mesmo instante
+            db.session.rollback()
+            flash("Este link venceu ou já foi usado. Peça um novo.", "danger")
+            return redirect(url_for("main.esqueci_senha"))
+        else:
+            funcionario.set_senha(senha_nova)
+            funcionario.senha_provisoria = False
+            regras_senha.limpar_tentativas_login(funcionario)
+            regras_senha.invalidar_tokens_pendentes(funcionario)
+            db.session.commit()
+            email_service.avisar_senha_alterada(funcionario)
+            flash("Senha criada com sucesso. Entre com a nova senha.", "success")
+            return redirect(url_for("main.login"))
+
+    return render_template("redefinir_senha.html", token=token)
 
 
 def _resultados_liberados_do_funcionario(funcionario):

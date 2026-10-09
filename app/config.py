@@ -5,7 +5,10 @@ load_dotenv()
 
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-key-mude-isso")
+    # Sem valor padrão de propósito: em produção (Vercel) o sistema se recusa a
+    # subir sem SECRET_KEY (ver create_app), porque quem conhece a chave
+    # consegue forjar qualquer sessão, inclusive a de administrador.
+    SECRET_KEY = os.environ.get("SECRET_KEY")
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mude-esta-senha")
     COMISSAO_PASSWORD = os.environ.get("COMISSAO_PASSWORD", "mude-esta-senha-comissao")
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")

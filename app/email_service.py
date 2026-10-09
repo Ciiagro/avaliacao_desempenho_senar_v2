@@ -16,7 +16,6 @@ Usa uma conta do Gmail via SMTP. Não depende de nenhuma biblioteca extra
 import html
 import smtplib
 import ssl
-import threading
 from email.message import EmailMessage
 
 from flask import current_app
@@ -58,16 +57,38 @@ def _email_funcionario(funcionario):
 # ---------------------------------------------------------------------------
 # Montagem do e-mail (HTML + texto simples) a partir de um conteúdo comum
 # ---------------------------------------------------------------------------
-def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=None, selo=None):
+_LOGO_CID = "logo_senar"
+_LOGO_ARQUIVO = "img/logo_senar_email.png"
+
+
+def _ler_logo():
+    """Bytes da logo do SENAR (versão pequena, própria para e-mail) ou None.
+
+    A logo vai ANEXADA ao e-mail (imagem embutida, "cid:"), em vez de
+    linkada pelo site: assim aparece sempre, sem depender de o site estar
+    acessível pela internet nem de o leitor de e-mail baixar imagens externas.
+    """
+    import os
+
+    try:
+        caminho = os.path.join(current_app.static_folder, _LOGO_ARQUIVO)
+        with open(caminho, "rb") as f:
+            return f.read()
+    except (OSError, RuntimeError):
+        return None
+
+
+def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=None, selo=None,
+                  icone=None, destaque_mono=False):
     """Monta o par (texto_simples, html) de um e-mail de aviso, com um
     layout único e consistente:
 
-    - título no cabeçalho (cor de marca), com um selo colorido opcional
-      ao lado (ex.: "REVISOU A NOTA" / "MANTEVE A NOTA"), pro leitor bater
-      o olho e já saber do que se trata antes de ler o texto;
+    - cabeçalho na cor da marca, com a logo, o título e um selo colorido
+      opcional (ex.: "REVISOU A NOTA") pro leitor já saber do que se trata;
+    - um ícone opcional (ex.: ✓) em um círculo, no topo do corpo;
     - parágrafos de texto corrido, em ordem;
-    - um "destaque" opcional (ex.: motivo do recurso, justificativa),
-      mostrado numa caixa clara, separado do resto do texto;
+    - um "destaque" opcional (ex.: motivo do recurso, senha provisória),
+      numa caixa clara (em fonte monoespaçada com destaque_mono=True);
     - um botão de ação opcional, linkando pra área do sistema onde a
       pessoa precisa agir.
     """
@@ -94,64 +115,101 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
     def esc(s):
         return html.escape(str(s)).replace("\n", "<br>")
 
+    fonte = "Segoe UI, Helvetica, Arial, sans-serif"
+
+    icone_html = ""
+    if icone:
+        icone_html = f"""
+                <div style="margin:0 0 18px;">
+                    <span style="display:inline-block; width:48px; height:48px; line-height:48px;
+                                 text-align:center; border-radius:50%; background:{_COR_SUCESSO_BG};
+                                 color:{_COR_SUCESSO_TEXTO}; font-size:24px; font-weight:bold;">{esc(icone)}</span>
+                </div>"""
+
     paragrafos_html = "".join(
-        f'<p style="margin:0 0 10px; font-size:13px; line-height:1.5; color:{_COR_TEXTO};">{esc(p)}</p>'
+        f'<p style="margin:0 0 14px; font-size:15px; line-height:1.6; color:{_COR_TEXTO};">{esc(p)}</p>'
         for p in paragrafos
     )
 
     destaque_html = ""
     if destaque:
         rotulo, conteudo = destaque
+        if destaque_mono:
+            estilo_conteudo = (
+                f"margin:0; font-family:Consolas, 'Courier New', monospace; font-size:20px; "
+                f"font-weight:bold; letter-spacing:0.06em; color:{_COR_TEXTO};"
+            )
+        else:
+            estilo_conteudo = f"margin:0; font-size:14px; line-height:1.55; color:{_COR_TEXTO};"
         destaque_html = f"""
-        <div style="margin:0 0 12px; padding:10px 12px; background:{_COR_DESTAQUE_BG};
-                    border-left:3px solid {_COR_DESTAQUE_TEXTO}; border-radius:5px;">
-            <p style="margin:0 0 3px; font-size:10px; font-weight:bold; letter-spacing:0.04em;
-                      text-transform:uppercase; color:{_COR_DESTAQUE_TEXTO};">{esc(rotulo)}</p>
-            <p style="margin:0; font-size:13px; line-height:1.45; color:{_COR_TEXTO};">{esc(conteudo)}</p>
-        </div>"""
+                <div style="margin:4px 0 20px; padding:14px 16px; background:{_COR_DESTAQUE_BG};
+                            border-left:4px solid {_COR_DESTAQUE_TEXTO}; border-radius:6px;">
+                    <p style="margin:0 0 6px; font-size:11px; font-weight:bold; letter-spacing:0.06em;
+                              text-transform:uppercase; color:{_COR_DESTAQUE_TEXTO};">{esc(rotulo)}</p>
+                    <p style="{estilo_conteudo}">{esc(conteudo)}</p>
+                </div>"""
 
     botao_html = ""
     if link_url:
         botao_html = f"""
-        <a href="{html.escape(link_url)}"
-           style="display:inline-block; margin-top:4px; padding:8px 16px; background:{_COR_NAVY_700};
-                  color:#ffffff; font-size:13px; font-weight:bold; text-decoration:none;
-                  border-radius:6px;">{esc(link_texto or 'Acessar o sistema')}</a>"""
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px;">
+                    <tr>
+                        <td align="center" bgcolor="{_COR_NAVY_700}" style="border-radius:8px; background:{_COR_NAVY_700};">
+                            <a href="{html.escape(link_url)}"
+                               style="display:inline-block; padding:13px 28px; color:#ffffff; font-size:15px;
+                                      font-weight:bold; text-decoration:none; border-radius:8px;">{esc(link_texto or 'Acessar o sistema')}</a>
+                        </td>
+                    </tr>
+                </table>"""
 
     selo_html = ""
     if selo:
         selo_texto, selo_bg, selo_texto_cor = selo
         selo_html = f"""
-                <span style="display:inline-block; margin-top:6px; padding:3px 9px; background:{selo_bg};
-                             color:{selo_texto_cor}; font-size:10px; font-weight:bold; letter-spacing:0.03em;
+                <span style="display:inline-block; margin-top:10px; padding:4px 11px; background:{selo_bg};
+                             color:{selo_texto_cor}; font-size:11px; font-weight:bold; letter-spacing:0.04em;
                              text-transform:uppercase; border-radius:20px;">{esc(selo_texto)}</span>"""
+
+    # Logo colorida sobre um "cartão" branco (a original não tem versão para fundo escuro).
+    logo_html = ""
+    if _ler_logo():
+        logo_html = (
+            f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;"><tr>'
+            f'<td bgcolor="#ffffff" style="background:#ffffff; border-radius:10px; padding:8px 14px;">'
+            f'<img src="cid:{_LOGO_CID}" alt="SENAR Ceará" width="120" '
+            f'style="display:block; width:120px; height:auto; border:0;">'
+            f'</td></tr></table>'
+        )
 
     corpo_html = f"""\
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"></head>
-<body style="margin:0; padding:20px 12px; background:{_COR_FUNDO}; font-family:Arial, Helvetica, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; margin:0 auto;">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0; padding:28px 12px; background:{_COR_FUNDO}; font-family:{fonte};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; margin:0 auto;">
         <tr>
-            <td style="background:{_COR_NAVY_900}; padding:12px 18px; border-radius:8px 8px 0 0;">
-                <p style="margin:0 0 2px; font-size:10px; font-weight:bold; letter-spacing:0.05em;
-                          text-transform:uppercase; color:rgba(255,255,255,0.6);">Avaliação de Desempenho</p>
-                <h1 style="margin:0; font-size:15px; color:#ffffff;">{esc(titulo)}</h1>
+            <td bgcolor="{_COR_NAVY_900}" style="background:{_COR_NAVY_900}; padding:24px 28px; border-radius:12px 12px 0 0;">
+                {logo_html}
+                <p style="margin:0 0 4px; font-size:11px; font-weight:bold; letter-spacing:0.08em;
+                          text-transform:uppercase; color:#9fc2c3;">Avaliação de Desempenho</p>
+                <h1 style="margin:0; font-size:22px; line-height:1.3; color:#ffffff;">{esc(titulo)}</h1>
                 {selo_html}
             </td>
         </tr>
         <tr>
-            <td style="background:#ffffff; border:1px solid {_COR_BORDA}; border-top:none;
-                       border-radius:0 0 8px 8px; padding:18px;">
+            <td bgcolor="#ffffff" style="background:#ffffff; border:1px solid {_COR_BORDA}; border-top:none;
+                       border-radius:0 0 12px 12px; padding:28px;">
+                {icone_html}
                 {paragrafos_html}
                 {destaque_html}
                 {botao_html}
             </td>
         </tr>
         <tr>
-            <td style="padding:12px 6px 0; text-align:center;">
-                <p style="margin:0; font-size:10px; color:{_COR_TEXTO_MUTED};">
-                    Mensagem automática do sistema de Avaliação de Desempenho.
+            <td style="padding:16px 8px 0; text-align:center;">
+                <p style="margin:0; font-size:12px; line-height:1.5; color:{_COR_TEXTO_MUTED};">
+                    Mensagem automática do sistema de Avaliação de Desempenho.<br>
+                    Não é necessário responder a este e-mail.
                 </p>
             </td>
         </tr>
@@ -162,16 +220,19 @@ def _montar_email(titulo, paragrafos, destaque=None, link_url=None, link_texto=N
     return texto, corpo_html
 
 
-def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, link_url=None, link_texto=None, selo=None):
+def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, link_url=None, link_texto=None, selo=None,
+                  icone=None, destaque_mono=False):
     """Envio de e-mail de baixo nível, usado tanto pros avisos da Comissão
     quanto pros avisos ao gestor/empregado. Manda em HTML com uma versão
     em texto simples como alternativa.
 
-    Se o e-mail não estiver configurado (variáveis de ambiente
-    MAIL_USERNAME / MAIL_APP_PASSWORD), não houver destinatário, ou o
-    envio falhar por qualquer motivo, só registra um aviso no log da
-    aplicação e segue em frente — isso nunca deve quebrar a ação do
-    empregado/gestor/comissão que disparou o aviso.
+    Devolve True se o e-mail foi entregue ao servidor SMTP e False se não
+    foi (e-mail não configurado, sem destinatário ou falha no envio).
+
+    Se algo falhar, só registra no log da aplicação e devolve False — isso
+    nunca deve quebrar a ação do empregado/gestor/comissão que disparou o
+    aviso. Quem chama pode usar o resultado para avisar o usuário (e a
+    rotina de lembretes só marca "enviado" quando deu certo).
     """
     usuario = current_app.config.get("MAIL_USERNAME")
     senha = current_app.config.get("MAIL_APP_PASSWORD")
@@ -181,7 +242,7 @@ def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, lin
             "não configurados no ambiente.",
             assunto,
         )
-        return
+        return False
 
     destinatarios = [d.strip() for d in destinatarios if d and d.strip()]
     if not destinatarios:
@@ -189,9 +250,11 @@ def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, lin
             "Aviso por e-mail não enviado (assunto: %s): nenhum destinatário com e-mail cadastrado.",
             assunto,
         )
-        return
+        return False
 
-    texto, corpo_html = _montar_email(titulo, paragrafos, destaque, link_url, link_texto, selo)
+    texto, corpo_html = _montar_email(
+        titulo, paragrafos, destaque, link_url, link_texto, selo, icone=icone, destaque_mono=destaque_mono
+    )
 
     msg = EmailMessage()
     msg["Subject"] = assunto
@@ -199,31 +262,28 @@ def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, lin
     msg["To"] = ", ".join(destinatarios)
     msg.set_content(texto)
     msg.add_alternative(corpo_html, subtype="html")
+    logo = _ler_logo()
+    if logo:
+        # imagem embutida no corpo HTML, referenciada por cid:logo_senar
+        msg.get_payload()[1].add_related(logo, "image", "png", cid=f"<{_LOGO_CID}>", disposition="inline")
 
     servidor = current_app.config.get("MAIL_SERVER", "smtp.gmail.com")
     porta = current_app.config.get("MAIL_PORT", 465)
 
-    # A conexão SMTP (handshake TLS + login + envio) pode levar vários
-    # segundos, e isso deixava quem abre/responde um recurso esperando
-    # a página carregar até o Gmail terminar de responder. Como o e-mail
-    # é só um aviso (não afeta o que foi salvo no banco), a gente manda
-    # de verdade numa thread em segundo plano e libera a resposta pro
-    # usuário na hora — quem clicou não fica esperando o e-mail sair.
-    app = current_app._get_current_object()
-
-    def _enviar_em_segundo_plano():
-        try:
-            contexto = ssl.create_default_context()
-            with smtplib.SMTP_SSL(servidor, porta, context=contexto) as smtp:
-                smtp.login(usuario, senha)
-                smtp.send_message(msg)
-        except Exception:
-            with app.app_context():
-                app.logger.exception(
-                    "Falha ao enviar e-mail de aviso (assunto: %s).", assunto
-                )
-
-    threading.Thread(target=_enviar_em_segundo_plano, daemon=True).start()
+    # O envio é feito na hora (sem thread em segundo plano). No Vercel a
+    # função é encerrada assim que a resposta é devolvida, então um envio
+    # "em segundo plano" era interrompido antes de terminar e o e-mail
+    # simplesmente não saía. O timeout evita a página ficar travada caso o
+    # Gmail demore a responder.
+    try:
+        contexto = ssl.create_default_context()
+        with smtplib.SMTP_SSL(servidor, porta, context=contexto, timeout=20) as smtp:
+            smtp.login(usuario, senha)
+            smtp.send_message(msg)
+        return True
+    except Exception:
+        current_app.logger.exception("Falha ao enviar e-mail de aviso (assunto: %s).", assunto)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +425,7 @@ def avisar_prazo_avaliacao(funcionario, tipo, dias_restantes, prazo):
             f"{nome_tipo}, que encerra em {prazo.strftime('%d/%m/%Y')}."
         )
 
-    _enviar_email(
+    return _enviar_email(
         _email_funcionario(funcionario),
         f"[Avaliação de Desempenho] Prazo — {assunto_prazo} ({nome_tipo})",
         titulo="Lembrete de prazo",
@@ -395,7 +455,7 @@ def avisar_prazo_ciencia_resultado(funcionario, dias_restantes, prazo):
             f"que encerra em {prazo.strftime('%d/%m/%Y')}."
         )
 
-    _enviar_email(
+    return _enviar_email(
         _email_funcionario(funcionario),
         f"[Avaliação de Desempenho] Prazo — {assunto_prazo} (ciência do resultado final)",
         titulo="Lembrete de prazo",
@@ -415,15 +475,14 @@ def avisar_prazo_ciencia_resultado(funcionario, dias_restantes, prazo):
 def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite):
     """Devolutiva marcada para o funcionário: aviso com a data e o prazo
     que ele tem para concordar ou recorrer."""
-    dias = (data_limite - data_devolutiva).days
-    _enviar_email(
+    return _enviar_email(
         _email_funcionario(funcionario),
         "[Avaliação de Desempenho] Data de devolutiva marcada",
         titulo="Devolutiva marcada",
         paragrafos=[
             f"A data de devolutiva da sua avaliação foi marcada para "
             f"{data_devolutiva.strftime('%d/%m/%Y')}.",
-            f"Você terá até {data_limite.strftime('%d/%m/%Y')} ({dias} dias) para "
+            f"Você terá até {data_limite.strftime('%d/%m/%Y')} (5 dias úteis) para "
             f"concordar com a resposta ou recorrer.",
         ],
         link_url=_link_empregado(),
@@ -466,3 +525,63 @@ def _link_empregado():
         return url_for("recursos.recurso_area", _external=True)
     except RuntimeError:
         return ""
+
+
+# ---------------------------------------------------------------------------
+# Senha: redefinição, aviso de troca e senha provisória
+# ---------------------------------------------------------------------------
+def avisar_redefinicao_senha(funcionario, link, validade_minutos):
+    """Link para o colaborador criar uma senha nova ("esqueci minha senha")."""
+    return _enviar_email(
+        _email_funcionario(funcionario),
+        "[Avaliação de Desempenho] Redefinição de senha",
+        titulo="Redefinição de senha",
+        paragrafos=[
+            f"Olá, {funcionario.nome}. Recebemos um pedido para criar uma nova senha de acesso.",
+            f"Use o botão abaixo para escolher a nova senha. O link vale por {validade_minutos} minutos "
+            f"e só pode ser usado uma vez.",
+            "Não foi você quem pediu? Ignore este e-mail: sua senha continua a mesma.",
+        ],
+        link_url=link,
+        link_texto="Criar nova senha",
+    )
+
+
+def avisar_senha_alterada(funcionario):
+    """Confirma a troca de senha, para a pessoa perceber se não foi ela."""
+    return _enviar_email(
+        _email_funcionario(funcionario),
+        "[Avaliação de Desempenho] Sua senha foi alterada",
+        titulo="Sua senha foi alterada",
+        paragrafos=[
+            f"Olá, {funcionario.nome}. A senha de acesso ao sistema acabou de ser alterada.",
+            "Não reconhece essa alteração? Avise o RH imediatamente.",
+        ],
+        icone="\u2713",
+        link_url=_link_minha_area(),
+        link_texto="Acessar o sistema",
+    )
+
+
+def avisar_senha_provisoria(funcionario, senha):
+    """Envia a senha provisória (aleatória) direto para o colaborador."""
+    from flask import url_for
+
+    try:
+        link = url_for("main.login", _external=True)
+    except RuntimeError:
+        link = ""
+    return _enviar_email(
+        _email_funcionario(funcionario),
+        "[Avaliação de Desempenho] Seu acesso ao sistema",
+        titulo="Seu acesso ao sistema",
+        paragrafos=[
+            f"Olá, {funcionario.nome}. Seu acesso ao sistema de Avaliação de Desempenho foi criado.",
+            f"Entre com o e-mail {funcionario.email} e a senha provisória abaixo. "
+            f"No primeiro acesso você vai escolher uma senha só sua.",
+        ],
+        destaque=("Senha provisória", senha),
+        destaque_mono=True,
+        link_url=link,
+        link_texto="Entrar no sistema",
+    )

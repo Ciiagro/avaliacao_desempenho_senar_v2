@@ -1,6 +1,6 @@
 import uuid
 import calendar
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import deferred
@@ -32,6 +32,21 @@ OPCOES_SEXO = ["Feminino", "Masculino", "Outro"]
 DIAS_MINIMOS_PARA_AVALIACAO = 365  # 1 ano de casa
 
 
+class RedefinicaoSenha(db.Model):
+    """Link de "esqueci minha senha". Só o hash do token fica no banco."""
+
+    __tablename__ = "redefinicoes_senha"
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    funcionario_id = db.Column(
+        UUID(as_uuid=True), db.ForeignKey("funcionarios.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash = db.Column(db.Text, unique=True, nullable=False)
+    expira_em = db.Column(db.DateTime(timezone=True), nullable=False)
+    usado_em = db.Column(db.DateTime(timezone=True))
+    criado_em = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class Funcionario(db.Model):
     __tablename__ = "funcionarios"
 
@@ -51,6 +66,8 @@ class Funcionario(db.Model):
     elegivel_avaliacao = db.Column(db.Boolean)  # None = calcular automaticamente pela data_admissao
     senha_hash = db.Column(db.Text)
     senha_provisoria = db.Column(db.Boolean, nullable=False, default=True)
+    tentativas_login = db.Column(db.Integer, nullable=False, default=0)
+    bloqueado_ate = db.Column(db.DateTime(timezone=True))
     ativo = db.Column(db.Boolean, nullable=False, default=True)
     eh_presidencia = db.Column(db.Boolean, nullable=False, default=False)
     criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)

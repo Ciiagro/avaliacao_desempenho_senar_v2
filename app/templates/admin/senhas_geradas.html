@@ -24,6 +24,9 @@
     </tbody>
 </table>
 
+<p class="muted">Alternativa sem repassar senha: a pessoa pode abrir a tela de login e clicar em
+<strong>"Esqueci minha senha"</strong> para criar a própria senha por e-mail.</p>
+
 <p class="muted">A pessoa deve entrar em <a href="{{ url_for('main.login') }}">{{ url_for('main.login', _external=True) }}</a>,
 usar essa senha e vai ser obrigada a trocar por uma nova no primeiro acesso.</p>
 {% endblock %}

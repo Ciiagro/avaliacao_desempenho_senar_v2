@@ -59,11 +59,10 @@ from ..models import (
 
 admin_bp = Blueprint("admin", __name__)
 
-SENHA_PADRAO_INICIAL = "123456"  # senha inicial simples; a pessoa troca no primeiro login
-
-
-def gerar_senha_temporaria():
-    return SENHA_PADRAO_INICIAL
+# Senha provisória: aleatória e diferente para cada pessoa (ver senhas.py).
+# A pessoa é obrigada a trocar no primeiro login.
+from ..senhas import gerar_senha_temporaria  # noqa: E402
+from .. import email_service  # noqa: E402
 
 
 # ---------------------------------------------------------
@@ -1889,11 +1888,17 @@ def funcionarios():
             novo.set_senha(senha_temp)
             db.session.add(novo)
             db.session.commit()
-            if email:
+            if email and email_service.avisar_senha_provisoria(novo, senha_temp):
                 flash(
-                    f"Funcionário {nome} cadastrado. Senha temporária: {senha_temp} "
-                    f"(repasse para {email} — ela só aparece agora, guarde-a).",
+                    f"Funcionário {nome} cadastrado. A senha provisória foi enviada para {email}.",
                     "success",
+                )
+            elif email:
+                flash(
+                    f"Funcionário {nome} cadastrado, mas NÃO foi possível enviar o e-mail. "
+                    f"Senha temporária: {senha_temp} (repasse para {email} — ela só aparece agora). "
+                    f"A pessoa também pode usar \"Esqueci minha senha\" na tela de login.",
+                    "warning",
                 )
             else:
                 flash(
@@ -2031,12 +2036,19 @@ def redefinir_senha(funcionario_id):
     senha_temp = gerar_senha_temporaria()
     funcionario.set_senha(senha_temp)
     funcionario.senha_provisoria = True
+    funcionario.tentativas_login = 0
+    funcionario.bloqueado_ate = None
     db.session.commit()
-    if funcionario.email:
+    if funcionario.email and email_service.avisar_senha_provisoria(funcionario, senha_temp):
         flash(
-            f"Nova senha temporária de {funcionario.nome}: {senha_temp} "
-            f"(repasse para {funcionario.email} — só aparece agora).",
+            f"Nova senha provisória de {funcionario.nome} enviada para {funcionario.email}.",
             "success",
+        )
+    elif funcionario.email:
+        flash(
+            f"Nova senha temporária de {funcionario.nome}: {senha_temp}. NÃO foi possível enviar "
+            f"o e-mail — repasse para {funcionario.email} (só aparece agora).",
+            "warning",
         )
     else:
         flash(

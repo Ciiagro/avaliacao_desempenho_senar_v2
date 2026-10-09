@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Criar nova senha{% endblock %}
+
+{% block content %}
+<div class="login-box">
+    <img src="{{ url_for('static', filename='img/logo_senar.png') }}" alt="SENAR" class="login-logo">
+    <h1>Criar nova senha</h1>
+    <p class="muted">Escolha uma senha com pelo menos 8 caracteres. Evite sequências como 12345678 e o seu nome.</p>
+
+    <form method="post" class="form-grid" onsubmit="var b=this.querySelector('button[type=submit]'); if(b){ b.disabled=true; b.textContent='Aguarde...'; }" style="max-width:360px;">
+        <input type="password" name="senha_nova" placeholder="Nova senha (mín. 8 caracteres)" required minlength="8" autocomplete="new-password" autofocus>
+        <input type="password" name="senha_confirmar" placeholder="Confirme a nova senha" required minlength="8" autocomplete="new-password">
+        <button type="submit" class="botao">Salvar nova senha</button>
+    </form>
+</div>
+{% endblock %}

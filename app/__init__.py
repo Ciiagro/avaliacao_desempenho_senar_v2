@@ -1,4 +1,7 @@
-from flask import Flask
+import os
+from urllib.parse import urlparse
+
+from flask import Flask, request
 
 from .config import Config
 from .extensions import db
@@ -8,7 +11,54 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # ---- Segurança da sessão -------------------------------------------
+    em_producao = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+    chave = app.config.get("SECRET_KEY")
+    if not chave or chave == "dev-key-mude-isso":
+        if em_producao:
+            raise RuntimeError(
+                "SECRET_KEY não configurada (ou ainda com o valor de exemplo). "
+                "Defina uma chave longa e aleatória em Settings > Environment Variables do Vercel."
+            )
+        # só no computador de desenvolvimento
+        app.config["SECRET_KEY"] = "dev-key-apenas-para-desenvolvimento-local"
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,   # JavaScript da página não lê o cookie
+        SESSION_COOKIE_SAMESITE="Lax",  # não vai junto em POSTs vindos de outros sites
+        SESSION_COOKIE_SECURE=em_producao,  # só trafega por HTTPS
+    )
+
     db.init_app(app)
+
+    @app.before_request
+    def proteger_contra_csrf():
+        """Barra formulários enviados por OUTRO site em nome de quem está logado.
+
+        Todo POST/PUT/PATCH/DELETE precisa vir do próprio sistema: o navegador
+        informa a origem da requisição (Sec-Fetch-Site / Origin / Referer) e
+        isso não pode ser forjado por uma página de terceiros. Não exige nenhum
+        campo extra nos formulários.
+        """
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return None
+
+        if request.headers.get("Sec-Fetch-Site") in ("same-origin", "none"):
+            return None
+
+        hosts_aceitos = {request.host.lower()}
+        for h in request.headers.get("X-Forwarded-Host", "").split(","):
+            if h.strip():
+                hosts_aceitos.add(h.strip().lower())
+        origem = request.headers.get("Origin") or request.headers.get("Referer") or ""
+        if origem and urlparse(origem).netloc.lower() in hosts_aceitos:
+            return None
+
+        app.logger.warning("Requisição bloqueada (origem diferente): %s %s", request.method, request.path)
+        return (
+            "<p style='font-family:sans-serif'>Requisição bloqueada por segurança "
+            "(origem diferente do sistema). Volte, recarregue a página e tente de novo.</p>",
+            403,
+        )
 
     from .utils import formatar_cpf, para_fortaleza
 

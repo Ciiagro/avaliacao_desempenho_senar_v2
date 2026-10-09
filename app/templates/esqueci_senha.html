@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Esqueci minha senha{% endblock %}
+
+{% block content %}
+<div class="login-box">
+    <a href="{{ url_for('main.login') }}" class="back-link">&larr; Voltar ao login</a>
+    <img src="{{ url_for('static', filename='img/logo_senar.png') }}" alt="SENAR" class="login-logo">
+    <h1>Esqueci minha senha</h1>
+    <p class="muted">Digite o e-mail cadastrado. Vamos enviar um link para você criar uma nova senha.</p>
+
+    <form method="post" class="form-grid" onsubmit="var b=this.querySelector('button[type=submit]'); if(b){ b.disabled=true; b.textContent='Aguarde...'; }" style="max-width:360px;">
+        <input type="email" name="email" placeholder="Seu e-mail" required autofocus>
+        <button type="submit" class="botao">Enviar link</button>
+    </form>
+
+    <p class="muted">Sem e-mail cadastrado ou sem acesso a ele? Fale com o RH.</p>
+</div>
+{% endblock %}
