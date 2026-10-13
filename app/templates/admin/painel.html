@@ -27,6 +27,10 @@
         <h2>Andamento das avaliações</h2>
         <p>Veja quem já concluiu a autoavaliação e a avaliação do gestor</p>
     </a>
+    <a class="card" href="{{ url_for('admin.prorrogacoes') }}">
+        <h2>Prorrogar prazo (férias)</h2>
+        <p>Dê mais prazo para pessoas específicas sem mexer no prazo de todos</p>
+    </a>
     <a class="card" href="{{ url_for('admin.resultados') }}">
         <h2>Resultado final</h2>
         <p>Nota final (auto x0,30 + gestor x0,70) e conceito, com liberação individual para o empregado</p>
@@ -72,6 +76,14 @@
             <label class="ciclo-campo">
                 <span>Prazo avaliação gestor</span>
                 <input type="date" name="data_limite_gestor">
+            </label>
+            <label class="ciclo-campo">
+                <span>Recursos: início</span>
+                <input type="date" name="data_inicio_recurso">
+            </label>
+            <label class="ciclo-campo">
+                <span>Recursos: fim</span>
+                <input type="date" name="data_fim_recurso">
             </label>
         </div>
         <div class="ciclo-acoes">
@@ -174,6 +186,15 @@
                                 <label class="ciclo-campo">
                                     <span>Prazo avaliação gestor</span>
                                     <input type="date" name="data_limite_gestor" value="{{ ciclo.data_limite_gestor.isoformat() if ciclo.data_limite_gestor else '' }}">
+                                </label>
+                                {% set janela_rec = ciclo.janela_recurso() %}
+                                <label class="ciclo-campo">
+                                    <span>Recursos: início</span>
+                                    <input type="date" name="data_inicio_recurso" value="{{ janela_rec[0].isoformat() if janela_rec else '' }}">
+                                </label>
+                                <label class="ciclo-campo">
+                                    <span>Recursos: fim</span>
+                                    <input type="date" name="data_fim_recurso" value="{{ janela_rec[1].isoformat() if janela_rec else '' }}">
                                 </label>
                             </div>
                             <div class="ciclo-acoes">

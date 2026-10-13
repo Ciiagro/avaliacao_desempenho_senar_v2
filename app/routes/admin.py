@@ -1,7 +1,7 @@
 import io
 import unicodedata
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 
 from sqlalchemy.orm import aliased, joinedload
 from flask import (
@@ -53,6 +53,9 @@ from ..models import (
     RECURSO_STATUS_ENCERRADO,
     DevolutivaPorFuncionario,
     Capacitacao,
+    NotificacaoPrazo,
+    ProrrogacaoPrazo,
+    prazo_do_ciclo,
     trimestre_atual,
     limites_trimestre,
 )
@@ -632,12 +635,17 @@ def montar_linhas_resultado_final(ciclo):
         Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     )
 
-    vinculos_por_avaliado = {
-        v.avaliado_id: v.avaliador
-        for v in VinculoAvaliacao.query.filter_by(ciclo_id=ciclo.id)
+    # Pode haver mais de um vínculo para o mesmo avaliado (ex: trocou de
+    # gestor no meio do ciclo). A regra é a mesma de
+    # resultado_final_service.vinculo_do_avaliado (usada na área do
+    # empregado): vale o avaliador com avaliação do gestor concluída; sem
+    # nenhum concluído, o vínculo mais recente.
+    vinculos_do_ciclo = (
+        VinculoAvaliacao.query.filter_by(ciclo_id=ciclo.id)
         .join(Funcionario, VinculoAvaliacao.avaliador_id == Funcionario.id)
+        .order_by(VinculoAvaliacao.id)
         .all()
-    }
+    )
 
     # joinedload evita N+1: sem isso, cada chamada de media_avaliacao() no
     # loop abaixo (uma por funcionário, x2: auto e gestor) disparava uma
@@ -650,6 +658,17 @@ def montar_linhas_resultado_final(ciclo):
         .all()
     )
     avaliacao_por_chave = {(a.avaliado_id, a.avaliador_id, a.tipo): a for a in avaliacoes}
+
+    def _gestor_concluido(v):
+        a = avaliacao_por_chave.get((v.avaliado_id, v.avaliador_id, "gestor"))
+        return bool(a and a.status == "concluida")
+
+    escolhido = {}
+    for v in vinculos_do_ciclo:
+        atual = escolhido.get(v.avaliado_id)
+        if atual is None or _gestor_concluido(v) or not _gestor_concluido(atual):
+            escolhido[v.avaliado_id] = v
+    vinculos_por_avaliado = {k: v.avaliador for k, v in escolhido.items()}
 
     liberados_por_avaliado = {
         r.avaliado_id: r
@@ -715,11 +734,15 @@ def montar_linhas_resultado_final(ciclo):
                 "assinatura_status": assinatura_status,
                 "assinatura_em": assinatura_em,
                 "prazo_ciencia": (
-                    adicionar_dias_uteis(
-                        para_fortaleza(resultado_registro.liberado_em), PRAZO_CIENCIA_DIAS_UTEIS
+                    ciclo.fim_janela_recurso_dt()
+                    if ciclo.janela_recurso()
+                    else (
+                        adicionar_dias_uteis(
+                            para_fortaleza(resultado_registro.liberado_em), PRAZO_CIENCIA_DIAS_UTEIS
+                        )
+                        if resultado_registro and resultado_registro.liberado_em
+                        else None
                     )
-                    if resultado_registro and resultado_registro.liberado_em
-                    else None
                 ),
             }
         )
@@ -2651,6 +2674,24 @@ def importar_vinculos():
 # ---------------------------------------------------------
 # Ciclos de avaliação
 # ---------------------------------------------------------
+def _ler_janela_recurso():
+    """Lê do formulário o período de recursos. Devolve (inicio, fim, erro).
+    As duas datas em branco = sem janela (vale a regra antiga)."""
+    ini_s = request.form.get("data_inicio_recurso") or None
+    fim_s = request.form.get("data_fim_recurso") or None
+    if not ini_s and not fim_s:
+        return None, None, None
+    if not (ini_s and fim_s):
+        return None, None, "Informe as duas datas do período de recursos (início e fim), ou deixe as duas em branco."
+    try:
+        ini, fim = date.fromisoformat(ini_s), date.fromisoformat(fim_s)
+    except ValueError:
+        return None, None, "Data do período de recursos inválida."
+    if fim < ini:
+        return None, None, "O fim do período de recursos não pode ser antes do início."
+    return ini, fim, None
+
+
 @admin_bp.route("/ciclos", methods=["POST"])
 def criar_ciclo():
     exercicio = request.form.get("exercicio")
@@ -2667,6 +2708,12 @@ def criar_ciclo():
         flash("Já existe um ciclo para esse exercício.", "warning")
         return redirect(url_for("admin.painel"))
 
+    ini_rec, fim_rec, erro_rec = _ler_janela_recurso()
+    if erro_rec:
+        flash(erro_rec, "danger")
+        return redirect(url_for("admin.painel"))
+    extras = {"data_inicio_recurso": ini_rec, "data_fim_recurso": fim_rec} if ini_rec else {}
+
     db.session.add(
         CicloAvaliacao(
             exercicio=int(exercicio),
@@ -2675,6 +2722,7 @@ def criar_ciclo():
             data_limite_autoavaliacao=data_limite_autoavaliacao,
             data_limite_gestor=data_limite_gestor,
             status="aberto",
+            **extras,
         )
     )
     db.session.commit()
@@ -2708,9 +2756,143 @@ def editar_prazos_ciclo(ciclo_id):
         ciclo.data_inicio = request.form.get("data_inicio") or None
     if "data_fim" in request.form:
         ciclo.data_fim = request.form.get("data_fim") or None
+
+    if "data_inicio_recurso" in request.form or "data_fim_recurso" in request.form:
+        ini_rec, fim_rec, erro_rec = _ler_janela_recurso()
+        if erro_rec:
+            db.session.rollback()
+            flash(erro_rec, "danger")
+            return redirect(url_for("admin.painel"))
+        ciclo.data_inicio_recurso = ini_rec
+        ciclo.data_fim_recurso = fim_rec
+        # Devolutivas já marcadas passam a valer até o fim da janela (só
+        # estende, nunca encurta). Nada é calculado: é a data que você definiu.
+        if fim_rec and ciclo.status == "aberto":
+            DevolutivaPorFuncionario.query.filter(
+                DevolutivaPorFuncionario.data_limite_recorrer < fim_rec
+            ).update({"data_limite_recorrer": fim_rec}, synchronize_session=False)
+
     db.session.commit()
     flash(f"Ciclo {ciclo.exercicio} atualizado.", "success")
     return redirect(url_for("admin.painel"))
+
+
+# ---------------------------------------------------------
+# Prorrogação individual de prazo (ex: pessoa de férias)
+# ---------------------------------------------------------
+@admin_bp.route("/prorrogacoes")
+def prorrogacoes():
+    ciclos = CicloAvaliacao.query.order_by(CicloAvaliacao.exercicio.desc()).all()
+    ciclo_id = request.args.get("ciclo_id", type=int)
+    ciclo = next((c for c in ciclos if c.id == ciclo_id), None)
+    if ciclo is None:
+        ciclo = next((c for c in ciclos if c.padrao), None) or next(
+            (c for c in ciclos if c.status == "aberto"), None
+        ) or (ciclos[0] if ciclos else None)
+
+    lista = []
+    funcionarios = []
+    if ciclo:
+        lista = (
+            ProrrogacaoPrazo.query.filter_by(ciclo_id=ciclo.id)
+            .join(Funcionario, ProrrogacaoPrazo.avaliador_id == Funcionario.id)
+            .order_by(Funcionario.nome, ProrrogacaoPrazo.tipo)
+            .all()
+        )
+        funcionarios = (
+            Funcionario.query.filter(Funcionario.data_demissao.is_(None))
+            .order_by(Funcionario.nome)
+            .all()
+        )
+
+    return render_template(
+        "admin/prorrogacoes.html",
+        ciclos=ciclos,
+        ciclo=ciclo,
+        lista=lista,
+        funcionarios=funcionarios,
+        hoje=date.today(),
+    )
+
+
+@admin_bp.route("/prorrogacoes/criar", methods=["POST"])
+def criar_prorrogacao():
+    ciclo = CicloAvaliacao.query.get_or_404(request.form.get("ciclo_id", type=int))
+    destino = redirect(url_for("admin.prorrogacoes", ciclo_id=ciclo.id))
+
+    funcionario = Funcionario.query.get(request.form.get("funcionario_id") or None)
+    if not funcionario:
+        flash("Escolha o funcionário.", "danger")
+        return destino
+
+    try:
+        nova_data = date.fromisoformat(request.form.get("data_limite", ""))
+    except ValueError:
+        flash("Informe a nova data-limite.", "danger")
+        return destino
+
+    escolha = request.form.get("tipo")
+    tipos = ["auto", "gestor"] if escolha == "ambos" else [escolha]
+    if any(t not in ("auto", "gestor") for t in tipos):
+        flash("Escolha o tipo de avaliação.", "danger")
+        return destino
+
+    motivo = (request.form.get("motivo") or "").strip() or "Férias"
+    nomes = {"auto": "autoavaliação", "gestor": "avaliação do gestor"}
+    salvos, ignorados = [], []
+
+    for tipo in tipos:
+        base = prazo_do_ciclo(ciclo, tipo)
+        if base is None:
+            ignorados.append(f"{nomes[tipo]} (o ciclo não tem prazo definido)")
+            continue
+        if nova_data <= base:
+            ignorados.append(
+                f"{nomes[tipo]} (a nova data precisa ser depois do prazo do ciclo, {base.strftime('%d/%m/%Y')})"
+            )
+            continue
+
+        pror = ProrrogacaoPrazo.query.filter_by(
+            ciclo_id=ciclo.id, tipo=tipo, avaliador_id=funcionario.id
+        ).first()
+        if pror:
+            pror.data_limite = nova_data
+            pror.motivo = motivo
+        else:
+            db.session.add(
+                ProrrogacaoPrazo(
+                    ciclo_id=ciclo.id, tipo=tipo, avaliador_id=funcionario.id,
+                    data_limite=nova_data, motivo=motivo, criado_por="RH",
+                )
+            )
+        # Os lembretes por e-mail (5 dias / 2 dias / no dia) recomeçam a
+        # contar a partir do novo prazo.
+        NotificacaoPrazo.query.filter_by(
+            ciclo_id=ciclo.id, tipo=tipo, avaliador_id=funcionario.id
+        ).delete()
+        salvos.append(nomes[tipo])
+
+    db.session.commit()
+    if salvos:
+        flash(
+            f"Prazo de {funcionario.nome} prorrogado até {nova_data.strftime('%d/%m/%Y')} "
+            f"({' e '.join(salvos)}).",
+            "success",
+        )
+    if ignorados:
+        flash("Não foi alterado: " + "; ".join(ignorados) + ".", "warning")
+    return destino
+
+
+@admin_bp.route("/prorrogacoes/<int:prorrogacao_id>/remover", methods=["POST"])
+def remover_prorrogacao(prorrogacao_id):
+    pror = ProrrogacaoPrazo.query.get_or_404(prorrogacao_id)
+    ciclo_id = pror.ciclo_id
+    nome = pror.avaliador.nome if pror.avaliador else ""
+    db.session.delete(pror)
+    db.session.commit()
+    flash(f"Prorrogação de {nome} removida; vale de novo o prazo do ciclo.", "success")
+    return redirect(url_for("admin.prorrogacoes", ciclo_id=ciclo_id))
 
 
 @admin_bp.route("/ciclos/<int:ciclo_id>/encerrar", methods=["POST"])
@@ -2866,8 +3048,15 @@ def marcar_devolutiva_funcionario(funcionario_id):
         flash("Formato de data inválido.", "error")
         return redirect(request.referrer or url_for("admin.listar_funcionarios_devolutiva"))
     
-    # 5 dias ÚTEIS (pula sábado e domingo) a partir da data da devolutiva.
-    data_limite = adicionar_dias_uteis(data_devolutiva, 5)
+    # Se o RH definiu a janela de recursos do ciclo, o prazo é o último dia
+    # dela (sem cálculo). Sem janela: 5 dias ÚTEIS a partir da devolutiva.
+    ciclo_prazos = (
+        CicloAvaliacao.query.filter_by(status="aberto")
+        .order_by(CicloAvaliacao.padrao.desc(), CicloAvaliacao.exercicio.desc())
+        .first()
+    )
+    janela = ciclo_prazos.janela_recurso() if ciclo_prazos else None
+    data_limite = janela[1] if janela else adicionar_dias_uteis(data_devolutiva, 5)
     
     devolutiva = DevolutivaPorFuncionario.query.filter_by(funcionario_id=funcionario_id).first()
     

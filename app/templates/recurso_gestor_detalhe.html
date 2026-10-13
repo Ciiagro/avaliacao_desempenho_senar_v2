@@ -99,7 +99,7 @@
                 {% for fator in dados.fatores %}
                     {% if (fator.id in itens_contestados) or (not itens_contestados) %}
                         <tr class="{{ 'linha-contestada' if fator.id in itens_contestados else '' }}">
-                            <td>{{ fator.nome }}{% if fator.id in itens_contestados %} <span class="badge badge-pending" style="margin-left:4px;">Contestado</span>{% endif %}</td>
+                            <td>{{ fator.nome }}{% if fator.id in itens_contestados %} <span class="badge badge-pending" style="margin-left:4px;">Contestado</span>{% endif %}{% if fator.descricao %}<div class="muted" style="font-size:0.8rem; font-weight:400; margin-top:2px; line-height:1.35;">{{ fator.descricao }}</div>{% endif %}</td>
                             {% for valor in [10, 8, 6, 4] %}
                                 <td class="celula-radio">
                                     <input type="radio" name="fator_{{ fator.id }}" value="{{ valor }}"
@@ -126,6 +126,7 @@
                     {% if fator.id in itens_contestados %}
                         <div>
                             <label for="motivo_fator_{{ fator.id }}" style="font-weight:600; text-transform:none;">{{ fator.nome }}</label>
+                            {% if fator.descricao %}<div class="muted" style="font-size:0.8rem; font-weight:400; margin-top:2px; line-height:1.35;">{{ fator.descricao }}</div>{% endif %}
                             <textarea id="motivo_fator_{{ fator.id }}" name="motivo_fator_{{ fator.id }}" rows="2" required
                                       placeholder="Explique por que manteve ou mudou a nota de {{ fator.nome }}..."></textarea>
                         </div>

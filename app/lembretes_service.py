@@ -16,7 +16,7 @@ rotina seja chamada mais de uma vez no mesmo dia.
 from datetime import datetime, timezone
 
 from .extensions import db
-from .models import CicloAvaliacao, VinculoAvaliacao, Avaliacao, ResultadoFinal, NotificacaoPrazo
+from .models import CicloAvaliacao, VinculoAvaliacao, Avaliacao, ResultadoFinal, NotificacaoPrazo, prorrogacoes_do_ciclo
 from .utils import para_fortaleza, adicionar_dias_uteis
 from .email_service import avisar_prazo_avaliacao, avisar_prazo_ciencia_resultado
 
@@ -76,12 +76,17 @@ def _lembretes_avaliacao(hoje, resumo):
             if not prazo:
                 continue
 
-            dias_restantes = (prazo - hoje).days
             resumo["verificados"] += 1
-            if dias_restantes not in DIAS_DE_AVISO:
-                continue
+            prorrogacoes = prorrogacoes_do_ciclo(ciclo.id, tipo)
 
             for pessoa in _pendentes_do_ciclo(ciclo, tipo):
+                # Cada pessoa é avisada pelo SEU prazo (o do ciclo, ou a
+                # prorrogação individual dela quando for maior).
+                prazo_pessoa = max(prazo, prorrogacoes.get(pessoa.id, prazo))
+                dias_restantes = (prazo_pessoa - hoje).days
+                if dias_restantes not in DIAS_DE_AVISO:
+                    continue
+
                 ja_enviado = NotificacaoPrazo.query.filter_by(
                     ciclo_id=ciclo.id,
                     tipo=tipo,
@@ -91,7 +96,7 @@ def _lembretes_avaliacao(hoje, resumo):
                 if ja_enviado:
                     continue
 
-                avisar_prazo_avaliacao(pessoa, tipo, dias_restantes, prazo)
+                avisar_prazo_avaliacao(pessoa, tipo, dias_restantes, prazo_pessoa)
                 db.session.add(
                     NotificacaoPrazo(
                         ciclo_id=ciclo.id,
@@ -117,10 +122,15 @@ def _lembretes_ciencia_resultado(hoje, resumo):
         if not registro.liberado_em:
             continue
 
-        prazo = adicionar_dias_uteis(para_fortaleza(registro.liberado_em), PRAZO_CIENCIA_DIAS_UTEIS)
-        if prazo is None:
-            continue
-        prazo = prazo.date()  # adicionar_dias_uteis devolve datetime; aqui só importa o dia
+        ciclo_reg = CicloAvaliacao.query.get(registro.ciclo_id)
+        janela = ciclo_reg.janela_recurso() if ciclo_reg else None
+        if janela:
+            prazo = janela[1]  # RH definiu o período de recursos: vale o último dia dele
+        else:
+            prazo = adicionar_dias_uteis(para_fortaleza(registro.liberado_em), PRAZO_CIENCIA_DIAS_UTEIS)
+            if prazo is None:
+                continue
+            prazo = prazo.date()  # adicionar_dias_uteis devolve datetime; aqui só importa o dia
         dias_restantes = (prazo - hoje).days
         resumo["verificados"] += 1
         if dias_restantes not in DIAS_DE_AVISO_CIENCIA:

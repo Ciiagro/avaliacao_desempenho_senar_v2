@@ -290,6 +290,46 @@ class CicloAvaliacao(db.Model):
     # que define o padrão, não por constraint no banco).
     padrao = db.Column(db.Boolean, nullable=False, default=False, server_default="false")
 
+    # Janela de recursos: datas DEFINIDAS PELO RH (nada é calculado). Só vale
+    # quando as duas estão preenchidas. "deferred" = só lê do banco quando
+    # alguém usa; assim, se o sql/032 ainda não rodou, o resto do sistema
+    # não é afetado.
+    data_inicio_recurso = deferred(db.Column(db.Date))
+    data_fim_recurso = deferred(db.Column(db.Date))
+
+    def janela_recurso(self):
+        """(inicio, fim) da janela de recursos, ou None se não foi definida."""
+        try:
+            ini, fim = self.data_inicio_recurso, self.data_fim_recurso
+        except Exception:
+            db.session.rollback()
+            return None
+        return (ini, fim) if ini and fim else None
+
+    def situacao_recurso(self):
+        """None (sem janela) | 'antes' | 'aberto' | 'encerrado' — pela data de hoje em Fortaleza."""
+        from .utils import para_fortaleza
+
+        janela = self.janela_recurso()
+        if not janela:
+            return None
+        hoje = para_fortaleza(datetime.now(timezone.utc)).date()
+        if hoje < janela[0]:
+            return "antes"
+        if hoje > janela[1]:
+            return "encerrado"
+        return "aberto"
+
+    def fim_janela_recurso_dt(self):
+        """Último dia da janela, até 23:59:59 (Fortaleza), como datetime."""
+        from .utils import FUSO_FORTALEZA
+
+        janela = self.janela_recurso()
+        if not janela:
+            return None
+        fim = janela[1]
+        return datetime(fim.year, fim.month, fim.day, 23, 59, 59, tzinfo=FUSO_FORTALEZA)
+
     def referencia_elegibilidade(self):
         """Data a usar como 'hoje' pra calcular elegibilidade (1 ano de
         casa) de um funcionário PARA ESTE ciclo — nunca a data atual, senão
@@ -371,6 +411,64 @@ class NotificacaoPrazo(db.Model):
     avaliador_id = db.Column(UUID(as_uuid=True), db.ForeignKey("funcionarios.id"), nullable=False)
     dias_restantes = db.Column(db.Integer, nullable=False)  # 5, 2 ou 0
     enviado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+
+class ProrrogacaoPrazo(db.Model):
+    """Exceção de prazo para UMA pessoa (ex: de férias): num ciclo e tipo
+    ('auto' | 'gestor'), vale `data_limite` no lugar do prazo do ciclo — desde
+    que seja maior. Para 'gestor', vale para todas as avaliações que esse
+    gestor (avaliador) precisa preencher."""
+
+    __tablename__ = "prorrogacoes_prazo"
+    __table_args__ = (db.UniqueConstraint("ciclo_id", "tipo", "avaliador_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    ciclo_id = db.Column(db.Integer, db.ForeignKey("ciclos_avaliacao.id"), nullable=False)
+    tipo = db.Column(db.Text, nullable=False)  # 'auto' | 'gestor'
+    avaliador_id = db.Column(UUID(as_uuid=True), db.ForeignKey("funcionarios.id"), nullable=False)
+    data_limite = db.Column(db.Date, nullable=False)
+    motivo = db.Column(db.Text)
+    criado_por = db.Column(db.Text)
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+    avaliador = db.relationship("Funcionario", foreign_keys=[avaliador_id])
+    ciclo = db.relationship("CicloAvaliacao", foreign_keys=[ciclo_id])
+
+
+def prazo_do_ciclo(ciclo, tipo):
+    """Prazo geral do ciclo para o `tipo` ('auto' | 'gestor'), ou None."""
+    return ciclo.data_limite_autoavaliacao if tipo == "auto" else ciclo.data_limite_gestor
+
+
+def prazo_efetivo(ciclo, tipo, avaliador_id):
+    """Prazo que vale para ESTA pessoa: o do ciclo, ou a prorrogação
+    individual dela quando for maior. Sem prazo no ciclo, continua sem prazo."""
+    base = prazo_do_ciclo(ciclo, tipo)
+    if base is None:
+        return None
+    try:
+        pror = ProrrogacaoPrazo.query.filter_by(
+            ciclo_id=ciclo.id, tipo=tipo, avaliador_id=avaliador_id
+        ).first()
+    except Exception:
+        # Tabela ainda não criada (sql/031 não rodou): vale o prazo do ciclo.
+        db.session.rollback()
+        return base
+    if pror and pror.data_limite > base:
+        return pror.data_limite
+    return base
+
+
+def prorrogacoes_do_ciclo(ciclo_id, tipo):
+    """{avaliador_id: data_limite} das prorrogações de um ciclo e tipo."""
+    try:
+        return {
+            p.avaliador_id: p.data_limite
+            for p in ProrrogacaoPrazo.query.filter_by(ciclo_id=ciclo_id, tipo=tipo).all()
+        }
+    except Exception:
+        db.session.rollback()
+        return {}
 
 
 # Pesos do resultado final (sem comissão, por enquanto): Auto 30% + Gestor 70%.

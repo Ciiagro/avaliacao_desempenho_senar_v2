@@ -473,8 +473,10 @@ def avisar_prazo_ciencia_resultado(funcionario, dias_restantes, prazo):
 
 
 def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limite):
-    """Devolutiva marcada para o funcionário: aviso com a data e o prazo
-    que ele tem para concordar ou recorrer."""
+    """Devolutiva marcada para o funcionário: aviso só com a data. O e-mail
+    não fala em recurso/recorrer — isso o funcionário vê e faz só dentro do
+    sistema. (`data_limite` continua no parâmetro por compatibilidade com
+    quem chama, mas não é mostrado aqui.)"""
     return _enviar_email(
         _email_funcionario(funcionario),
         "[Avaliação de Desempenho] Data de devolutiva marcada",
@@ -482,11 +484,9 @@ def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limit
         paragrafos=[
             f"A data de devolutiva da sua avaliação foi marcada para "
             f"{data_devolutiva.strftime('%d/%m/%Y')}.",
-            f"Você terá até {data_limite.strftime('%d/%m/%Y')} (5 dias úteis) para "
-            f"concordar com a resposta ou recorrer.",
         ],
-        link_url=_link_empregado(),
-        link_texto="Acessar meus recursos",
+        link_url=_link_minha_area(),
+        link_texto="Acessar minha área",
     )
 
 

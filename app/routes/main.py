@@ -18,7 +18,7 @@ from ..models import (
     limites_trimestre,
 )
 from ..utils import media_avaliacao, calcular_resultado_final, conceito_resultado, adicionar_dias_uteis, para_fortaleza, FUSO_FORTALEZA
-from ..resultado_final_service import montar_dados_resultado_final
+from ..resultado_final_service import montar_dados_resultado_final, vinculo_do_avaliado
 from .. import senhas as regras_senha
 from .. import email_service
 # gerar_pdf_resultado_final e gerar_excel_resultado_final são importados dentro
@@ -221,9 +221,7 @@ def _resultados_liberados_do_funcionario(funcionario):
             tipo="auto",
         ).first()
 
-        meu_vinculo = VinculoAvaliacao.query.filter_by(
-            ciclo_id=registro.ciclo_id, avaliado_id=funcionario.id
-        ).first()
+        meu_vinculo = vinculo_do_avaliado(registro.ciclo_id, funcionario.id)
         avaliacao_gestor_dele = None
         if meu_vinculo:
             avaliacao_gestor_dele = Avaliacao.query.filter_by(
@@ -764,9 +762,18 @@ def _devolutiva_do_registro(registro):
     return None
 
 
+def _ciclo_com_janela(registro):
+    """Ciclo do resultado, se o RH definiu a janela de recursos nele."""
+    ciclo = CicloAvaliacao.query.get(registro.ciclo_id) if registro else None
+    return ciclo if ciclo and ciclo.janela_recurso() else None
+
+
 def prazo_ciencia_base(registro):
     """Diz de onde o prazo está sendo contado ('devolutiva' ou 'liberação'),
-    pra as telas mostrarem o texto certo."""
+    pra as telas mostrarem o texto certo. Com a janela de recursos definida
+    pelo RH, não há contagem: é o 'período de recursos'."""
+    if _ciclo_com_janela(registro):
+        return "período de recursos"
     return "devolutiva" if _devolutiva_do_registro(registro) else "liberação"
 
 
@@ -781,6 +788,9 @@ def prazo_ciencia(registro):
     Conta os dias úteis pelo calendário de Fortaleza/CE, não pelo UTC."""
     if not registro:
         return None
+    ciclo_janela = _ciclo_com_janela(registro)
+    if ciclo_janela:
+        return ciclo_janela.fim_janela_recurso_dt()
     devolutiva = _devolutiva_do_registro(registro)
     if devolutiva:
         limite = devolutiva.data_limite_recorrer

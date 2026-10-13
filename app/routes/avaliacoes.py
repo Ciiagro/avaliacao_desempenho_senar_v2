@@ -9,6 +9,7 @@ from ..models import (
     Avaliacao,
     RespostaFator,
     CicloAvaliacao,
+    prazo_efetivo,
 )
 # gerar_pdf_avaliacao é importado dentro de baixar_pdf() (reportlab só
 # precisa carregar quando alguém realmente baixa um PDF).
@@ -122,7 +123,8 @@ def formulario(ciclo_id, avaliado_id, avaliador_id, tipo):
     avaliador = Funcionario.query.get_or_404(avaliador_id)
 
     ciclo = CicloAvaliacao.query.get_or_404(ciclo_id)
-    prazo = ciclo.data_limite_autoavaliacao if tipo == "auto" else ciclo.data_limite_gestor
+    # Prazo do ciclo, ou a prorrogação individual dessa pessoa (ex: férias).
+    prazo = prazo_efetivo(ciclo, tipo, avaliador_id)
     prazo_encerrado = prazo is not None and date.today() > prazo
 
     formulario_obj = Formulario.query.filter_by(

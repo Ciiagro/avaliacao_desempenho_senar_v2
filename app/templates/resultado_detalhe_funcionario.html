@@ -19,7 +19,7 @@
             {% for fator in dados.fatores %}
                 <tr>
                     <td>{{ fator.ordem }}</td>
-                    <td>{{ fator.nome }}</td>
+                    <td>{{ fator.nome }}{% if fator.descricao %}<div class="muted" style="font-size:0.8rem; font-weight:400; margin-top:2px; line-height:1.35;">{{ fator.descricao }}</div>{% endif %}</td>
                     <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
                     <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
                 </tr>
@@ -110,7 +110,7 @@
                 {% if prazo_ciencia < agora %}
                     <strong>Prazo vencido em {{ prazo_ciencia.strftime('%d/%m/%Y') }}.</strong>
                 {% else %}
-                    <strong>Prazo até {{ prazo_ciencia.strftime('%d/%m/%Y') }}</strong> (5 dias úteis a partir da {{ prazo_base }})
+                    <strong>Prazo até {{ prazo_ciencia.strftime('%d/%m/%Y') }}</strong> {% if prazo_base == 'período de recursos' %}(período de recursos){% else %}(5 dias úteis a partir da {{ prazo_base }}){% endif %}
                 {% endif %}
             {% endif %}
             para você dar ciência do recebimento desta avaliação: informe se aceita o

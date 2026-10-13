@@ -27,7 +27,7 @@
             {% for fator in dados.fatores %}
                 <tr>
                     <td>{{ fator.ordem }}</td>
-                    <td>{{ fator.nome }}</td>
+                    <td>{{ fator.nome }}{% if fator.descricao %}<div class="muted" style="font-size:0.8rem; font-weight:400; margin-top:2px; line-height:1.35;">{{ fator.descricao }}</div>{% endif %}</td>
                     <td>{{ dados.respostas_auto.get(fator.id, '-') }}</td>
                     <td>{{ dados.respostas_gestor.get(fator.id, '-') }}</td>
                 </tr>

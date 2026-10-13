@@ -14,13 +14,32 @@
     </p>
     <h2>Abrir recurso</h2>
     {% for ciclo in ciclos_sem_recurso %}
+        {% if ciclo.recurso_situacao == 'encerrado' %}
+            <div class="flash flash-danger" style="margin-bottom:20px;">
+                <strong>Exercício {{ ciclo.exercicio }}</strong> — o período para abrir recurso terminou em
+                <strong>{{ ciclo.recurso_janela[1].strftime('%d/%m/%Y') }}</strong>.
+            </div>
+        {% else %}
         <form method="post" action="{{ url_for('recursos.abrir_recurso') }}" style="margin-bottom:20px;">
             <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
             <label>Exercício {{ ciclo.exercicio }}</label>
+            {% if ciclo.recurso_situacao == 'antes' %}
+            <div class="flash flash-warning" style="margin-bottom:12px;">
+                O período para abrir recurso será de
+                <strong>{{ ciclo.recurso_janela[0].strftime('%d/%m/%Y') }}</strong> a
+                <strong>{{ ciclo.recurso_janela[1].strftime('%d/%m/%Y') }}</strong>.
+                Você já pode ver os itens e se preparar, mas só poderá enviar a partir de
+                {{ ciclo.recurso_janela[0].strftime('%d/%m/%Y') }}.
+            </div>
+            {% endif %}
             {% if ciclo.prazo_abrir_recurso %}
                 <p class="muted" style="margin:-2px 0 8px;">
                     Prazo para abrir recurso: <span class="badge badge-pending">até {{ ciclo.prazo_abrir_recurso.strftime('%d/%m/%Y') }}</span>
-                    (5 dias úteis a partir da {{ ciclo.prazo_base }})
+                    {% if ciclo.prazo_base == 'período de recursos' %}
+                        (período de recursos: {{ ciclo.recurso_janela[0].strftime('%d/%m/%Y') }} a {{ ciclo.recurso_janela[1].strftime('%d/%m/%Y') }})
+                    {% else %}
+                        (5 dias úteis a partir da {{ ciclo.prazo_base }})
+                    {% endif %}
                 </p>
             {% endif %}
 
@@ -31,7 +50,7 @@
                         <div class="item-discordancia">
                             <label style="display:flex; align-items:flex-start; gap:8px; margin:0; text-transform:none; font-weight:400; font-size:0.9rem;">
                                 <input type="checkbox" name="itens_discordancia" value="{{ fator.id }}" style="margin-top:3px;" onchange="toggleMotivoItem(this)">
-                                {{ fator.nome }}
+                                <span>{{ fator.nome }}{% if fator.descricao %}<span class="muted" style="display:block; font-size:0.8rem; margin-top:2px; line-height:1.35;">{{ fator.descricao }}</span>{% endif %}</span>
                             </label>
                             <textarea name="motivo_fator_{{ fator.id }}" class="motivo-item" style="display:none; margin-top:6px;" rows="2" placeholder="Explique por que não concorda com {{ fator.nome }}..."></textarea>
                         </div>
@@ -39,8 +58,9 @@
                 </div>
             {% endif %}
 
-            <button type="submit" class="botao" style="margin-top:8px;">Abrir recurso</button>
+            <button type="submit" class="botao" style="margin-top:8px;"{% if ciclo.recurso_situacao == 'antes' %} disabled title="Disponível a partir de {{ ciclo.recurso_janela[0].strftime('%d/%m/%Y') }}"{% endif %}>Abrir recurso</button>
         </form>
+        {% endif %}
     {% endfor %}
 {% elif not meus_recursos %}
     <p class="muted">

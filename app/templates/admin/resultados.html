@@ -170,15 +170,15 @@
             <p style="margin:0 0 16px;">
                 Funcionário: <strong id="modal-devolutiva-nome"></strong>
             </p>
-            <form id="form-devolutiva" method="post" action="">
+            <form id="form-devolutiva" method="post" action="" onsubmit="var b=document.getElementById('btn-marcar-devolutiva'); b.disabled=true; b.textContent='Marcando e enviando e-mail…';">
                 <label for="modal-devolutiva-data" style="display:block; margin-bottom:6px; font-weight:600;">Data da devolutiva:</label>
                 <input type="date" id="modal-devolutiva-data" name="data_devolutiva" required style="width:100%; padding:8px; margin-bottom:6px;">
                 <small class="muted" style="display:block; margin-bottom:16px;">
-                    O prazo para recorrer será calculado automaticamente (data + 5 dias úteis, sem contar sábados e domingos).
+                    O funcionário recebe um e-mail avisando a data. O período de recursos é o definido no ciclo (não é calculado a partir desta data).
                 </small>
                 <div style="display:flex; gap:8px; justify-content:flex-end;">
                     <button type="button" class="botao botao-secundario" onclick="fecharModalDevolutiva()">Cancelar</button>
-                    <button type="submit" class="botao">Marcar</button>
+                    <button type="submit" id="btn-marcar-devolutiva" class="botao">Marcar</button>
                 </div>
             </form>
         </div>
@@ -190,6 +190,7 @@
             document.getElementById('modal-devolutiva-nome').textContent = funcionarioNome;
             document.getElementById('modal-devolutiva-data').value = dataAtual || '';
             document.getElementById('form-devolutiva').action = URL_BASE_MARCAR_DEVOLUTIVA.replace('__ID__', funcionarioId);
+            var bm = document.getElementById('btn-marcar-devolutiva'); bm.disabled = false; bm.textContent = 'Marcar';
             document.getElementById('modal-devolutiva').style.display = 'flex';
         }
         function fecharModalDevolutiva() {

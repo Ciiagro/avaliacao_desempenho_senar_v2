@@ -265,6 +265,8 @@ def recurso_area():
             # (ou da liberação, se a devolutiva ainda não foi marcada).
             ciclo.prazo_abrir_recurso = prazo_ciencia(registro)
             ciclo.prazo_base = prazo_ciencia_base(registro)
+            ciclo.recurso_janela = ciclo.janela_recurso()
+            ciclo.recurso_situacao = ciclo.situacao_recurso()
             ciclo.fatores = fatores_funcionario
             ciclos_sem_recurso.append(ciclo)
 
@@ -343,6 +345,25 @@ def abrir_recurso():
         return redirect(url_for("recursos.recurso_area"))
 
     ciclo = CicloAvaliacao.query.get_or_404(ciclo_id)
+
+    # Janela de recursos definida pelo RH: só dá para abrir dentro dela.
+    situacao_janela = ciclo.situacao_recurso()
+    if situacao_janela in ("antes", "aberto", "encerrado"):
+        ini_j, fim_j = ciclo.janela_recurso()
+        if situacao_janela == "antes":
+            flash(
+                f"O período para abrir recurso começa em {ini_j.strftime('%d/%m/%Y')} "
+                f"e vai até {fim_j.strftime('%d/%m/%Y')}.",
+                "warning",
+            )
+            return redirect(url_for("recursos.recurso_area"))
+        if situacao_janela == "encerrado":
+            flash(
+                f"O período para abrir recurso terminou em {fim_j.strftime('%d/%m/%Y')}.",
+                "warning",
+            )
+            return redirect(url_for("recursos.recurso_area"))
+
     dados = montar_dados_resultado_final(ciclo, funcionario)
     resultado_texto = (
         f"{dados['resultado_final']:.2f} ({dados['conceito']})"
@@ -439,7 +460,11 @@ def recorrer_recurso(recurso_id):
         return redirect(url_for("recursos.recurso_area"))
 
     devolutiva = funcionario.devolutiva
-    if not devolutiva or not devolutiva.pode_recorrer():
+    # Com a janela de recursos definida pelo RH, esta etapa (recorrer depois
+    # da resposta do gestor) não é limitada por data calculada da devolutiva.
+    ciclo_do_recurso = CicloAvaliacao.query.get(recurso.ciclo_id)
+    janela_definida = bool(ciclo_do_recurso and ciclo_do_recurso.janela_recurso())
+    if not janela_definida and (not devolutiva or not devolutiva.pode_recorrer()):
         flash(
             "O prazo para recorrer após a devolutiva já expirou. "
             "Você só pode confirmar o recebimento (aceitar).",

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Prorrogar prazo{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
+<h1>Prorrogar prazo para pessoas específicas</h1>
+<p class="muted">
+    Use para quem está de férias ou afastado. O prazo do ciclo continua valendo para todos os outros;
+    aqui você libera uma data maior só para a pessoa escolhida. Os lembretes por e-mail dela
+    passam a contar a partir da nova data.
+</p>
+
+{% if not ciclo %}
+    <p>Nenhum ciclo cadastrado.</p>
+{% else %}
+
+<form method="get" class="form-inline" style="margin-bottom:16px;">
+    <label>Ciclo
+        <select name="ciclo_id" onchange="this.form.submit()">
+            {% for c in ciclos %}
+                <option value="{{ c.id }}" {{ 'selected' if c.id == ciclo.id }}>{{ c.exercicio }} ({{ c.status }})</option>
+            {% endfor %}
+        </select>
+    </label>
+    <span class="muted">
+        Prazo do ciclo — autoavaliação:
+        <strong>{{ ciclo.data_limite_autoavaliacao.strftime('%d/%m/%Y') if ciclo.data_limite_autoavaliacao else 'sem prazo' }}</strong>
+        · avaliação do gestor:
+        <strong>{{ ciclo.data_limite_gestor.strftime('%d/%m/%Y') if ciclo.data_limite_gestor else 'sem prazo' }}</strong>
+    </span>
+</form>
+
+<h2>Nova prorrogação</h2>
+<form method="post" action="{{ url_for('admin.criar_prorrogacao') }}" class="form-inline">
+    <input type="hidden" name="ciclo_id" value="{{ ciclo.id }}">
+    <select name="funcionario_id" required>
+        <option value="">Funcionário...</option>
+        {% for f in funcionarios %}
+            <option value="{{ f.id }}">{{ f.nome }}</option>
+        {% endfor %}
+    </select>
+    <select name="tipo" required>
+        <option value="ambos">Autoavaliação e avaliação do gestor</option>
+        <option value="auto">Só autoavaliação</option>
+        <option value="gestor">Só avaliação do gestor (como gestor)</option>
+    </select>
+    <label>Novo prazo <input type="date" name="data_limite" required></label>
+    <input type="text" name="motivo" placeholder="Motivo (padrão: Férias)" maxlength="120">
+    <button type="submit" class="botao">Prorrogar</button>
+</form>
+<p class="muted" style="margin-top:6px;">
+    "Avaliação do gestor" vale para todas as avaliações de subordinados que essa pessoa precisa preencher.
+</p>
+
+<h2>Prorrogações do ciclo {{ ciclo.exercicio }}</h2>
+<table class="tabela">
+    <thead>
+        <tr><th>Funcionário</th><th>Tipo</th><th>Prazo do ciclo</th><th>Novo prazo</th><th>Motivo</th><th style="width:120px;"></th></tr>
+    </thead>
+    <tbody>
+        {% for p in lista %}
+            {% set base = ciclo.data_limite_autoavaliacao if p.tipo == 'auto' else ciclo.data_limite_gestor %}
+            <tr>
+                <td>{{ p.avaliador.nome }}</td>
+                <td>{{ 'Autoavaliação' if p.tipo == 'auto' else 'Avaliação do gestor' }}</td>
+                <td>{{ base.strftime('%d/%m/%Y') if base else '-' }}</td>
+                <td>
+                    <strong>{{ p.data_limite.strftime('%d/%m/%Y') }}</strong>
+                    {% if p.data_limite < hoje %}<span class="badge badge-new">encerrado</span>{% endif %}
+                </td>
+                <td>{{ p.motivo or '-' }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin.remover_prorrogacao', prorrogacao_id=p.id) }}"
+                          onsubmit="return confirm('Remover a prorrogação de {{ p.avaliador.nome }}?');">
+                        <button type="submit" class="botao botao-secundario botao-pequeno">Remover</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6" class="muted">Nenhuma prorrogação neste ciclo.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endif %}
+{% endblock %}

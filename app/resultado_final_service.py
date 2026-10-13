@@ -9,6 +9,33 @@ from .models import Avaliacao, VinculoAvaliacao, ResultadoFinal
 from .utils import media_avaliacao, calcular_resultado_final, conceito_resultado
 
 
+def vinculo_do_avaliado(ciclo_id, avaliado_id):
+    """Vínculo (avaliador) a usar para o avaliado no ciclo.
+
+    Se houver mais de um vínculo (duplicado ou trocado de avaliador), vale o
+    que tem avaliação do gestor concluída; sem nenhuma concluída, o mais
+    recente. Telas do admin e do empregado usam esta mesma regra, para
+    mostrarem sempre o mesmo resultado."""
+    vinculos = (
+        VinculoAvaliacao.query.filter_by(ciclo_id=ciclo_id, avaliado_id=avaliado_id)
+        .order_by(VinculoAvaliacao.id)
+        .all()
+    )
+    if not vinculos:
+        return None
+    for v in reversed(vinculos):
+        concluida = Avaliacao.query.filter_by(
+            ciclo_id=ciclo_id,
+            avaliado_id=avaliado_id,
+            avaliador_id=v.avaliador_id,
+            tipo="gestor",
+            status="concluida",
+        ).first()
+        if concluida:
+            return v
+    return vinculos[-1]
+
+
 def montar_dados_resultado_final(ciclo, avaliado):
     resultado_registro = ResultadoFinal.query.filter_by(
         ciclo_id=ciclo.id, avaliado_id=avaliado.id
@@ -18,9 +45,7 @@ def montar_dados_resultado_final(ciclo, avaliado):
         ciclo_id=ciclo.id, avaliado_id=avaliado.id, avaliador_id=avaliado.id, tipo="auto"
     ).first()
 
-    vinculo = VinculoAvaliacao.query.filter_by(
-        ciclo_id=ciclo.id, avaliado_id=avaliado.id
-    ).first()
+    vinculo = vinculo_do_avaliado(ciclo.id, avaliado.id)
     avaliacao_gestor = None
     if vinculo:
         avaliacao_gestor = Avaliacao.query.filter_by(
