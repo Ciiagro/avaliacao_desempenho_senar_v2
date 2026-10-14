@@ -3,14 +3,18 @@
 
 {% block content %}
 <div class="login-box">
+    <a href="{{ url_for('main.index') }}" class="back-link">&larr; Voltar</a>
     <img src="{{ url_for('static', filename='img/logo_senar.png') }}" alt="SENAR" class="login-logo">
     <h1>Comissão de Recursos</h1>
-    <p class="muted">Acesso restrito a quem tem a senha da Comissão (diferente da senha da Administração).</p>
+    <p class="muted login-texto">Acesso restrito à Comissão. Digite a senha para continuar.</p>
 
-    <form method="post" class="form-grid" style="max-width:320px;">
+    <form method="post" class="login-form">
         <input type="hidden" name="proximo" value="{{ proximo }}">
-        <input type="password" name="senha" placeholder="Senha da Comissão" required autofocus>
-        <button type="submit" class="botao">Entrar</button>
+        <label class="campo-icone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <input type="password" name="senha" placeholder="Senha da Comissão" required autofocus autocomplete="current-password" aria-label="Senha da Comissão">
+        </label>
+        <button type="submit" class="botao login-botao">Entrar</button>
     </form>
 </div>
 {% endblock %}
