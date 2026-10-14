@@ -65,11 +65,6 @@
                         <td>
                             {% if linha.funcionario.tem_devolutiva_marcada() %}
                                 <strong style="color:#1a5f7a;">{{ linha.funcionario.devolutiva.data_devolutiva.strftime('%d/%m/%Y') }}</strong>
-                                {% if linha.funcionario.devolutiva.pode_recorrer() %}
-                                    <div class="muted" style="font-size:0.78rem;">prazo até {{ linha.funcionario.devolutiva.data_limite_recorrer.strftime('%d/%m/%Y') }}</div>
-                                {% else %}
-                                    <div class="muted" style="font-size:0.78rem;">prazo encerrado</div>
-                                {% endif %}
                             {% else %}
                                 <span class="badge badge-new">Não marcada</span>
                             {% endif %}
@@ -172,7 +167,15 @@
             </p>
             <form id="form-devolutiva" method="post" action="" onsubmit="var b=document.getElementById('btn-marcar-devolutiva'); b.disabled=true; b.textContent='Marcando e enviando e-mail…';">
                 <label for="modal-devolutiva-data" style="display:block; margin-bottom:6px; font-weight:600;">Data da devolutiva:</label>
-                <input type="date" id="modal-devolutiva-data" name="data_devolutiva" required style="width:100%; padding:8px; margin-bottom:6px;">
+                {% set jd_modal = ciclo.janela_devolutiva() %}
+                <input type="date" id="modal-devolutiva-data" name="data_devolutiva" required
+                       {% if jd_modal %}min="{{ jd_modal[0].isoformat() }}" max="{{ jd_modal[1].isoformat() }}"{% endif %}
+                       style="width:100%; padding:8px; margin-bottom:6px;">
+                {% if jd_modal %}
+                <small style="display:block; margin-bottom:6px; color:#1a5f7a;">
+                    Período da devolutiva no ciclo: {{ jd_modal[0].strftime('%d/%m/%Y') }} a {{ jd_modal[1].strftime('%d/%m/%Y') }}. Outra data não é aceita.
+                </small>
+                {% endif %}
                 <small class="muted" style="display:block; margin-bottom:16px;">
                     O funcionário recebe um e-mail avisando a data. O período de recursos é o definido no ciclo (não é calculado a partir desta data).
                 </small>

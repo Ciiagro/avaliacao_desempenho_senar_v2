@@ -166,6 +166,9 @@ def formulario(ciclo_id, avaliado_id, avaliador_id, tipo):
             return redirect(url_for("main.minha_area"))
 
         rascunho = request.form.get("acao") == "rascunho"
+        # Se faltar algo pra concluir, NÃO descarta o que a pessoa digitou:
+        # grava como rascunho e avisa o que falta (ver o fim desta rota).
+        erro_conclusao = None
 
         if not rascunho:
             fatores_faltando = []
@@ -198,35 +201,18 @@ def formulario(ciclo_id, avaliado_id, avaliador_id, tipo):
                     partes.append("os fatores (" + ", ".join(fatores_faltando) + ")")
                 if campos_faltando:
                     partes.append("os campos (" + ", ".join(campos_faltando) + ")")
-                flash(
+                erro_conclusao = (
                     "Para concluir, preencha " + " e ".join(partes)
-                    + ". Enquanto estiver em rascunho, isso não é obrigatório.",
-                    "danger",
+                    + ". Enquanto estiver em rascunho, isso não é obrigatório."
                 )
-                return redirect(
-                    url_for(
-                        "avaliacoes.formulario",
-                        ciclo_id=ciclo_id,
-                        avaliado_id=avaliado_id,
-                        avaliador_id=avaliador_id,
-                        tipo=tipo,
-                    )
+            elif not request.form.get("confirmo_assinatura"):
+                erro_conclusao = (
+                    "Para concluir, marque a confirmação de que as informações são "
+                    "verdadeiras (assinatura eletrônica)."
                 )
 
-            if not request.form.get("confirmo_assinatura"):
-                flash(
-                    "Para concluir, marque a confirmação de que as informações são verdadeiras (assinatura eletrônica).",
-                    "danger",
-                )
-                return redirect(
-                    url_for(
-                        "avaliacoes.formulario",
-                        ciclo_id=ciclo_id,
-                        avaliado_id=avaliado_id,
-                        avaliador_id=avaliador_id,
-                        tipo=tipo,
-                    )
-                )
+            if erro_conclusao:
+                rascunho = True  # grava o que foi preenchido como rascunho
 
         if not avaliacao:
             avaliacao = Avaliacao(
@@ -278,6 +264,21 @@ def formulario(ciclo_id, avaliado_id, avaliador_id, tipo):
             avaliacao.assinado_em = datetime.utcnow()
 
         db.session.commit()
+
+        if erro_conclusao:
+            flash(
+                erro_conclusao + " Tudo o que você preencheu foi salvo como rascunho.",
+                "danger",
+            )
+            return redirect(
+                url_for(
+                    "avaliacoes.formulario",
+                    ciclo_id=ciclo_id,
+                    avaliado_id=avaliado_id,
+                    avaliador_id=avaliador_id,
+                    tipo=tipo,
+                )
+            )
 
         flash(
             "Avaliação salva como rascunho."

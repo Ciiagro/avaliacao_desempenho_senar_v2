@@ -1,0 +1,38 @@
+{# Mostra os itens contestados na abertura de um recurso, cada um em sua
+   própria linha (nome do item + motivo). Recursos antigos, sem itens
+   individualizados, mostram o texto livre como antes. #}
+{% macro itens_abertura(recurso, texto) -%}
+{%- if recurso.itens_contestados -%}
+<span style="display:block; white-space:normal; margin-top:6px;">
+{%- for item in recurso.itens_contestados -%}
+<span style="display:block; margin:6px 0; padding:8px 12px; border-left:3px solid #1a5f7a; background:#f3f7f9; border-radius:0 4px 4px 0;">
+<strong style="display:block; color:#1a5f7a; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.02em;">{{ item.fator.nome }}</strong>
+<span style="display:block; white-space:pre-line;">{{ item.motivo }}</span>
+</span>
+{%- endfor -%}
+</span>
+{%- else -%}
+"{{ texto }}"
+{%- endif -%}
+{%- endmacro %}
+
+
+{# Resposta do gestor: cada item numa linha própria, igual à abertura do
+   recurso. Sem itens reconhecidos, mostra o texto livre como antes. #}
+{% macro itens_resposta(recurso, texto) -%}
+{%- set nomes = [] -%}
+{%- for item in recurso.itens_contestados -%}{%- if nomes.append(item.fator.nome) -%}{%- endif -%}{%- endfor -%}
+{%- set blocos = texto | separar_resposta_por_item(nomes) -%}
+{%- if blocos and blocos[0][0] -%}
+<span style="display:block; white-space:normal; margin-top:6px;">
+{%- for titulo, corpo in blocos -%}
+<span style="display:block; margin:6px 0; padding:8px 12px; border-left:3px solid #1a5f7a; background:#f3f7f9; border-radius:0 4px 4px 0;">
+{%- if titulo -%}<strong style="display:block; color:#1a5f7a; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.02em;">{{ titulo }}</strong>{%- endif -%}
+<span style="display:block; white-space:pre-line;">{{ corpo }}</span>
+</span>
+{%- endfor -%}
+</span>
+{%- else -%}
+"{{ texto }}"
+{%- endif -%}
+{%- endmacro %}

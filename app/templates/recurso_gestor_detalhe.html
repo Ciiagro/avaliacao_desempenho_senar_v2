@@ -8,19 +8,15 @@
 {% if prazo_gestor_responder %}
     <p class="muted">
         Prazo para responder: <span class="badge badge-pending">até {{ prazo_gestor_responder.strftime('%d/%m/%Y') }}</span>
-        (10 dias corridos a partir do encaminhamento da Comissão)
     </p>
 {% endif %}
 {% set itens_contestados = recurso.itens_contestados_por_fator %}
 {% set fatores_reavaliados = recurso.revisoes_notas | map(attribute='fator_id') | list %}
 
 {# Buscar e exibir o comentário da comissão de forma destacada #}
-{% set comentario_comissao = None %}
-{% for e in recurso.eventos %}
-    {% if e.tipo == 'encaminhamento_comissao_gestor' and not comentario_comissao %}
-        {% set comentario_comissao = e.texto %}
-    {% endif %}
-{% endfor %}
+{# O "set" dentro do "for" não vaza pra fora no Jinja; por isso o filtro. Vale a mensagem mais recente da Comissão. #}
+{% set encaminhamentos = recurso.eventos | selectattr('tipo', 'equalto', 'encaminhamento_comissao_gestor') | selectattr('texto') | list %}
+{% set comentario_comissao = encaminhamentos[-1].texto if encaminhamentos else None %}
 
 {# SEMPRE mostrar a caixa azul, com ou sem comentário #}
 <div style="background:#e3f2fd; border-left:4px solid #1976d2; padding:14px; margin:16px 0; border-radius:4px;">
@@ -173,18 +169,19 @@
     {% endif %}
 
     <h2 style="margin-top:20px;">Linha do tempo</h2>
+    {% from "_recurso_abertura.html" import itens_abertura, itens_resposta %}
     {% for e in recurso.eventos %}
-        <p class="muted" style="white-space:pre-line;">
+        <p class="muted" style="white-space:normal; margin:18px 0 6px;">
             <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
-            {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
-            {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou a você: "{{ e.texto }}"
-            {% elif e.tipo == 'resposta_gestor' %}Sua resposta: {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }} &mdash; "{{ e.texto }}"
-            {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: "{{ e.texto }}"{% endif %}
+            {% if e.tipo == 'abertura' %}Empregado abriu o recurso: {{ itens_abertura(recurso, e.texto) }}
+            {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou a você: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+            {% elif e.tipo == 'resposta_gestor' %}Sua resposta: {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }} &mdash; {{ itens_resposta(recurso, e.texto) }}
+            {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
             {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado.
             {% elif e.tipo == 'fechamento_comissao' %}Comissão confirmou o encerramento.
             {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer.
             {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou para a presidência.
-            {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'acatou' if e.decisao == 'acatado' else 'não acatou' }}: "{{ e.texto }}"
+            {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'acatou' if e.decisao == 'acatado' else 'não acatou' }}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
             {% elif e.tipo == 'aceite_funcionario' %}Empregado aceitou sua decisão.
             {% endif %}
         </p>

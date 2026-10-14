@@ -60,6 +60,32 @@
                     Essa é a resposta final do gestor, já revisada pela Comissão — confirme o
                     recebimento para assinar eletronicamente e encerrar o recurso.
                 </p>
+                {% from "_recurso_abertura.html" import itens_resposta %}
+                {% set respostas_gestor = recurso_atual.eventos | selectattr('tipo', 'equalto', 'resposta_gestor') | list %}
+                {% set repasses = recurso_atual.eventos | selectattr('tipo', 'equalto', 'repasse_comissao_funcionario') | list %}
+                {% if respostas_gestor %}
+                    {% set resposta_gestor = respostas_gestor[-1] %}
+                    <div style="background:#fff; border-left:4px solid #1a5f7a; padding:12px 14px; margin:0 0 12px; border-radius:4px; text-align:left;">
+                        <p style="margin:0 0 6px;">
+                            <strong style="color:#1a5f7a;">Resposta do gestor</strong>
+                            &mdash;
+                            {% if resposta_gestor.decisao == 'revisou' %}
+                                <span class="badge badge-ok">Revisou a avaliação</span>
+                            {% else %}
+                                <span class="badge badge-new">Manteve a avaliação</span>
+                            {% endif %}
+                        </p>
+                        <div style="color:#333;">
+                            {% if resposta_gestor.texto %}{{ itens_resposta(recurso_atual, resposta_gestor.texto) }}{% else %}O gestor não escreveu observações.{% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+                {% if repasses and repasses[-1].texto %}
+                    <div style="background:#e3f2fd; border-left:4px solid #1976d2; padding:12px 14px; margin:0 0 12px; border-radius:4px; text-align:left;">
+                        <p style="margin:0 0 6px;"><strong style="color:#1565c0;">Comentário da Comissão</strong></p>
+                        <p style="margin:0; white-space:pre-wrap; color:#333;">{{ repasses[-1].texto }}</p>
+                    </div>
+                {% endif %}
                 <form method="post" action="{{ url_for('recursos.aceitar_recurso', recurso_id=recurso_atual.id) }}" onsubmit="return confirm('Confirmar o recebimento e assinar eletronicamente? Isso encerra o recurso definitivamente.');">
                     <button type="submit" class="botao">Confirmar recebimento e assinar</button>
                 </form>

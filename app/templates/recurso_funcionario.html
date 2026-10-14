@@ -162,25 +162,26 @@ document.addEventListener('submit', function (e) {
         {% endif %}
 
         <div class="linha-tempo">
+            {% from "_recurso_abertura.html" import itens_abertura, itens_resposta %}
             {% for e in r.eventos_visiveis %}
-                <p class="muted" style="margin:4px 0; white-space:pre-line;">
-                    <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
+                <p class="muted" style="white-space:normal; {% if e.aninhado %}margin:-6px 0 18px 16px;{% else %}margin:18px 0 6px;{% endif %}">
+                    {% if not e.aninhado %}<strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;{% endif %}
                     {% if e.tipo == 'abertura' %}
-                        Você abriu o recurso: "{{ e.texto }}"
+                        Você abriu o recurso: {{ itens_abertura(r, e.texto) }}
                     {% elif e.tipo == 'encaminhamento_comissao_gestor' %}
                         A Comissão encaminhou seu recurso ao gestor.
                     {% elif e.tipo == 'resposta_gestor' %}
-                        O gestor {{ 'revisou a avaliação' if e.decisao == 'revisou' else 'manteve a avaliação' }}: "{{ e.texto }}"
+                        {% if e.aninhado %}Avaliação do gestor ({{ 'revisou' if e.decisao == 'revisou' else 'manteve' }}):{% else %}O gestor {{ 'revisou a avaliação' if e.decisao == 'revisou' else 'manteve a avaliação' }}:{% endif %} {{ itens_resposta(r, e.texto) }}
                     {% elif e.tipo == 'repasse_comissao_funcionario' %}
-                        A Comissão repassou a resposta do gestor{% if e.texto %}: "{{ e.texto }}"{% endif %}
+                        A Comissão repassou a resposta do gestor{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
                     {% elif e.tipo == 'fechamento_comissao' %}
-                        A Comissão confirmou o encerramento do recurso{% if e.texto %}: "{{ e.texto }}"{% endif %}
+                        A Comissão confirmou o encerramento do recurso{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
                     {% elif e.tipo == 'pedido_recorrer' %}
-                        Você pediu pra recorrer novamente{% if e.texto %}: "{{ e.texto }}"{% endif %}
+                        Você pediu pra recorrer novamente{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
                     {% elif e.tipo == 'encaminhamento_comissao' %}
-                        A Comissão encaminhou para decisão final: "{{ e.texto }}"
+                        A Comissão encaminhou para decisão final: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
                     {% elif e.tipo == 'decisao_presidencia' %}
-                        {{ 'O recurso foi acatado e a avaliação foi revisada' if e.decisao == 'acatado' else 'O recurso não foi acatado' }}: "{{ e.texto }}"
+                        {{ 'O recurso foi acatado e a avaliação foi revisada' if e.decisao == 'acatado' else 'O recurso não foi acatado' }}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
                     {% elif e.tipo == 'aceite_funcionario' %}
                         Empregado confirmou o recebimento &mdash; recurso finalizado.
                     {% endif %}

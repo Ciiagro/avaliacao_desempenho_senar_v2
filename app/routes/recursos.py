@@ -43,19 +43,12 @@ from ..email_service import (
 
 recursos_bp = Blueprint("recursos", __name__)
 
-# Prazo pra Comissão agir num recurso: dias corridos a partir da abertura.
-PRAZO_COMISSAO_DIAS = 5
-
 # Depois que o resultado final é liberado pro empregado ver, ele tem esse
 # prazo (dias corridos, empurrando pro próximo dia útil se cair em fim de
 # semana) pra abrir um recurso — é só informativo (mostra a data-limite pro
 # empregado), o sistema não bloqueia a abertura depois que esse prazo passa.
 PRAZO_RECURSO_FUNCIONARIO_DIAS = 5
 
-# Depois que a Comissão encaminha o recurso pro gestor reavaliar, ele tem
-# esse prazo (dias corridos, mesma regra de empurrar fim de semana) pra
-# responder à Comissão. Também só informativo.
-PRAZO_GESTOR_RESPONDER_DIAS = 10
 
 
 @recursos_bp.before_request
@@ -71,13 +64,6 @@ def exigir_senha_comissao():
     if not session.get("comissao_logueada"):
         return redirect(url_for("recursos.recurso_comissao_login", proximo=request.path))
     return None
-
-
-def prazo_comissao(recurso):
-    """Data-limite pra Comissão agir nesse recurso."""
-    if not recurso.criado_em:
-        return None
-    return recurso.criado_em + timedelta(days=PRAZO_COMISSAO_DIAS)
 
 
 # Pra cada status "aguardando a Comissão", qual tipo de evento marca o
@@ -235,6 +221,29 @@ def _pode_abrir_novo_recurso(ciclo_id, avaliado_id):
 # Empregado
 # ---------------------------------------------------------------------------
 
+def _ordenar_eventos_para_empregado(eventos):
+    """Pro empregado, a resposta do gestor vem DEPOIS da mensagem da Comissão
+    que a repassou (a Comissão apresenta, em seguida vem a avaliação do
+    gestor). Cada resposta do gestor é movida pra logo depois do primeiro
+    repasse/encerramento da Comissão que vem após ela, e marcada como
+    "aninhada" pra aparecer sem horário próprio (o horário que vale é o do
+    repasse). Resposta sem repasse depois dela fica onde está."""
+    tipos_repasse = ("repasse_comissao_funcionario", "fechamento_comissao")
+    resultado = list(eventos)
+    for resposta in [e for e in eventos if e.tipo == "resposta_gestor"]:
+        pos = resultado.index(resposta)
+        pos_repasse = next(
+            (i for i in range(pos + 1, len(resultado)) if resultado[i].tipo in tipos_repasse),
+            None,
+        )
+        if pos_repasse is None:
+            continue
+        resultado.pop(pos)  # o repasse sobe uma posição ao tirar a resposta
+        resultado.insert(pos_repasse, resposta)
+        resposta.aninhado = True
+    return resultado
+
+
 @recursos_bp.route("/recurso")
 def recurso_area():
     funcionario = _funcionario_logado()
@@ -287,12 +296,12 @@ def recurso_area():
             e.tipo in ("repasse_comissao_funcionario", "fechamento_comissao")
             for e in r.eventos
         )
-        r.eventos_visiveis = [
+        r.eventos_visiveis = _ordenar_eventos_para_empregado([
             e
             for e in r.eventos
             if e.tipo != "ajuste_comissao"
             and not (e.tipo == "resposta_gestor" and not liberado)
-        ]
+        ])
         r.resultado_atual_em_texto = (
             _resultado_atual_texto(montar_dados_resultado_final(r.ciclo, r.avaliado))
             if liberado else None
@@ -536,17 +545,10 @@ def recurso_dar_ciencia(recurso_id):
 # ---------------------------------------------------------------------------
 
 def _calcular_prazo_gestor_responder(recurso):
-    """Prazo (10 dias corridos, empurrando fim de semana) pro gestor
-    responder, contado a partir de quando a Comissão encaminhou o recurso
-    pra ele — usado tanto na lista quanto na tela de resposta do gestor."""
-    evento_encaminhamento = next(
-        (e for e in reversed(recurso.eventos) if e.tipo == "encaminhamento_comissao_gestor"),
-        None,
-    )
-    momento_encaminhamento = (
-        evento_encaminhamento.criado_em if evento_encaminhamento else recurso.criado_em
-    )
-    return prazo_dias_corridos(momento_encaminhamento, PRAZO_GESTOR_RESPONDER_DIAS)
+    """Prazo pro gestor responder: a data definida pelo RH no ciclo (nada é
+    calculado). Sem data definida, não mostra prazo."""
+    ciclo = recurso.ciclo or CicloAvaliacao.query.get(recurso.ciclo_id)
+    return ciclo.prazo_resposta_recurso() if ciclo else None
 
 
 STATUS_RECURSO_LABEL = {
@@ -792,14 +794,8 @@ def recurso_comissao_area():
         pendentes_fechamento=pendentes_fechamento,
         em_andamento=em_andamento,
         encerrados=encerrados,
-        prazo_comissao=prazo_comissao,
         now=datetime.now(timezone.utc),
         total_pendentes=len(todos_pendentes),
-        total_atrasados=sum(
-            1
-            for r in todos_pendentes
-            if prazo_comissao(r) and prazo_comissao(r) < datetime.now(timezone.utc)
-        ),
     )
 
 

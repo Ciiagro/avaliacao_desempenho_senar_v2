@@ -9,8 +9,12 @@
     <h1>Avaliação de Desempenho<span class="destaque">dos Colaboradores</span></h1>
 </div>
 
+{% macro seta() -%}
+<span class="atalho-seta-leve" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+{%- endmacro %}
+
 {% if ciclo %}
-    <p class="muted subtitulo" style="text-align:center;">Ciclo aberto: <strong>Exercício {{ ciclo.exercicio }}</strong></p>
+    <p class="ciclo-status"><span class="ciclo-status-ponto" aria-hidden="true"></span>Ciclo aberto: <strong>Exercício {{ ciclo.exercicio }}</strong></p>
 {% else %}
     <p class="flash flash-warning" style="text-align:center;">
         Nenhum ciclo de avaliação está aberto no momento. Peça ao RH para abrir um ciclo em
@@ -18,30 +22,55 @@
     </p>
 {% endif %}
 
-<div class="cards">
+<div class="atalhos atalhos-inicio">
     {% if funcionario %}
-        <a class="card" href="{{ url_for('main.minha_area') }}">
-            <h2>Ir para minha área</h2>
-            <p>Continuar logado como {{ funcionario.nome }}.</p>
+        <a class="atalho" href="{{ url_for('main.minha_area') }}">
+            <span class="atalho-icone atalho-icone-claro" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+            </span>
+            <span class="atalho-texto">
+                <strong>Ir para minha área</strong>
+                <small>Continuar logado como {{ funcionario.nome }}.</small>
+            </span>
+            {{ seta() }}
         </a>
     {% else %}
-        <a class="card" href="{{ url_for('main.login') }}">
-            <h2>Entrar</h2>
-            <p>Faça login com seu e-mail e senha para fazer sua autoavaliação ou avaliar quem você gerencia.</p>
+        <a class="atalho" href="{{ url_for('main.login') }}">
+            <span class="atalho-icone atalho-icone-claro" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+            </span>
+            <span class="atalho-texto">
+                <strong>Entrar</strong>
+                <small>Faça login com seu e-mail e senha para fazer sua autoavaliação ou avaliar quem você gerencia.</small>
+            </span>
+            {{ seta() }}
         </a>
     {% endif %}
 
-    <a class="card" href="{{ url_for('admin.painel') }}">
-        <h2>Administração</h2>
-        <p>
-            Acesso restrito ao RH.
-            {% if session.get('admin_logueado') %}Você está logado nessa área.{% endif %}
-        </p>
+    <a class="atalho" href="{{ url_for('admin.painel') }}">
+        <span class="atalho-icone atalho-icone-claro" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </span>
+        <span class="atalho-texto">
+            <strong>Administração</strong>
+            <small>
+                Acesso restrito ao RH.
+                {% if session.get('admin_logueado') %}Você está logado nessa área.{% endif %}
+            </small>
+        </span>
+        {{ seta() }}
     </a>
+
     {% if session.get('admin_logueado') %}
-        <a class="card" href="{{ url_for('admin.logout') }}">
-            <h2>Sair da Administração</h2>
-            <p>Encerrar a sessão de Administração neste dispositivo.</p>
+        <a class="atalho" href="{{ url_for('admin.logout') }}">
+            <span class="atalho-icone atalho-icone-claro" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            </span>
+            <span class="atalho-texto">
+                <strong>Sair da Administração</strong>
+                <small>Encerrar a sessão de Administração neste dispositivo.</small>
+            </span>
+            {{ seta() }}
         </a>
     {% endif %}
 </div>

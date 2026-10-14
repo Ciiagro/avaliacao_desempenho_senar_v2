@@ -59,7 +59,7 @@
             type="text"
             name="q"
             id="busca-avaliador"
-            placeholder="Digite o nome do avaliador para pesquisar..."
+            placeholder="Digite o nome do avaliador ou do empregado para pesquisar..."
             value="{{ busca }}"
             autocomplete="off"
             style="min-width: 320px;"
@@ -75,7 +75,7 @@
         <thead><tr><th>Avaliado</th><th>Avaliador</th><th></th></tr></thead>
         <tbody>
             {% for v in lista %}
-                <tr data-avaliador="{{ v.avaliador.nome|lower }}" data-linha-vinculo="{{ v.id }}">
+                <tr data-busca="{{ v.avaliador.nome|lower }} {{ v.avaliado.nome|lower }}" data-linha-vinculo="{{ v.id }}">
                     <td>{{ v.avaliado.nome }}</td>
                     <td>{{ v.avaliador.nome }}</td>
                     <td>
@@ -93,7 +93,7 @@
                         {% endif %}
                     </td>
                 </tr>
-                <tr class="linha-edicao-vinculo" data-avaliador="{{ v.avaliador.nome|lower }}" data-edicao-vinculo="{{ v.id }}" style="display:none;">
+                <tr class="linha-edicao-vinculo" data-busca="{{ v.avaliador.nome|lower }} {{ v.avaliado.nome|lower }}" data-edicao-vinculo="{{ v.id }}" style="display:none;">
                     <td colspan="3">
                         <form method="post" action="{{ url_for('admin.editar_vinculo', vinculo_id=v.id) }}" class="form-inline">
                             <input type="hidden" name="q" value="{{ busca }}">
@@ -122,9 +122,9 @@
             var baseExportar = "{{ url_for('admin.exportar_vinculos', ciclo_id=ciclo.id) }}";
 
             function filtrarLinhas(termo) {
-                var linhas = document.querySelectorAll('#tabela-vinculos tbody tr[data-avaliador]');
+                var linhas = document.querySelectorAll('#tabela-vinculos tbody tr[data-busca]');
                 linhas.forEach(function (linha) {
-                    var nome = linha.getAttribute('data-avaliador') || '';
+                    var nome = linha.getAttribute('data-busca') || '';
                     var visivel = nome.indexOf(termo) !== -1;
                     if (linha.classList.contains('linha-edicao-vinculo')) {
                         // linhas de edição ficam ocultas até o usuário clicar em "Editar"

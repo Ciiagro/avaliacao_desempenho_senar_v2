@@ -24,21 +24,22 @@
 {% endif %}
 
 <h2>Linha do tempo</h2>
+{% from "_recurso_abertura.html" import itens_abertura, itens_resposta %}
 {% for e in recurso.eventos %}
-    <p class="muted" style="white-space:pre-line;">
+    <p class="muted" style="white-space:normal; margin:18px 0 6px;">
         <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') if e.criado_em else '-' }}</strong> &mdash;
-        {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
-        {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou ao gestor: "{{ e.texto }}"
-        {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'REVISOU a nota' if e.decisao == 'revisou' else 'MANTEVE a nota' }}: "{{ e.texto }}"
-        {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: "{{ e.texto }}"{% endif %}
-        {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% if e.tipo == 'abertura' %}Empregado abriu o recurso: {{ itens_abertura(recurso, e.texto) }}
+        {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou ao gestor: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+        {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'REVISOU a nota' if e.decisao == 'revisou' else 'MANTEVE a nota' }}: {{ itens_resposta(recurso, e.texto) }}
+        {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
+        {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
         {% elif e.tipo == 'aceite_funcionario' %}Empregado confirmou o recebimento &mdash; recurso finalizado.
-        {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: "{{ e.texto }}"{% endif %}
-        {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou à presidência: "{{ e.texto }}"
-        {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'ACATOU' if e.decisao == 'acatado' else 'NÃO acatou' }}: "{{ e.texto }}"
-        {% elif e.tipo == 'fechamento_comissao' %}Comissão confirmou o encerramento{% if e.texto %}: "{{ e.texto }}"{% endif %}
-        {% elif e.tipo == 'conversa_comissao_presidencia' %}<strong>Conversa Comissão &harr; Presidência:</strong> "{{ e.texto }}"
-        {% else %}{{ e.tipo }}{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
+        {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou à presidência: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+        {% elif e.tipo == 'decisao_presidencia' %}Presidência {{ 'ACATOU' if e.decisao == 'acatado' else 'NÃO acatou' }}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+        {% elif e.tipo == 'fechamento_comissao' %}Comissão confirmou o encerramento{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
+        {% elif e.tipo == 'conversa_comissao_presidencia' %}<strong>Conversa Comissão &harr; Presidência:</strong> <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+        {% else %}{{ e.tipo }}{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
         {% endif %}
     </p>
 {% endfor %}

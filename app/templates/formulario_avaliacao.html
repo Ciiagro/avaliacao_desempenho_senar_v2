@@ -9,9 +9,12 @@
 {% endif %}
 
 <h1>{{ formulario.nome }}</h1>
-<p class="muted">
-    Avaliado: <strong>{{ avaliado.nome }}</strong> ({{ avaliado.cargo.nome if avaliado.cargo else '' }})
-    {% if tipo == 'auto' %}&mdash; Autoavaliação{% else %}&mdash; Avaliador: {{ avaliador.nome }}{% endif %}
+<p class="form-info">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+    <span>
+        Avaliado: <strong>{{ avaliado.nome }}</strong>{% if avaliado.cargo %} ({{ avaliado.cargo.nome }}){% endif %}
+        &mdash; {% if tipo == 'auto' %}Autoavaliação{% else %}Avaliador: {{ avaliador.nome }}{% endif %}
+    </span>
 </p>
 
 {% if ja_concluida %}
@@ -26,12 +29,17 @@
         para consulta; não é mais possível salvar alterações.
     </div>
 {% elif prazo %}
-    <p class="muted">Prazo para concluir esta avaliação: <strong>{{ prazo.strftime('%d/%m/%Y') }}</strong>.</p>
+    <p class="form-prazo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Prazo para concluir esta avaliação: <strong>{{ prazo.strftime('%d/%m/%Y') }}</strong>.
+    </p>
 {% endif %}
 
 <form method="post">
     <fieldset {% if prazo_encerrado or ja_concluida %}disabled{% endif %} style="border:none; padding:0; margin:0;">
-    <h2>Parte I &mdash; Fatores de desempenho</h2>
+    <section class="form-cartao">
+    <h2 class="form-cartao-titulo">Parte I &mdash; Fatores de desempenho</h2>
+    <div class="form-tabela-rolagem">
     <table class="tabela tabela-formulario">
         <thead>
             <tr>
@@ -62,8 +70,11 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+    </section>
 
-    <h2>Parte II</h2>
+    <section class="form-cartao">
+    <h2 class="form-cartao-titulo">Parte II</h2>
 
     <label for="pontos_fortes">Pontos fortes</label>
     <textarea id="pontos_fortes" name="pontos_fortes" rows="5" style="min-height:112px; line-height:1.5; resize:vertical;">{{ avaliacao.pontos_fortes if avaliacao else '' }}</textarea>
@@ -80,6 +91,7 @@
 
     <label for="resultados_alcancados">Resultados alcançados durante o ano</label>
     <textarea id="resultados_alcancados" name="resultados_alcancados" rows="5" style="min-height:112px; line-height:1.5; resize:vertical;">{{ avaliacao.resultados_alcancados if avaliacao else '' }}</textarea>
+    </section>
 
     {% if avaliacao and avaliacao.status == 'concluida' and avaliacao.assinado_por %}
         <p class="muted" style="margin-top:20px;">
@@ -101,7 +113,7 @@
     {% endif %}
 
     <div class="acoes-formulario">
-        <button type="submit" name="acao" value="rascunho" class="botao botao-secundario">Salvar rascunho</button>
+        <button type="submit" name="acao" value="rascunho" class="botao botao-secundario" formnovalidate>Salvar rascunho</button>
         <button type="submit" name="acao" value="concluir" id="botao-concluir" class="botao">Concluir e assinar avaliação</button>
     </div>
 
@@ -119,6 +131,10 @@
                     var campo = document.getElementById(id);
                     if (campo) campo.required = true;
                 });
+                // A caixinha da assinatura eletrônica também é obrigatória pra concluir:
+                // o navegador avisa na hora, sem enviar o formulário (nada é perdido).
+                var assinatura = document.querySelector('input[name="confirmo_assinatura"]');
+                if (assinatura) assinatura.required = true;
             });
         })();
     </script>

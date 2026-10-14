@@ -19,8 +19,22 @@
     padding: 22px 24px; margin-bottom: 24px;
 }
 .cap-painel[hidden] { display: none; }
+.cap-painel-topo { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.cap-painel-topo > div { min-width: 0; }
+.cap-painel-icone {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: #e4f0f0;
+    color: var(--navy-700);
+}
+.cap-painel-icone svg { width: 28px; height: 28px; }
 .cap-painel-topo h2 { margin: 0 0 4px; border: none; padding: 0; font-size: 1.1rem; }
-.cap-painel-topo p { margin: 0 0 18px; font-size: 0.9rem; }
+.cap-painel-topo p { margin: 0; font-size: 0.9rem; }
 .cap-check { flex-direction: row; align-items: center; gap: 8px; }
 .cap-check input { width: auto; }
 .cap-check span { text-transform: none; letter-spacing: 0; font-size: 0.9rem; font-weight: 600; color: var(--texto); }

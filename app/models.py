@@ -296,6 +296,29 @@ class CicloAvaliacao(db.Model):
     # não é afetado.
     data_inicio_recurso = deferred(db.Column(db.Date))
     data_fim_recurso = deferred(db.Column(db.Date))
+    # Prazo para responder aos recursos, definido pelo RH (sql/034).
+    data_limite_resposta_recurso = deferred(db.Column(db.Date))
+
+    def prazo_resposta_recurso(self):
+        """Data-limite para responder aos recursos, ou None se não definida."""
+        try:
+            return self.data_limite_resposta_recurso
+        except Exception:
+            db.session.rollback()
+            return None
+
+    # Período da devolutiva (vem antes dos recursos), definido pelo RH (sql/033).
+    data_inicio_devolutiva = deferred(db.Column(db.Date))
+    data_fim_devolutiva = deferred(db.Column(db.Date))
+
+    def janela_devolutiva(self):
+        """(inicio, fim) do período da devolutiva, ou None se não foi definido."""
+        try:
+            ini, fim = self.data_inicio_devolutiva, self.data_fim_devolutiva
+        except Exception:
+            db.session.rollback()
+            return None
+        return (ini, fim) if ini and fim else None
 
     def janela_recurso(self):
         """(inicio, fim) da janela de recursos, ou None se não foi definida."""

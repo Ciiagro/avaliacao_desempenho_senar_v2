@@ -60,10 +60,11 @@ def create_app():
             403,
         )
 
-    from .utils import formatar_cpf, para_fortaleza
+    from .utils import formatar_cpf, para_fortaleza, separar_resposta_por_item
 
     app.jinja_env.filters["formatar_cpf"] = formatar_cpf
     app.jinja_env.filters["fortaleza"] = para_fortaleza
+    app.jinja_env.filters["separar_resposta_por_item"] = separar_resposta_por_item
 
     from .routes.main import main_bp
     from .routes.avaliacoes import avaliacoes_bp
@@ -98,6 +99,19 @@ def create_app():
             eh_gestor = funcionario.eh_gestor_de_alguem()
             eh_comissao = funcionario.eh_membro_comissao()
             resultado_pendente = resultado_pendente_ciencia_do_funcionario(funcionario.id)
+            # O menu "Recurso" só existe pra quem decidiu recorrer (ou já tem
+            # recurso aberto). Quem só está vendo a nota final não vê o menu:
+            # a escolha de aceitar/recorrer é feita na tela do resultado.
+            from .models import RecursoAvaliacao, ResultadoFinal
+
+            mostrar_menu_recurso = (
+                ResultadoFinal.query.filter_by(
+                    avaliado_id=funcionario.id, liberado=True, decisao_avaliado="recorreu"
+                ).first()
+                is not None
+                or RecursoAvaliacao.query.filter_by(avaliado_id=funcionario.id).first()
+                is not None
+            )
             recursos_gestor = (
                 contar_recursos_pendentes_gestor(funcionario.id) if eh_gestor else 0
             )
@@ -105,6 +119,7 @@ def create_app():
             eh_gestor = False
             eh_comissao = False
             resultado_pendente = None
+            mostrar_menu_recurso = False
             recursos_gestor = 0
 
         # O link "Comissão" só aparece se não há ninguém logado (visitante)
@@ -120,6 +135,7 @@ def create_app():
             "recursos_pendentes_comissao": recursos_comissao,
             "recursos_pendentes_gestor": recursos_gestor,
             "resultado_pendente_ciencia": resultado_pendente,
+            "mostrar_menu_recurso": mostrar_menu_recurso,
         }
 
     return app

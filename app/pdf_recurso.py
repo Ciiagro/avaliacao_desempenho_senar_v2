@@ -1,4 +1,5 @@
 import io
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -13,7 +14,45 @@ from reportlab.platypus import (
 )
 
 from .pdf_timbrado import ALTURA_TIMBRADO, desenhar_timbrado
-from .utils import formatar_data_local
+from .utils import formatar_data_local, separar_resposta_por_item
+
+AZUL_ITEM = colors.HexColor("#1a5f7a")
+FUNDO_ITEM = colors.HexColor("#f3f7f9")
+
+
+def _texto_pdf(texto):
+    """Texto digitado por uma pessoa, seguro pro Paragraph (sem tags soltas)
+    e mantendo as quebras de linha."""
+    return escape(texto or "-").replace("\n", "<br/>")
+
+
+def _blocos_por_item(blocos, estilo_titulo, estilo_corpo):
+    """Cada item (título + texto) num bloco com barra azul na lateral, igual
+    à tela do sistema. `blocos` é uma lista de (título, texto)."""
+    elementos = []
+    for titulo, texto in blocos:
+        conteudo = []
+        if titulo:
+            conteudo.append([Paragraph(escape(titulo).upper(), estilo_titulo)])
+        conteudo.append([Paragraph(_texto_pdf(texto), estilo_corpo)])
+        tabela = Table(conteudo, colWidths=[17.8 * cm])
+        tabela.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), FUNDO_ITEM),
+                    ("LINEBEFORE", (0, 0), (0, -1), 3, AZUL_ITEM),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, 0), 6),
+                    ("BOTTOMPADDING", (0, -1), (-1, -1), 6),
+                ]
+            )
+        )
+        elementos.append(tabela)
+        elementos.append(Spacer(1, 5))
+    return elementos
 
 
 def gerar_pdf_recurso(recurso, dados_resultado):
@@ -42,6 +81,9 @@ def gerar_pdf_recurso(recurso, dados_resultado):
     corpo = ParagraphStyle("Corpo", parent=styles["Normal"], fontSize=10, leading=14)
     celula = ParagraphStyle("Celula", parent=styles["Normal"], fontSize=9, leading=13)
     celula_nome = ParagraphStyle("CelulaNome", parent=celula, fontName="Helvetica-Bold")
+    titulo_item = ParagraphStyle(
+        "TituloItem", parent=celula, fontName="Helvetica-Bold", fontSize=8, textColor=AZUL_ITEM
+    )
 
     story = []
 
@@ -59,27 +101,46 @@ def gerar_pdf_recurso(recurso, dados_resultado):
             corpo,
         )
     )
-    story.append(Spacer(1, 4))
-    story.append(Paragraph((recurso.motivo or "-").replace("\n", "<br/>"), corpo))
+    story.append(Spacer(1, 6))
+    itens = [(i.fator.nome, i.motivo) for i in recurso.itens_contestados]
+    if itens:
+        story.extend(_blocos_por_item(itens, titulo_item, corpo))
+    else:
+        story.append(Paragraph(_texto_pdf(recurso.motivo), corpo))
     story.append(Spacer(1, 12))
 
     resposta_gestor = next(
         (e for e in reversed(recurso.eventos) if e.tipo == "resposta_gestor"), None
     )
-    story.append(Paragraph("Resposta do gestor", secao))
-    if resposta_gestor:
-        decisao_texto = (
-            "revisou a avaliação" if resposta_gestor.decisao == "revisou" else "manteve a avaliação"
-        )
+    repasse = next(
+        (e for e in reversed(recurso.eventos) if e.tipo == "repasse_comissao_funcionario"), None
+    )
+    story.append(Paragraph("Resposta ao recurso", secao))
+    # Primeiro a mensagem da Comissão que repassou a resposta; em seguida, a
+    # avaliação do gestor (mesma ordem que o empregado vê no sistema).
+    if repasse:
         story.append(
             Paragraph(
-                f"O gestor {decisao_texto} em {formatar_data_local(resposta_gestor.criado_em)}:",
+                f"<b>A Comissão repassou a resposta do gestor</b> em "
+                f"{formatar_data_local(repasse.criado_em)}"
+                + (f": &ldquo;{_texto_pdf(repasse.texto)}&rdquo;" if repasse.texto else "."),
                 corpo,
             )
         )
+        story.append(Spacer(1, 8))
+    if resposta_gestor:
+        decisao_texto = "revisou" if resposta_gestor.decisao == "revisou" else "manteve"
+        story.append(
+            Paragraph(f"<b>Avaliação do gestor ({decisao_texto})</b>", corpo)
+        )
         story.append(Spacer(1, 4))
-        story.append(Paragraph((resposta_gestor.texto or "-").replace("\n", "<br/>"), corpo))
-    else:
+        nomes = [i.fator.nome for i in recurso.itens_contestados]
+        blocos = separar_resposta_por_item(resposta_gestor.texto, nomes)
+        if blocos and blocos[0][0]:
+            story.extend(_blocos_por_item(blocos, titulo_item, corpo))
+        else:
+            story.append(Paragraph(_texto_pdf(resposta_gestor.texto), corpo))
+    elif not repasse:
         story.append(Paragraph("-", corpo))
     story.append(Spacer(1, 12))
 

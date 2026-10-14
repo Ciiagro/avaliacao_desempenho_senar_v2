@@ -3,6 +3,7 @@ import unicodedata
 from collections import defaultdict
 from datetime import date, datetime, timezone, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import aliased, joinedload
 from flask import (
     Blueprint,
@@ -2497,7 +2498,13 @@ def vinculos():
             .join(AvaliadoFuncionario, VinculoAvaliacao.avaliado_id == AvaliadoFuncionario.id)
         )
         if busca:
-            query = query.filter(AvaliadorFuncionario.nome.ilike(f"%{busca}%"))
+            # Busca pelo nome do avaliador OU do avaliado (empregado).
+            query = query.filter(
+                or_(
+                    AvaliadorFuncionario.nome.ilike(f"%{busca}%"),
+                    AvaliadoFuncionario.nome.ilike(f"%{busca}%"),
+                )
+            )
         lista = query.order_by(AvaliadorFuncionario.nome, AvaliadoFuncionario.nome).all()
 
     funcionarios_ativos = (
@@ -2515,7 +2522,7 @@ def vinculos():
 
 @admin_bp.route("/vinculos/exportar")
 def exportar_vinculos():
-    """Exporta os vínculos do ciclo selecionado (ou aberto) para Excel, respeitando a busca por nome do avaliado (q)."""
+    """Exporta os vínculos do ciclo selecionado (ou aberto) para Excel, respeitando a busca por nome do avaliador ou do avaliado (q)."""
     import pandas as pd
     ciclo = _ciclo_selecionado_ou_aberto()
     if not ciclo:
@@ -2532,7 +2539,12 @@ def exportar_vinculos():
         .join(AvaliadoFuncionario, VinculoAvaliacao.avaliado_id == AvaliadoFuncionario.id)
     )
     if busca:
-        query = query.filter(AvaliadorFuncionario.nome.ilike(f"%{busca}%"))
+        query = query.filter(
+            or_(
+                AvaliadorFuncionario.nome.ilike(f"%{busca}%"),
+                AvaliadoFuncionario.nome.ilike(f"%{busca}%"),
+            )
+        )
     lista = query.order_by(AvaliadorFuncionario.nome, AvaliadoFuncionario.nome).all()
 
     df = pd.DataFrame(
@@ -2692,6 +2704,35 @@ def _ler_janela_recurso():
     return ini, fim, None
 
 
+def _ler_janela_devolutiva():
+    """Lê do formulário o período da devolutiva. Devolve (inicio, fim, erro).
+    As duas datas em branco = sem período definido."""
+    ini_s = request.form.get("data_inicio_devolutiva") or None
+    fim_s = request.form.get("data_fim_devolutiva") or None
+    if not ini_s and not fim_s:
+        return None, None, None
+    if not (ini_s and fim_s):
+        return None, None, "Informe as duas datas da devolutiva (início e fim), ou deixe as duas em branco."
+    try:
+        ini, fim = date.fromisoformat(ini_s), date.fromisoformat(fim_s)
+    except ValueError:
+        return None, None, "Data da devolutiva inválida."
+    if fim < ini:
+        return None, None, "O fim da devolutiva não pode ser antes do início."
+    return ini, fim, None
+
+
+def _ler_prazo_resposta_recurso():
+    """Lê do formulário o prazo para responder aos recursos. Devolve (data, erro)."""
+    s = request.form.get("data_limite_resposta_recurso") or None
+    if not s:
+        return None, None
+    try:
+        return date.fromisoformat(s), None
+    except ValueError:
+        return None, "Data do prazo para responder aos recursos inválida."
+
+
 @admin_bp.route("/ciclos", methods=["POST"])
 def criar_ciclo():
     exercicio = request.form.get("exercicio")
@@ -2713,6 +2754,19 @@ def criar_ciclo():
         flash(erro_rec, "danger")
         return redirect(url_for("admin.painel"))
     extras = {"data_inicio_recurso": ini_rec, "data_fim_recurso": fim_rec} if ini_rec else {}
+    ini_dev, fim_dev, erro_dev = _ler_janela_devolutiva()
+    if erro_dev:
+        flash(erro_dev, "danger")
+        return redirect(url_for("admin.painel"))
+    if ini_dev:
+        extras["data_inicio_devolutiva"] = ini_dev
+        extras["data_fim_devolutiva"] = fim_dev
+    prazo_resp, erro_resp = _ler_prazo_resposta_recurso()
+    if erro_resp:
+        flash(erro_resp, "danger")
+        return redirect(url_for("admin.painel"))
+    if prazo_resp:
+        extras["data_limite_resposta_recurso"] = prazo_resp
 
     db.session.add(
         CicloAvaliacao(
@@ -2771,6 +2825,23 @@ def editar_prazos_ciclo(ciclo_id):
             DevolutivaPorFuncionario.query.filter(
                 DevolutivaPorFuncionario.data_limite_recorrer < fim_rec
             ).update({"data_limite_recorrer": fim_rec}, synchronize_session=False)
+
+    if "data_inicio_devolutiva" in request.form or "data_fim_devolutiva" in request.form:
+        ini_dev, fim_dev, erro_dev = _ler_janela_devolutiva()
+        if erro_dev:
+            db.session.rollback()
+            flash(erro_dev, "danger")
+            return redirect(url_for("admin.painel"))
+        ciclo.data_inicio_devolutiva = ini_dev
+        ciclo.data_fim_devolutiva = fim_dev
+
+    if "data_limite_resposta_recurso" in request.form:
+        prazo_resp, erro_resp = _ler_prazo_resposta_recurso()
+        if erro_resp:
+            db.session.rollback()
+            flash(erro_resp, "danger")
+            return redirect(url_for("admin.painel"))
+        ciclo.data_limite_resposta_recurso = prazo_resp
 
     db.session.commit()
     flash(f"Ciclo {ciclo.exercicio} atualizado.", "success")
@@ -3056,6 +3127,20 @@ def marcar_devolutiva_funcionario(funcionario_id):
         .first()
     )
     janela = ciclo_prazos.janela_recurso() if ciclo_prazos else None
+
+    # Se o RH definiu o período da devolutiva no ciclo, a data marcada tem que
+    # cair dentro dele; fora disso, não grava nem envia e-mail.
+    janela_dev = ciclo_prazos.janela_devolutiva() if ciclo_prazos else None
+    if janela_dev and not (janela_dev[0] <= data_devolutiva <= janela_dev[1]):
+        flash(
+            f"A data {data_devolutiva.strftime('%d/%m/%Y')} não é a data de devolutiva "
+            f"estabelecida no ciclo ({janela_dev[0].strftime('%d/%m/%Y')} a "
+            f"{janela_dev[1].strftime('%d/%m/%Y')}). Escolha uma data dentro desse período "
+            f"ou altere o período no ciclo.",
+            "error",
+        )
+        return redirect(request.referrer or url_for("admin.resultados"))
+
     data_limite = janela[1] if janela else adicionar_dias_uteis(data_devolutiva, 5)
     
     devolutiva = DevolutivaPorFuncionario.query.filter_by(funcionario_id=funcionario_id).first()

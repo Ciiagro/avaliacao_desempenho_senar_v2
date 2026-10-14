@@ -163,3 +163,27 @@ def prazo_dias_corridos(data_inicio, dias_corridos, empurrar_fim_de_semana=True)
         elif prazo.weekday() == 6:  # domingo
             prazo += timedelta(days=1)
     return prazo
+
+
+def separar_resposta_por_item(texto, nomes_itens):
+    """A resposta do gestor é gravada como um texto só: "ITEM: justificativa",
+    com uma linha em branco entre os itens. Devolve [(item, justificativa)]
+    reconhecendo só os nomes de itens informados; trecho que não começa com um
+    desses nomes continua no item anterior (ou vira um bloco sem título)."""
+    blocos = []
+    if not texto:
+        return blocos
+    for parte in str(texto).replace("\r\n", "\n").split("\n\n"):
+        parte_limpa = parte.strip()
+        if not parte_limpa:
+            continue
+        titulo = next(
+            (n for n in nomes_itens if n and parte_limpa.startswith(f"{n}:")), None
+        )
+        if titulo:
+            blocos.append([titulo, parte_limpa[len(titulo) + 1:].strip()])
+        elif blocos:
+            blocos[-1][1] += "\n\n" + parte_limpa
+        else:
+            blocos.append([None, parte_limpa])
+    return [(t, c) for t, c in blocos]

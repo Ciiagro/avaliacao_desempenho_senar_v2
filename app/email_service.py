@@ -387,9 +387,13 @@ def avisar_empregado_resposta_disponivel(recurso, comentario):
         paragrafos=[
             f"Chegou uma resposta ao seu recurso sobre o resultado da avaliação de "
             f"desempenho (Exercício {recurso.ciclo.exercicio}).",
-            "Acesse o sistema para visualizar a resposta completa e confirmar o recebimento.",
+            "Acesse o sistema para visualizar a resposta completa.",
+            "Importante: ao abrir a sua nova avaliação, você deve confirmar o "
+            "recebimento para que isso fique registrado no sistema.",
         ],
         destaque=("Comentário da Comissão", comentario) if comentario else None,
+        link_url=_link_empregado(),
+        link_texto="Abrir minha avaliação",
     )
 
 

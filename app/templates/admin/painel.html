@@ -78,12 +78,24 @@
                 <input type="date" name="data_limite_gestor">
             </label>
             <label class="ciclo-campo">
+                <span>Devolutiva: início</span>
+                <input type="date" name="data_inicio_devolutiva">
+            </label>
+            <label class="ciclo-campo">
+                <span>Devolutiva: fim</span>
+                <input type="date" name="data_fim_devolutiva">
+            </label>
+            <label class="ciclo-campo">
                 <span>Recursos: início</span>
                 <input type="date" name="data_inicio_recurso">
             </label>
             <label class="ciclo-campo">
                 <span>Recursos: fim</span>
                 <input type="date" name="data_fim_recurso">
+            </label>
+            <label class="ciclo-campo">
+                <span>Responder recursos: até</span>
+                <input type="date" name="data_limite_resposta_recurso">
             </label>
         </div>
         <div class="ciclo-acoes">
@@ -187,6 +199,15 @@
                                     <span>Prazo avaliação gestor</span>
                                     <input type="date" name="data_limite_gestor" value="{{ ciclo.data_limite_gestor.isoformat() if ciclo.data_limite_gestor else '' }}">
                                 </label>
+                                {% set janela_dev = ciclo.janela_devolutiva() %}
+                                <label class="ciclo-campo">
+                                    <span>Devolutiva: início</span>
+                                    <input type="date" name="data_inicio_devolutiva" value="{{ janela_dev[0].isoformat() if janela_dev else '' }}">
+                                </label>
+                                <label class="ciclo-campo">
+                                    <span>Devolutiva: fim</span>
+                                    <input type="date" name="data_fim_devolutiva" value="{{ janela_dev[1].isoformat() if janela_dev else '' }}">
+                                </label>
                                 {% set janela_rec = ciclo.janela_recurso() %}
                                 <label class="ciclo-campo">
                                     <span>Recursos: início</span>
@@ -195,6 +216,11 @@
                                 <label class="ciclo-campo">
                                     <span>Recursos: fim</span>
                                     <input type="date" name="data_fim_recurso" value="{{ janela_rec[1].isoformat() if janela_rec else '' }}">
+                                </label>
+                                {% set prazo_resp = ciclo.prazo_resposta_recurso() %}
+                                <label class="ciclo-campo">
+                                    <span>Responder recursos: até</span>
+                                    <input type="date" name="data_limite_resposta_recurso" value="{{ prazo_resp.isoformat() if prazo_resp else '' }}">
                                 </label>
                             </div>
                             <div class="ciclo-acoes">

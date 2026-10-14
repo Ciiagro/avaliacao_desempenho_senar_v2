@@ -7,17 +7,18 @@
 <p class="muted">Resultado contestado: {{ recurso.resultado_final_em_texto or '-' }}</p>
 
 <h2>Linha do tempo</h2>
+{% from "_recurso_abertura.html" import itens_abertura, itens_resposta %}
 {% for e in recurso.eventos %}
-    <p class="muted" style="white-space:pre-line;">
+    <p class="muted" style="white-space:normal; margin:18px 0 6px;">
         <strong>{{ (e.criado_em|fortaleza).strftime('%d/%m/%Y %H:%M') }}</strong> &mdash;
-        {% if e.tipo == 'abertura' %}Empregado abriu o recurso: "{{ e.texto }}"
-        {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou ao gestor: "{{ e.texto }}"
-        {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }}: "{{ e.texto }}"
-        {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: "{{ e.texto }}"{% endif %}
+        {% if e.tipo == 'abertura' %}Empregado abriu o recurso: {{ itens_abertura(recurso, e.texto) }}
+        {% elif e.tipo == 'encaminhamento_comissao_gestor' %}Comissão encaminhou ao gestor: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+        {% elif e.tipo == 'resposta_gestor' %}Gestor {{ 'revisou' if e.decisao == 'revisou' else 'manteve' }}: {{ itens_resposta(recurso, e.texto) }}
+        {% elif e.tipo == 'ajuste_comissao' %}Comissão ajustou alguma nota antes de repassar{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
         {% elif e.tipo == 'repasse_comissao_funcionario' %}Comissão repassou ao empregado.
-        {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: "{{ e.texto }}"{% endif %}
-        {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou: "{{ e.texto }}"
-        {% elif e.tipo == 'conversa_comissao_presidencia' %}<strong>Conversa Comissão &harr; Presidência:</strong> "{{ e.texto }}"
+        {% elif e.tipo == 'pedido_recorrer' %}Empregado pediu para recorrer{% if e.texto %}: <span style="white-space:pre-line;">"{{ e.texto }}"</span>{% endif %}
+        {% elif e.tipo == 'encaminhamento_comissao' %}Comissão encaminhou: <span style="white-space:pre-line;">"{{ e.texto }}"</span>
+        {% elif e.tipo == 'conversa_comissao_presidencia' %}<strong>Conversa Comissão &harr; Presidência:</strong> <span style="white-space:pre-line;">"{{ e.texto }}"</span>
         {% endif %}
     </p>
 {% endfor %}

@@ -12,19 +12,11 @@
 {% endif %}
 {% endmacro %}
 
-{% macro cabecalho_resumo(r, limite=None, extra=None) %}
+{% macro cabecalho_resumo(r, extra=None) %}
 <span class="recurso-card-nome">{{ r.avaliado.nome }} &mdash; Exercício {{ r.ciclo.exercicio }}</span>
 <div class="muted recurso-card-linha">
     Resultado contestado: {{ r.resultado_final_em_texto or '-' }}
     &middot; {{ chip_chegada(r.chegada_comissao_em) }}
-    {% if limite %}
-        &middot; Prazo:
-        {% if limite < now %}
-            <span class="badge badge-danger">Atrasado desde {{ limite.strftime('%d/%m/%Y') }}</span>
-        {% else %}
-            <span class="badge badge-pending">até {{ limite.strftime('%d/%m/%Y') }}</span>
-        {% endif %}
-    {% endif %}
     {% if extra %}
         &middot; {{ extra }}
     {% endif %}
@@ -120,12 +112,11 @@
 
 {% block content %}
 <h1>Comissão de recursos</h1>
-<p class="muted">Prazo pra Comissão agir: 5 dias corridos a partir da abertura do recurso. Nada passa entre gestor e empregado sem a Comissão ver e repassar.</p>
+<p class="muted">Nada passa entre gestor e empregado sem a Comissão ver e repassar.</p>
 
 {% if total_pendentes %}
-    <div class="flash {% if total_atrasados %}flash-danger{% else %}flash-warning{% endif %}" style="margin-bottom:16px;">
-        {{ total_pendentes }} recurso(s) aguardando a Comissão
-        {% if total_atrasados %} &mdash; <strong>{{ total_atrasados }} atrasado(s)</strong>{% endif %}.
+    <div class="flash flash-warning" style="margin-bottom:16px;">
+        {{ total_pendentes }} recurso(s) aguardando a Comissão.
     </div>
 {% endif %}
 
@@ -145,9 +136,8 @@
 {% if pendentes_iniciais %}
 <h2>Recursos recém-abertos &mdash; mandar mensagem ao gestor pedindo reavaliação</h2>
 {% for r in pendentes_iniciais %}
-    {% set limite = prazo_comissao(r)|fortaleza %}
     <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
-        <summary>{{ cabecalho_resumo(r, limite) }}</summary>
+        <summary>{{ cabecalho_resumo(r) }}</summary>
         <div class="recurso-card-corpo">
         {% set itens_contestados_iniciais = r.itens_contestados_por_fator %}
         {% if not itens_contestados_iniciais %}
@@ -175,7 +165,6 @@
 {% if pendentes_repasse %}
 <h2>Gestor respondeu &mdash; revisar antes de repassar</h2>
 {% for r in pendentes_repasse %}
-    {% set limite = prazo_comissao(r)|fortaleza %}
     {% set resposta = r.eventos|selectattr('tipo', 'equalto', 'resposta_gestor')|list|last %}
     {% set extra_gestor %}
         {% if resposta %}
@@ -185,7 +174,7 @@
         {% endif %}
     {% endset %}
     <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
-        <summary>{{ cabecalho_resumo(r, limite, extra_gestor) }}</summary>
+        <summary>{{ cabecalho_resumo(r, extra_gestor) }}</summary>
         <div class="recurso-card-corpo">
         {% set itens_contestados_repasse = r.itens_contestados_por_fator %}
         {% if not itens_contestados_repasse %}
@@ -301,9 +290,8 @@
 {% if pendentes_recurso %}
 <h2>Empregado recorreu &mdash; encaminhar à presidência</h2>
 {% for r in pendentes_recurso %}
-    {% set limite = prazo_comissao(r)|fortaleza %}
     <details class="card recurso-card" style="margin-bottom:16px; text-align:left;">
-        <summary>{{ cabecalho_resumo(r, limite) }}</summary>
+        <summary>{{ cabecalho_resumo(r) }}</summary>
         <div class="recurso-card-corpo">
         {% set itens_contestados_recurso = r.itens_contestados_por_fator %}
         {% if not itens_contestados_recurso %}

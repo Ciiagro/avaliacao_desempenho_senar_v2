@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=5">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=12">
 </head>
 <body>
     <header class="topbar">
@@ -18,12 +18,7 @@
             <a href="{{ url_for('main.index') }}">Início</a>
             {% if funcionario_atual %}
                 <a href="{{ url_for('main.minha_area') }}">Minha área</a>
-                {% if resultado_pendente_ciencia %}
-                    <a href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=resultado_pendente_ciencia.ciclo_id) }}"
-                       title="Dê ciência do seu resultado (aceite ou recorra) antes de acessar a área de recursos">
-                        Recurso <span class="badge badge-pending">!</span>
-                    </a>
-                {% else %}
+                {% if mostrar_menu_recurso %}
                     <a href="{{ url_for('recursos.recurso_area') }}">Recurso</a>
                 {% endif %}
                 {% if funcionario_eh_gestor and recursos_pendentes_gestor %}

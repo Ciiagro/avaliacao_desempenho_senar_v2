@@ -2,123 +2,237 @@
 {% block title %}Minha área{% endblock %}
 
 {% block content %}
-<h1>Olá, {{ funcionario.nome.split(' ')[0] }}</h1>
+<div class="ma-topo">
+    <div>
+        <h1 class="ma-saudacao">Olá, {{ funcionario.nome.split(' ')[0]|capitalize }}! <span aria-hidden="true">👋</span></h1>
+        <p class="ma-subtitulo">Acompanhe suas avaliações e seu desenvolvimento profissional.</p>
+    </div>
+    <div class="ma-data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        {{ data_extenso }}
+    </div>
+</div>
 
-<div class="cards">
-    <a class="card" href="{{ url_for('main.minhas_capacitacoes') }}">
-        <h2>Minhas Capacitações</h2>
-        <p>Cadastre seus cursos, treinamentos e certificações</p>
+<div class="atalhos">
+    <a class="atalho" href="{{ url_for('main.minhas_capacitacoes') }}">
+        <span class="atalho-icone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+        </span>
+        <span class="atalho-texto">
+            <strong>Minhas Capacitações</strong>
+            <small>Cadastre seus cursos, treinamentos e certificações</small>
+        </span>
+        <span class="atalho-seta" aria-hidden="true">Acessar &rarr;</span>
     </a>
 </div>
 
-{% if resultados_liberados %}
-    <h2>Meus resultados finais</h2>
-    <div class="cards">
-        {% for r in resultados_liberados %}
-            <div class="card">
-                <h2>{{ '%.2f'|format(r.resultado_final) }} &middot; {{ r.conceito }}</h2>
-                <p>Exercício {{ r.ciclo.exercicio }} &mdash; autoavaliação x0,30 + avaliação do gestor x0,70</p>
-                <p>
-                    <a class="botao botao-pequeno" href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=r.ciclo.id) }}">Ver as duas avaliações</a>
-                    <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=r.ciclo.id) }}">Baixar PDF</a>
-                    <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=r.ciclo.id) }}">Baixar Excel</a>
-                </p>
+{# Resultados do ciclo em andamento (ou com ciência pendente) ficam em destaque;
+   os de ciclos anteriores ficam numa lista discreta no fim da página. #}
+{% set destaque = [] %}
+{% set anteriores = [] %}
+{% for r in resultados_liberados %}
+    {% if not ciclo or r.ciclo.id == ciclo.id or (resultado_pendente_ciencia and r.ciclo.id == resultado_pendente_ciencia.ciclo_id) %}
+        {% set _ = destaque.append(r) %}
+    {% else %}
+        {% set _ = anteriores.append(r) %}
+    {% endif %}
+{% endfor %}
+
+{% if destaque %}
+    <section class="ma-secao">
+        <h2 class="ma-secao-titulo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+            Meu desempenho
+        </h2>
+        {% for r in destaque %}
+            {% set pct = (r.resultado_final / 10 * 100)|round(0)|int %}
+            {% set pendente = resultado_pendente_ciencia and r.ciclo.id == resultado_pendente_ciencia.ciclo_id %}
+            <div class="ma-desempenho">
+                <div class="ma-anel ma-anel-{{ r.conceito|lower }}" style="--pct: {{ pct }};" role="img" aria-label="Resultado final {{ '%.2f'|format(r.resultado_final) }}, conceito {{ r.conceito }}">
+                    <div class="ma-anel-miolo">
+                        <small>Resultado final</small>
+                        <strong>{{ ('%.2f'|format(r.resultado_final)).replace('.', ',') }}</strong>
+                        <span>{{ r.conceito }}</span>
+                    </div>
+                </div>
+                <div class="ma-desempenho-info">
+                    <p class="ma-exercicio">Exercício {{ r.ciclo.exercicio }}</p>
+                    <p class="ma-formula">Autoavaliação (30%) + avaliação do gestor (70%)</p>
+                    {% if pendente %}
+                        <p class="ma-aviso-ciencia">
+                            Abra suas avaliações, confirme o recebimento e escolha se aceita o resultado ou se vai recorrer.
+                        </p>
+                    {% endif %}
+                    <div class="ma-botoes">
+                        <a class="botao" href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=r.ciclo.id) }}">{% if pendente %}Ver avaliações e dar ciência{% else %}Ver avaliações{% endif %}</a>
+                        <a class="botao botao-secundario" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=r.ciclo.id) }}">Baixar PDF</a>
+                        <a class="botao botao-secundario" href="{{ url_for('main.meu_resultado_excel', ciclo_id=r.ciclo.id) }}">Baixar Excel</a>
+                    </div>
+                </div>
+                <a class="ma-seta" href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=r.ciclo.id) }}" aria-label="Abrir avaliações do exercício {{ r.ciclo.exercicio }}">&rsaquo;</a>
             </div>
         {% endfor %}
-    </div>
+    </section>
 {% endif %}
 
 {% if ciclo %}
-    <p class="muted">Ciclo aberto: exercício {{ ciclo.exercicio }}</p>
-
-    <h2>Minha autoavaliação</h2>
     {% set elegivel = funcionario.is_elegivel_avaliacao() %}
-    {% if elegivel is sameas false %}
-        <p class="muted">Você ainda não completou o tempo mínimo de casa para ser avaliado neste ciclo.</p>
-    {% else %}
-        <a class="botao"
-           href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=funcionario.id, avaliador_id=funcionario.id, tipo='auto') }}">
-            {% if autoavaliacao and autoavaliacao.status == 'concluida' %}
-                Ver minha autoavaliação
-            {% elif autoavaliacao %}
-                Continuar minha autoavaliação
-            {% else %}
-                Fazer minha autoavaliação
-            {% endif %}
-        </a>
-        {% if autoavaliacao %}
-            <p class="muted">
-                Status:
-                {% if autoavaliacao.status == 'concluida' %}
-                    <span class="badge badge-ok">Concluída</span>
+    <div class="atalhos ma-autoavaliacao">
+        <div class="atalho atalho-estatico">
+            <span class="atalho-icone atalho-icone-claro" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3h6v3H9zM9 12l2 2 4-4M9 17h6"/></svg>
+            </span>
+            <span class="atalho-texto">
+                <strong>Minha autoavaliação</strong>
+                {% if elegivel is sameas false %}
+                    <small>Você ainda não completou o tempo mínimo de casa para ser avaliado neste ciclo (exercício {{ ciclo.exercicio }}).</small>
+                {% elif autoavaliacao and autoavaliacao.status == 'concluida' %}
+                    <small>Concluída &middot; consulte suas respostas e avaliações (exercício {{ ciclo.exercicio }}).</small>
+                {% elif autoavaliacao %}
+                    <small>Em andamento &middot; continue de onde parou (exercício {{ ciclo.exercicio }}).</small>
                 {% else %}
-                    <span class="badge badge-pending">Em andamento</span>
+                    <small>Ciclo aberto &middot; faça sua autoavaliação do exercício {{ ciclo.exercicio }}.</small>
                 {% endif %}
-            </p>
-        {% endif %}
-    {% endif %}
+            </span>
+            {% if elegivel is not sameas false %}
+                <a class="botao"
+                   href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=funcionario.id, avaliador_id=funcionario.id, tipo='auto') }}">
+                    {% if autoavaliacao and autoavaliacao.status == 'concluida' %}
+                        Ver minha autoavaliação
+                    {% elif autoavaliacao %}
+                        Continuar minha autoavaliação
+                    {% else %}
+                        Fazer minha autoavaliação
+                    {% endif %}
+                    &rarr;
+                </a>
+            {% endif %}
+        </div>
+    </div>
 
     {% if linhas %}
-        <h2>Pessoas que eu avalio</h2>
-        <table class="tabela">
-            <thead>
-                <tr>
-                    <th>Empregado</th>
-                    <th>Cargo</th>
-                    <th>Minha avaliação</th>
-                    <th>Autoavaliação dele(a)</th>
-                    <th></th>
-                </tr>
-            </thead>
+        {% macro pill(status) -%}
+            {%- if status == 'concluida' -%}
+                <span class="pill pill-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Concluída</span>
+            {%- elif status == 'em_andamento' -%}
+                <span class="pill pill-pend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Em andamento</span>
+            {%- else -%}
+                <span class="pill pill-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Não iniciada</span>
+            {%- endif -%}
+        {%- endmacro %}
+        {% set ordem_status = {'concluida': 2, 'em_andamento': 1} %}
+
+        <section class="ma-secao">
+            <h2 class="ma-secao-titulo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Pessoas que eu avalio
+                <span class="ma-contagem">{{ linhas|length }}</span>
+            </h2>
+            <div class="ma-tabela-rolagem">
+                <table class="tabela-equipe" id="tabela-equipe">
+                    <thead>
+                        <tr>
+                            <th data-col="0" tabindex="0">Empregado <span class="ordenar" aria-hidden="true">&#8645;</span></th>
+                            <th data-col="1" tabindex="0">Cargo <span class="ordenar" aria-hidden="true">&#8645;</span></th>
+                            <th data-col="2" tabindex="0">Minha avaliação <span class="ordenar" aria-hidden="true">&#8645;</span></th>
+                            <th data-col="3" tabindex="0">Autoavaliação dele(a) <span class="ordenar" aria-hidden="true">&#8645;</span></th>
+                            <th class="sem-ordem">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in linhas %}
+                            <tr>
+                                <td data-sort="{{ linha.avaliado.nome|lower }}">
+                                    <span class="eq-pessoa">
+                                        <span class="eq-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></span>
+                                        <strong>{{ linha.avaliado.nome }}</strong>
+                                    </span>
+                                </td>
+                                <td data-sort="{{ (linha.avaliado.cargo.nome if linha.avaliado.cargo else '')|lower }}">{{ linha.avaliado.cargo.nome if linha.avaliado.cargo else '-' }}</td>
+                                <td data-sort="{{ ordem_status.get(linha.status, 0) }}">{{ pill(linha.status) }}</td>
+                                <td data-sort="{{ ordem_status.get(linha.autoavaliacao_status, 0) }}">{{ pill(linha.autoavaliacao_status) }}</td>
+                                <td>
+                                    <span class="eq-acoes">
+                                        <a class="botao botao-pequeno"
+                                           href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=linha.avaliado.id, avaliador_id=funcionario.id, tipo='gestor') }}">
+                                            {% if linha.status == 'concluida' %}Ver{% else %}Avaliar{% endif %}
+                                        </a>
+                                        {% if linha.status == 'concluida' and linha.avaliacao %}
+                                            <a class="botao-icone botao-icone-secundario"
+                                               href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=linha.avaliacao.id) }}"
+                                               title="Baixar PDF"
+                                               aria-label="Baixar PDF da avaliação de {{ linha.avaliado.nome }}">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                            </a>
+                                        {% endif %}
+                                        <a class="botao-icone botao-icone-secundario"
+                                           href="{{ url_for('main.capacitacoes_da_equipe', avaliado_id=linha.avaliado.id) }}"
+                                           title="Ver capacitações"
+                                           aria-label="Ver capacitações de {{ linha.avaliado.nome }}">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+                                        </a>
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <script>
+            (function () {
+                var tabela = document.getElementById('tabela-equipe');
+                if (!tabela) return;
+                var corpo = tabela.tBodies[0];
+                var cabecalhos = tabela.querySelectorAll('th[data-col]');
+                function ordenar(th) {
+                    var col = parseInt(th.getAttribute('data-col'), 10);
+                    var asc = th.getAttribute('data-dir') !== 'asc';
+                    cabecalhos.forEach(function (h) { h.removeAttribute('data-dir'); });
+                    th.setAttribute('data-dir', asc ? 'asc' : 'desc');
+                    var linhas = Array.prototype.slice.call(corpo.rows);
+                    linhas.sort(function (a, b) {
+                        var va = a.cells[col].getAttribute('data-sort') || '';
+                        var vb = b.cells[col].getAttribute('data-sort') || '';
+                        var na = parseFloat(va), nb = parseFloat(vb);
+                        var cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : va.localeCompare(vb, 'pt');
+                        return asc ? cmp : -cmp;
+                    });
+                    linhas.forEach(function (l) { corpo.appendChild(l); });
+                }
+                cabecalhos.forEach(function (th) {
+                    th.addEventListener('click', function () { ordenar(th); });
+                    th.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ordenar(th); }
+                    });
+                });
+            })();
+        </script>
+    {% endif %}
+{% else %}
+    <p class="flash flash-warning">Nenhum ciclo de avaliação está aberto no momento.</p>
+{% endif %}
+
+{% if anteriores %}
+    <details style="margin-top:28px;">
+        <summary class="muted" style="cursor:pointer; font-size:0.9rem;">
+            Resultados de ciclos anteriores ({{ anteriores|length }})
+        </summary>
+        <table class="tabela" style="margin-top:8px; font-size:0.9rem;">
             <tbody>
-                {% for linha in linhas %}
+                {% for r in anteriores %}
                     <tr>
-                        <td>{{ linha.avaliado.nome }}</td>
-                        <td>{{ linha.avaliado.cargo.nome if linha.avaliado.cargo else '-' }}</td>
-                        <td>
-                            {% if linha.status == 'concluida' %}
-                                <span class="badge badge-ok">Concluída</span>
-                            {% elif linha.status == 'em_andamento' %}
-                                <span class="badge badge-pending">Em andamento</span>
-                            {% else %}
-                                <span class="badge badge-new">Não iniciada</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if linha.autoavaliacao_status == 'concluida' %}
-                                <span class="badge badge-ok">Concluída</span>
-                            {% elif linha.autoavaliacao_status == 'em_andamento' %}
-                                <span class="badge badge-pending">Em andamento</span>
-                            {% else %}
-                                <span class="badge badge-new">Não iniciada</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a class="botao"
-                               href="{{ url_for('avaliacoes.formulario', ciclo_id=ciclo.id, avaliado_id=linha.avaliado.id, avaliador_id=funcionario.id, tipo='gestor') }}">
-                                {% if linha.status == 'concluida' %}Ver{% else %}Avaliar{% endif %}
-                            </a>
-                            <a class="botao-icone botao-icone-secundario"
-                               href="{{ url_for('main.capacitacoes_da_equipe', avaliado_id=linha.avaliado.id) }}"
-                               title="Ver capacitações"
-                               aria-label="Ver capacitações de {{ linha.avaliado.nome }}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
-                            </a>
-                            {% if linha.status == 'concluida' and linha.avaliacao %}
-                                <a class="botao-icone botao-icone-secundario"
-                                   href="{{ url_for('avaliacoes.baixar_pdf', avaliacao_id=linha.avaliacao.id) }}"
-                                   title="Baixar PDF"
-                                   aria-label="Baixar PDF da avaliação de {{ linha.avaliado.nome }}">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                                </a>
-                            {% endif %}
+                        <td>Exercício {{ r.ciclo.exercicio }}</td>
+                        <td><strong>{{ '%.2f'|format(r.resultado_final) }}</strong> &middot; {{ r.conceito }}</td>
+                        <td style="text-align:right; white-space:nowrap;">
+                            <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_detalhe', ciclo_id=r.ciclo.id) }}">Ver avaliações</a>
+                            <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_pdf', ciclo_id=r.ciclo.id) }}">PDF</a>
+                            <a class="botao botao-secundario botao-pequeno" href="{{ url_for('main.meu_resultado_excel', ciclo_id=r.ciclo.id) }}">Excel</a>
                         </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-    {% endif %}
-{% else %}
-    <p class="flash flash-warning">Nenhum ciclo de avaliação está aberto no momento.</p>
+    </details>
 {% endif %}
 {% endblock %}

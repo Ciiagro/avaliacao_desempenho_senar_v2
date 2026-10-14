@@ -250,6 +250,16 @@ def _resultados_liberados_do_funcionario(funcionario):
     return resultados
 
 
+_DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def _data_por_extenso():
+    """Ex: "Terça-feira, 13 de outubro de 2026" (data de hoje em Fortaleza)."""
+    hoje = para_fortaleza(datetime.now(timezone.utc))
+    return f"{_DIAS_SEMANA[hoje.weekday()]}, {hoje.day} de {_MESES[hoje.month - 1]} de {hoje.year}"
+
+
 @main_bp.route("/minha-area")
 def minha_area():
     funcionario = funcionario_logado()
@@ -270,6 +280,7 @@ def minha_area():
             autoavaliacao=None,
             linhas=[],
             resultados_liberados=resultados_liberados,
+            data_extenso=_data_por_extenso(),
         )
 
     autoavaliacao = Avaliacao.query.filter_by(
@@ -321,6 +332,7 @@ def minha_area():
         autoavaliacao=autoavaliacao,
         linhas=linhas,
         resultados_liberados=resultados_liberados,
+        data_extenso=_data_por_extenso(),
     )
 
 
