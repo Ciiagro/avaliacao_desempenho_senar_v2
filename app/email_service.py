@@ -415,7 +415,7 @@ def avisar_empregado_recurso_encerrado(recurso, resumo):
 
 
 def avisar_prazo_avaliacao(funcionario, tipo, dias_restantes, prazo):
-    """Lembrete de prazo (5 dias / 2 dias / no dia) pra quem ainda não
+    """Lembrete de prazo (5 dias / 1 dia / no dia) pra quem ainda não
     concluiu a autoavaliação ou a avaliação do gestor de alguém."""
     nome_tipo = "autoavaliação" if tipo == "auto" else "avaliação do(s) empregado(s) sob sua gestão"
 

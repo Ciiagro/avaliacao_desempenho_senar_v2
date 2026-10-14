@@ -1,7 +1,7 @@
 """
 Lembretes automáticos de prazo por e-mail.
 
-Regra: quando faltarem 5 dias, 2 dias ou 0 dias (o próprio dia) para o
+Regra: quando faltarem 5 dias, 1 dia ou 0 dias (o próprio dia) para o
 prazo de autoavaliação ou de avaliação do gestor de um ciclo, manda um
 e-mail para cada pessoa que AINDA não concluiu a avaliação que é
 responsabilidade dela.
@@ -20,7 +20,7 @@ from .models import CicloAvaliacao, VinculoAvaliacao, Avaliacao, ResultadoFinal,
 from .utils import para_fortaleza, adicionar_dias_uteis
 from .email_service import avisar_prazo_avaliacao, avisar_prazo_ciencia_resultado
 
-DIAS_DE_AVISO = (5, 2, 0)
+DIAS_DE_AVISO = (5, 1, 0)
 DIAS_DE_AVISO_CIENCIA = (2, 0)  # prazo de ciência é curto (5 dias úteis), não cabe um aviso de "5 dias"
 PRAZO_CIENCIA_DIAS_UTEIS = 5
 
@@ -96,7 +96,12 @@ def _lembretes_avaliacao(hoje, resumo):
                 if ja_enviado:
                     continue
 
-                avisar_prazo_avaliacao(pessoa, tipo, dias_restantes, prazo_pessoa)
+                enviado = avisar_prazo_avaliacao(pessoa, tipo, dias_restantes, prazo_pessoa)
+                if not enviado:
+                    # Falhou (SMTP/config): não registra, assim a próxima
+                    # execução do cron tenta de novo.
+                    resumo["falhas"] = resumo.get("falhas", 0) + 1
+                    continue
                 db.session.add(
                     NotificacaoPrazo(
                         ciclo_id=ciclo.id,
