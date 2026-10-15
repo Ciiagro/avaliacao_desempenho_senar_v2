@@ -194,6 +194,7 @@ TIPOS_CAPACITACAO = [
     "Treinamento",
     "Palestra",
     "Certificação",
+    "Graduação",
     "Pós-graduação",
     "Outro"
 ]
