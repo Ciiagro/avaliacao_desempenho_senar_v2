@@ -7,6 +7,22 @@ from .config import Config
 from .extensions import db
 
 
+_MINUSCULAS = {"de", "da", "do", "das", "dos", "e", "em", "para", "com", "a", "o", "na", "no", "nas", "nos", "por"}
+
+
+def formatar_titulo(texto):
+    """Primeira letra de cada palavra maiúscula e o resto minúsculo (de/da/e... ficam minúsculos)."""
+    palavras = (texto or "").split()
+    saida = []
+    for i, p in enumerate(palavras):
+        baixa = p.lower()
+        if i > 0 and baixa in _MINUSCULAS:
+            saida.append(baixa)
+        else:
+            saida.append(baixa[:1].upper() + baixa[1:])
+    return " ".join(saida)
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -77,6 +93,15 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(recursos_bp)
     app.register_blueprint(painel_bp)
+
+    @app.template_filter("titulo")
+    def titulo_curso(texto):
+        return formatar_titulo(texto)
+
+    @app.template_filter("brl")
+    def formatar_reais(valor):
+        v = float(valor or 0)
+        return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     @app.context_processor
     def injetar_funcionario_logado():

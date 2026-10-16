@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Capacitações{% endblock %}
 
+{% macro paginador(pagina, total, endpoint, params) -%}
+<nav class="pg" aria-label="Páginas">
+    {% if pagina > 1 %}<a class="pg-b" href="{{ url_for(endpoint, pagina=pagina-1, **params) }}" aria-label="Página anterior">&lsaquo;</a>{% else %}<span class="pg-b off">&lsaquo;</span>{% endif %}
+    {% for n in range(1, total + 1) %}
+        {% if n == 1 or n == total or (n >= pagina - 2 and n <= pagina + 2) %}
+            {% if n == pagina %}<span class="pg-b atual" aria-current="page">{{ n }}</span>{% else %}<a class="pg-b" href="{{ url_for(endpoint, pagina=n, **params) }}">{{ n }}</a>{% endif %}
+        {% elif n == pagina - 3 or n == pagina + 3 %}<span class="pg-r">&hellip;</span>{% endif %}
+    {% endfor %}
+    {% if pagina < total %}<a class="pg-b" href="{{ url_for(endpoint, pagina=pagina+1, **params) }}" aria-label="Próxima página">&rsaquo;</a>{% else %}<span class="pg-b off">&rsaquo;</span>{% endif %}
+</nav>
+{%- endmacro %}
+
 {% block content %}
 <a href="{{ url_for('admin.painel') }}" class="back-link">&larr; Administração</a>
 <h1>Capacitações</h1>
@@ -23,38 +35,44 @@
                     <option value="{{ a }}" {% if a == ano_selecionado %}selected{% endif %}>{{ a }}</option>
                 {% endfor %}
             </select>
+            <select name="status" onchange="this.form.submit()" aria-label="Status">
+                <option value="">Todos os status</option>
+                {% for st in status_opcoes %}<option value="{{ st }}" {% if st == status_selecionado %}selected{% endif %}>{{ st }}</option>{% endfor %}
+            </select>
+            <select name="tipo" onchange="this.form.submit()" aria-label="Tipo de curso">
+                <option value="">Todos os tipos</option>
+                {% for tp in tipo_opcoes %}<option value="{{ tp }}" {% if tp == tipo_selecionado %}selected{% endif %}>{{ tp }}</option>{% endfor %}
+            </select>
+            <select name="duracao" onchange="this.form.submit()" aria-label="Duração">
+                <option value="">Todas as durações</option>
+                {% for d in duracao_opcoes %}<option value="{{ d }}" {% if d == duracao_selecionada %}selected{% endif %}>{{ d }}</option>{% endfor %}
+            </select>
         </form>
         <nav class="cap-tabs" aria-label="Trimestre">
             <a class="cap-tab {% if not trimestre_selecionado %}ativo{% endif %}"
-               href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, trimestre=0) }}">Todos</a>
+               href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, status=status_selecionado, tipo=tipo_selecionado, duracao=duracao_selecionada, trimestre=0) }}">Todos</a>
             {% for t in trimestres %}
                 <a class="cap-tab {% if t == trimestre_selecionado %}ativo{% endif %}"
-                   href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, trimestre=t) }}">{{ t }}º tri</a>
+                   href="{{ url_for('admin.capacitacoes', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, status=status_selecionado, tipo=tipo_selecionado, duracao=duracao_selecionada, trimestre=t) }}">{{ t }}º tri</a>
             {% endfor %}
         </nav>
     </div>
 </div>
 
-<p class="cap-periodo muted">{{ periodo_txt }}</p>
+<div class="cap-periodo-linha">
+    <p class="cap-periodo muted">{{ periodo_txt }}</p>
+    <a class="botao botao-secundario cap-excel" href="{{ url_for('admin.exportar_capacitacoes_excel', funcionario_id=funcionario_id_selecionado, ano=ano_selecionado, status=status_selecionado, tipo=tipo_selecionado, duracao=duracao_selecionada, trimestre=trimestre_selecionado) }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Baixar Excel
+    </a>
+</div>
 
 <!-- Resumo -->
 <div class="cap-resumo">
-    <div class="cap-kpi">
-        <span class="cap-kpi-valor">{{ capacitacoes|length }}</span>
-        <span class="cap-kpi-rotulo">Capacitações no período</span>
-    </div>
-    <div class="cap-kpi">
-        <span class="cap-kpi-valor">{{ total_pessoas }}</span>
-        <span class="cap-kpi-rotulo">Funcionários com capacitação</span>
-    </div>
-    <div class="cap-kpi">
-        <span class="cap-kpi-valor">{{ total_horas }}h</span>
-        <span class="cap-kpi-rotulo">Carga horária total</span>
-    </div>
-    <div class="cap-kpi">
-        <span class="cap-kpi-valor">{{ total_valor_fmt }}</span>
-        <span class="cap-kpi-rotulo">Investido pelo SENAR</span>
-    </div>
+    <div class="cap-kpi"><span class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg></span><span class="kpi-txt"><span class="cap-kpi-valor">{{ total_registros }}</span><span class="cap-kpi-rotulo">Capacitações no período</span></span></div>
+    <div class="cap-kpi"><span class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></span><span class="kpi-txt"><span class="cap-kpi-valor">{{ total_pessoas }}</span><span class="cap-kpi-rotulo">Funcionários com capacitação</span>{% if pct_pessoas is not none %}<span class="cap-kpi-sub">{{ pct_pessoas }}% dos {{ total_ativos }} avaliados</span>{% endif %}</span></div>
+    <div class="cap-kpi"><span class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="kpi-txt"><span class="cap-kpi-valor">{{ total_horas }}h</span><span class="cap-kpi-rotulo">Carga horária total</span></span></div>
+    <div class="cap-kpi"><span class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.5-.8-1.5-1.2-2.8-1.2-1.7 0-2.8.8-2.8 2s1 1.7 2.8 2 2.8.8 2.8 2-1.1 2-2.8 2c-1.3 0-2.3-.4-2.8-1.2M12 6.5V8m0 8v1.5"/></svg></span><span class="kpi-txt"><span class="cap-kpi-valor">{{ total_valor_fmt }}</span><span class="cap-kpi-rotulo">Investido pelo SENAR</span></span></div>
 </div>
 
 <!-- Lista -->
@@ -77,16 +95,17 @@
                 <tr>
                     <td class="cap-col-func"><strong class="cap-nome">{{ c.funcionario.nome }}</strong></td>
                     <td class="cap-col-nome">
-                        <strong class="cap-nome">{{ c.nome_curso }}</strong>
-                        {% if c.instituicao %}<div class="muted cap-sub">{{ c.instituicao }}</div>{% endif %}
+                        <strong class="cap-nome">{{ c.nome_curso|titulo }}</strong>
+                        {% if c.instituicao %}<div class="muted cap-sub">{{ c.instituicao|upper }}</div>{% endif %}
                     </td>
-                    <td>{{ c.tipo or '-' }}</td>
+                    <td>{{ c.tipo or '-' }}<div class="muted cap-sub">{{ c.classe }}</div></td>
                     <td>
-                        {% if c.status == 'Concluído' %}<span class="badge badge-ok">Concluído</span>
-                        {% elif c.status == 'Em andamento' %}<span class="badge badge-pending">Em andamento</span>
+                        {% if c.situacao == 'Desistente' %}<span class="badge badge-danger">Desistente</span>
+                        {% elif c.situacao == 'Concluído' %}<span class="badge badge-ok">Concluído</span>
+                        {% elif c.situacao == 'Em andamento' %}<span class="badge badge-pending">Em andamento</span>
                         {% else %}-{% endif %}
                     </td>
-                    <td class="cap-nowrap">{{ (c.carga_horaria ~ 'h') if c.carga_horaria else '-' }}</td>
+                    <td class="cap-nowrap">{% if c.previsto %}<span class="muted" title="Horas previstas: só contam depois do comprovante">{{ c.carga_horaria or 0 }}h prev.</span>{% else %}{{ (c.carga_horaria ~ 'h') if c.carga_horaria else '-' }}{% endif %}{% if c.carga_horaria_total %}<div class="muted cap-sub">total {{ c.carga_horaria_total }}h</div>{% endif %}</td>
                     <td class="cap-nowrap">
                         {% if c.data_inicio or c.data_conclusao %}
                             {{ c.data_inicio.strftime('%d/%m') if c.data_inicio else '?' }}
@@ -97,17 +116,18 @@
                             <div class="muted cap-sub">{{ c.trimestre }}º tri/{{ c.ano }}</div>
                         {% endif %}
                     </td>
-                    <td class="cap-nowrap">{{ ('R$ ' ~ c.valor_pago_senar|string) if c.valor_pago_senar is not none else '-' }}</td>
+                    <td class="cap-nowrap">{{ (c.valor_pago_senar|brl) if (c.valor_pago_senar is not none and not c.previsto) else '-' }}</td>
                     <td>
                         {% if c.arquivo_tipo %}
                             {% set eh_pdf = c.arquivo_tipo == 'application/pdf' %}
                             <a class="cap-doc {{ 'cap-doc-pdf' if eh_pdf else 'cap-doc-img' }}"
                                href="{{ url_for('admin.documento_capacitacao', capacitacao_id=c.id) }}"
                                target="_blank" rel="noopener"
-                               data-tip="Visualizar documento" aria-label="Visualizar documento de {{ c.nome_curso }}">
+                               data-tip="Visualizar {{ 'PDF' if eh_pdf else 'imagem' }}" aria-label="Visualizar documento de {{ c.nome_curso }}">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
-                                {{ 'PDF' if eh_pdf else 'Imagem' }}
+                                
                             </a>
+                        {% elif c.previsto %}<span class="badge badge-pending" title="Trimestre ainda sem comprovante">Pendente</span>
                         {% else %}<span class="muted">-</span>{% endif %}
                     </td>
                 </tr>
@@ -120,6 +140,10 @@
     </table>
 </div>
 
+{% if total_paginas >= 1 %}
+{{ paginador(pagina, total_paginas, 'admin.capacitacoes', {'funcionario_id': funcionario_id_selecionado, 'ano': ano_selecionado, 'trimestre': trimestre_selecionado or 0, 'status': status_selecionado, 'tipo': tipo_selecionado, 'duracao': duracao_selecionada}) }}
+<p class="pg-info">{{ total_registros }} registros &middot; 20 por página</p>
+{% endif %}
 <style>
 /* Mesmo visual da tela "Minhas Capacitações" do colaborador */
 .cap-barra {
@@ -146,28 +170,42 @@
 .cap-periodo { margin: 6px 0 18px; font-size: 0.9rem; }
 
 /* Resumo */
+.pg { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 16px 0 4px; flex-wrap: wrap; }
+.pg-b { min-width: 34px; height: 34px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--navy-900); font-weight: 700; font-size: 0.88rem; text-decoration: none; }
+a.pg-b:hover { border-color: var(--navy-700); background: #f1f6f6; }
+.pg-b.atual { background: var(--navy-800); border-color: var(--navy-800); color: #fff; }
+.pg-b.off { opacity: 0.4; }
+.pg-r { color: var(--texto-muted); padding: 0 2px; }
+.pg-info { text-align: center; font-size: 0.8rem; color: var(--texto-muted); margin-top: 6px; }
+.cap-periodo-linha { margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cap-excel { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 0.88rem; }
+.cap-excel svg { width: 16px; height: 16px; }
 .cap-resumo {
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px; margin-bottom: 20px;
 }
+/* cartões de resumo */
 .cap-kpi {
-    background: var(--surface); border: 1px solid var(--border);
-    border-top: 3px solid var(--navy-800); border-radius: var(--radius);
-    padding: 16px 20px; box-shadow: var(--shadow-sm);
-    display: flex; flex-direction: column; gap: 4px;
+    background: #f3f9f9; border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 12px; min-width: 0;
 }
-.cap-kpi-valor { font-size: 1.7rem; font-weight: 800; color: var(--navy-900); line-height: 1.1; }
+.kpi-ico { flex: 0 0 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #e0efef; color: var(--navy-700); }
+.kpi-ico svg { width: 20px; height: 20px; }
+.kpi-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cap-kpi-valor small { font-size: 0.8rem; font-weight: 700; color: var(--navy-700); }
+.cap-kpi-sub { font-size: 0.74rem; color: var(--navy-700); font-weight: 700; }
+.cap-kpi-valor { font-size: 1.45rem; font-weight: 800; color: var(--navy-900); line-height: 1.1; }
 .cap-kpi-rotulo { font-size: 0.8rem; color: var(--texto-muted); font-weight: 600; }
 
 /* Lista */
 .cap-lista { max-height: none; }
-.tabela-capacitacoes { font-size: 0.95rem; }
-.tabela-capacitacoes th { padding: 14px 12px; }
-.tabela-capacitacoes td { padding: 14px 12px; vertical-align: middle; }
-.tabela-capacitacoes th:first-child, .tabela-capacitacoes td:first-child { padding-left: 18px; }
-.tabela-capacitacoes th:last-child, .tabela-capacitacoes td:last-child { padding-right: 18px; }
-.cap-col-func { min-width: 170px; }
-.cap-col-nome { min-width: 230px; }
+.tabela-capacitacoes { font-size: 0.88rem; }
+.tabela-capacitacoes th { padding: 10px 7px; font-size: 0.7rem; }
+.tabela-capacitacoes td { padding: 9px 7px; vertical-align: middle; }
+.tabela-capacitacoes th:first-child, .tabela-capacitacoes td:first-child { padding-left: 12px; }
+.tabela-capacitacoes th:last-child, .tabela-capacitacoes td:last-child { padding-right: 12px; }
+.cap-col-func { min-width: 120px; max-width: 150px; }
+.cap-col-nome { min-width: 160px; max-width: 240px; }
 .cap-nome { color: var(--navy-900); }
 .cap-sub { font-size: 0.85rem; margin-top: 2px; }
 .cap-nowrap { white-space: nowrap; }
@@ -176,7 +214,7 @@
 /* Botão do comprovante: ícone + rótulo (PDF / Imagem) */
 .cap-doc {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 11px; border-radius: 8px; text-decoration: none;
+    justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: 8px; text-decoration: none;
     font-size: 0.8rem; font-weight: 700; letter-spacing: 0.02em;
     border: 1px solid transparent; transition: filter 0.15s ease;
 }

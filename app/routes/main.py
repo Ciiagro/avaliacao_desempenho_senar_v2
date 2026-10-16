@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timezone, date as _date
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, g, abort
 from werkzeug.utils import secure_filename
@@ -349,7 +350,31 @@ ASSINATURAS_COMPROVACAO = {
     "image/png": (b"\x89PNG\r\n\x1a\n",),
 }
 # O servidor (Vercel) aceita corpo de até ~4,5 MB por requisição.
-MAX_COMPROVACAO_BYTES = 4 * 1024 * 1024
+MAX_COMPROVACAO_BYTES = 2 * 1024 * 1024
+
+
+MAX_ENTRADA_BYTES = 4 * 1024 * 1024  # fotos maiores são aceitas e reduzidas automaticamente
+
+
+def _reduzir_imagem(dados):
+    """Reduz foto/imagem (lado maior 1600 px, JPEG qualidade 78). Devolve os bytes ou None se não compensar."""
+    try:
+        from PIL import Image, ImageOps
+        import io
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(dados)))
+        img.thumbnail((1600, 1600))
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGBA")
+            fundo = Image.new("RGB", img.size, (255, 255, 255))
+            fundo.paste(img, mask=img.split()[-1])
+            img = fundo
+        else:
+            img = img.convert("RGB")
+        saida = io.BytesIO()
+        img.save(saida, "JPEG", quality=78, optimize=True)
+        return saida.getvalue() if len(saida.getvalue()) < len(dados) else None
+    except Exception:
+        return None
 
 
 def _ler_comprovacao(file):
@@ -361,11 +386,18 @@ def _ler_comprovacao(file):
     mimetype = EXT_COMPROVACAO.get(ext)
     if not mimetype:
         return None, None, None, "O documento precisa ser PDF, JPG ou PNG."
-    dados = file.read(MAX_COMPROVACAO_BYTES + 1)
-    if len(dados) > MAX_COMPROVACAO_BYTES:
+    dados = file.read(MAX_ENTRADA_BYTES + 1)
+    if len(dados) > MAX_ENTRADA_BYTES:
         return None, None, None, "O documento é grande demais (máximo de 4 MB)."
     if not any(dados.startswith(a) for a in ASSINATURAS_COMPROVACAO[mimetype]):
         return None, None, None, "O conteúdo do arquivo não corresponde a um PDF, JPG ou PNG válido."
+    if mimetype != "application/pdf":
+        reduzido = _reduzir_imagem(dados)
+        if reduzido:
+            dados, mimetype = reduzido, "image/jpeg"
+            nome = nome.rsplit(".", 1)[0] + ".jpg"
+    if len(dados) > MAX_COMPROVACAO_BYTES:
+        return None, None, None, "O documento é grande demais (máximo de 2 MB). Em PDF, reduza o tamanho antes de enviar."
     return nome, mimetype, dados, None
 
 
@@ -394,48 +426,232 @@ def _parse_carga_horaria_form():
     return int(round(valor)) if valor is not None else None
 
 
-def _erro_campos_obrigatorios(tem_comprovante):
-    """Todos os campos da capacitação são obrigatórios (menos observações).
-    O valor pago pelo SENAR pode ser 0, mas não pode ficar em branco."""
-    f = request.form
-    faltando = []
-    if not f.get("nome_curso", "").strip():
-        faltando.append("nome do curso")
-    if not f.get("instituicao", "").strip():
-        faltando.append("instituição")
-    if not f.get("tipo"):
-        faltando.append("tipo")
-    if not f.get("status"):
-        faltando.append("status")
-    if _parse_decimal_form("carga_horaria") is None:
-        faltando.append("carga horária")
-    if not _parse_data_form("data_inicio"):
-        faltando.append("data de início")
-    if not _parse_data_form("data_conclusao"):
-        faltando.append("data de conclusão")
-    valor = _parse_decimal_form("valor_pago_senar")
-    if valor is None or valor < 0:
-        faltando.append("valor pago pelo SENAR (informe 0 se não houve custo)")
-    if not tem_comprovante:
-        faltando.append("comprovante (certificado ou prova de que está cursando)")
-    if faltando:
-        return "Preencha todos os campos obrigatórios: " + ", ".join(faltando) + "."
+MAX_TRIMESTRES_CURSO = 20
+FILTROS_CURSO = {"todos": None, "andamento": "Em andamento", "concluidos": "Concluído", "desistentes": "Desistente"}
+
+
+def _fmt_h(v):
+    return f"{v:g}h"
+
+
+def _fmt_reais(v):
+    return f"R$ {float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _chave_tri(ano, tri):
+    return ano * 4 + (tri - 1)
+
+
+def _de_chave(chave):
+    return chave // 4, chave % 4 + 1
+
+
+def _tri_da_data(d):
+    return d.year, (d.month - 1) // 3 + 1
+
+
+def _horas_proporcionais(total, ini_curso, fim_curso, ano, tri):
+    """Horas sugeridas do trimestre = total x (dias do curso no trimestre / dias do curso)."""
+    if not (total and ini_curso and fim_curso) or fim_curso < ini_curso:
+        return 0
+    ini_tri, fim_tri = limites_trimestre(ano, tri)
+    dias = (min(fim_curso, fim_tri) - max(ini_curso, ini_tri)).days + 1
+    if dias <= 0:
+        return 0
+    return int(round(total * dias / ((fim_curso - ini_curso).days + 1)))
+
+
+def _chaves_do_curso(ini, fim):
+    return range(_chave_tri(*_tri_da_data(ini)), _chave_tri(*_tri_da_data(fim)) + 1)
+
+
+def _curso_key(c):
+    return f"g_{c.grupo_curso}" if c.grupo_curso else f"c_{c.id}"
+
+
+def _linhas_do_curso(funcionario_id, key):
+    """Trimestres (linhas) de um curso do funcionário, em ordem."""
+    q = Capacitacao.query.filter_by(funcionario_id=funcionario_id)
+    try:
+        if key.startswith("g_"):
+            q = q.filter_by(grupo_curso=uuid.UUID(key[2:]))
+        elif key.startswith("c_"):
+            q = q.filter_by(id=int(key[2:]))
+        else:
+            return []
+    except ValueError:
+        return []
+    return q.order_by(Capacitacao.ano, Capacitacao.trimestre, Capacitacao.id).all()
+
+
+def _montar_curso(linhas):
+    base = linhas[0]
+    grupo = bool(base.grupo_curso)
+    confirmadas = [r for r in linhas if not r.previsto]
+    total_h = base.carga_horaria_total or base.carga_horaria or 0
+    total_v = base.valor_total_senar if base.valor_total_senar is not None else base.valor_pago_senar
+    desistente = any(r.status == "Desistente" for r in linhas)
+    if desistente:
+        situacao = "Desistente"
+    elif grupo and base.data_conclusao:
+        situacao = "Concluído" if base.data_conclusao < _date.today() else "Em andamento"
+    else:
+        situacao = base.status or "Em andamento"
+    return {
+        "key": _curso_key(base), "base": base, "linhas": linhas, "grupo": grupo,
+        "classe": base.classe, "longo": base.classe == "Longo",
+        "nome": base.nome_curso, "instituicao": base.instituicao, "tipo": base.tipo,
+        "ini": base.data_inicio, "fim": base.data_conclusao,
+        "total_h": total_h, "total_v": total_v, "situacao": situacao,
+        "horas_ok": sum(r.carga_horaria or 0 for r in confirmadas),
+        "valor_ok": sum(float(r.valor_pago_senar or 0) for r in confirmadas),
+        "pendentes": sum(1 for r in linhas if r.previsto),
+    }
+
+
+def _ratear_valores(linhas, so_vazios=False):
+    """Divide em parcelas IGUAIS o que falta do valor total entre os trimestres sem comprovante."""
+    base = linhas[0]
+    if base.valor_total_senar is None:
+        return False
+    pend = sorted((r for r in linhas if r.previsto), key=lambda r: (r.ano, r.trimestre))
+    if not pend or (so_vazios and all(r.valor_pago_senar is not None for r in pend)):
+        return False
+    resta = float(base.valor_total_senar) - sum(float(r.valor_pago_senar or 0) for r in linhas if not r.previsto)
+    resta = max(resta, 0)
+    parcela = round(resta / len(pend), 2)
+    novos = [parcela] * (len(pend) - 1) + [round(max(resta - parcela * (len(pend) - 1), 0), 2)]
+    mudou = False
+    for r, v in zip(pend, novos):
+        if r.valor_pago_senar is None or abs(float(r.valor_pago_senar) - v) > 0.001:
+            r.valor_pago_senar = v
+            mudou = True
+    return mudou
+
+
+def _preencher_valores_previstos(linhas):
+    """Cursos criados antes da divisão automática: preenche o valor previsto dos trimestres sem comprovante."""
+    return _ratear_valores(linhas)
+
+
+def _cursos_do_funcionario(funcionario_id):
+    linhas = (
+        Capacitacao.query.filter_by(funcionario_id=funcionario_id)
+        .order_by(Capacitacao.ano, Capacitacao.trimestre, Capacitacao.id).all()
+    )
+    grupos = {}
+    for r in linhas:
+        grupos.setdefault(_curso_key(r), []).append(r)
+    if any([_preencher_valores_previstos(g) for g in grupos.values()]):
+        db.session.commit()
+    cursos = [_montar_curso(g) for g in grupos.values()]
+    cursos.sort(key=lambda c: (c["fim"] or c["base"].criado_em.date() if c["base"].criado_em else _date.min), reverse=True)
+    return cursos
+
+
+def _outros_confirmados(funcionario_id, grupo, excluir_id):
+    if not grupo:
+        return []
+    return Capacitacao.query.filter(
+        Capacitacao.funcionario_id == funcionario_id, Capacitacao.grupo_curso == grupo,
+        Capacitacao.previsto.is_(False), Capacitacao.id != excluir_id,
+    ).all()
+
+
+def _erro_soma_trimestres(linha, carga_horaria, valor):
+    """A soma dos trimestres comprovados não pode passar do total do curso."""
+    total_h = linha.carga_horaria_total
+    total_v = float(linha.valor_total_senar) if linha.valor_total_senar is not None else None
+    outros = _outros_confirmados(linha.funcionario_id, linha.grupo_curso, linha.id)
+    horas_outros = sum(r.carga_horaria or 0 for r in outros)
+    valor_outros = sum(float(r.valor_pago_senar or 0) for r in outros)
+    if total_h and carga_horaria is not None and horas_outros + carga_horaria > total_h:
+        return (
+            f"Somando os outros trimestres comprovados ({_fmt_h(horas_outros)}), essas horas passam da carga "
+            f"horária total do curso ({_fmt_h(total_h)}). Neste trimestre o máximo é {_fmt_h(max(total_h - horas_outros, 0))}."
+        )
+    if total_v is not None and valor is not None and valor_outros + valor > total_v + 0.001:
+        return (
+            f"Somando os outros trimestres comprovados ({_fmt_reais(valor_outros)}), esse valor passa do total do curso "
+            f"({_fmt_reais(total_v)}). Neste trimestre o máximo é {_fmt_reais(max(total_v - valor_outros, 0))}."
+        )
     return None
 
 
-def _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao):
-    """Mensagem de erro se as datas saírem do trimestre; senão None."""
-    ini_tri, fim_tri = limites_trimestre(ano, trimestre)
-    periodo = f"{ini_tri.strftime('%d/%m/%Y')} a {fim_tri.strftime('%d/%m/%Y')}"
-    for rotulo, d in (("início", data_inicio), ("conclusão", data_conclusao)):
-        if d and not (ini_tri <= d <= fim_tri):
-            return (
-                f"A data de {rotulo} precisa estar dentro do {trimestre}º trimestre "
-                f"de {ano} ({periodo})."
+def _sincronizar_curso(linhas, interrompido=False):
+    """Mantém os trimestres do curso coerentes com as datas e totais: refaz as horas sugeridas dos
+    pendentes, apaga os pendentes fora do período e cria os que faltam."""
+    base = linhas[0]
+    if not (base.data_inicio and base.data_conclusao and base.carga_horaria_total):
+        return
+    chaves = set(_chaves_do_curso(base.data_inicio, base.data_conclusao))
+    existentes = {}
+    for r in linhas:
+        k = _chave_tri(r.ano, r.trimestre)
+        if r.previsto and k not in chaves:
+            db.session.delete(r)
+            continue
+        existentes[k] = r
+        if r.previsto:
+            r.carga_horaria = _horas_proporcionais(
+                base.carga_horaria_total, base.data_inicio, base.data_conclusao, r.ano, r.trimestre
             )
-    if data_inicio and data_conclusao and data_conclusao < data_inicio:
-        return "A data de conclusão não pode ser anterior à data de início."
-    return None
+    if interrompido:
+        db.session.flush()
+        _ratear_valores(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
+        return
+    for k in sorted(chaves):
+        if k in existentes:
+            continue
+        a, t = _de_chave(k)
+        db.session.add(Capacitacao(
+            funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso, previsto=True,
+            nome_curso=base.nome_curso, instituicao=base.instituicao, tipo=base.tipo, status="Em andamento",
+            carga_horaria_total=base.carga_horaria_total, valor_total_senar=base.valor_total_senar,
+            data_inicio=base.data_inicio, data_conclusao=base.data_conclusao, ano=a, trimestre=t,
+            carga_horaria=_horas_proporcionais(base.carga_horaria_total, base.data_inicio, base.data_conclusao, a, t),
+        ))
+    db.session.flush()
+    _ratear_valores(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
+
+
+def _dados_curso_form():
+    """Lê e valida os campos do curso. Devolve (dados, erro)."""
+    f = request.form
+    from app import formatar_titulo
+    nome = formatar_titulo(f.get("nome_curso", ""))
+    instituicao = f.get("instituicao", "").strip().upper()
+    tipo = f.get("tipo", "")
+    ini, fim = _parse_data_form("data_inicio"), _parse_data_form("data_conclusao")
+    total_h = _parse_decimal_form("carga_horaria_total")
+    total_v = _parse_decimal_form("valor_total_senar")
+    faltando = []
+    if not nome:
+        faltando.append("nome do curso")
+    if not instituicao:
+        faltando.append("instituição")
+    if not tipo:
+        faltando.append("tipo")
+    if not ini:
+        faltando.append("data de início")
+    if not fim:
+        faltando.append("data de término")
+    if total_h is None or total_h <= 0:
+        faltando.append("carga horária total")
+    if total_v is None or total_v < 0:
+        faltando.append("valor total pago pelo SENAR (informe 0 se não houve custo)")
+    if faltando:
+        return None, "Preencha todos os campos obrigatórios: " + ", ".join(faltando) + "."
+    if fim < ini:
+        return None, "A data de término não pode ser anterior à data de início."
+    if len(_chaves_do_curso(ini, fim)) > MAX_TRIMESTRES_CURSO:
+        return None, f"O período do curso é muito longo (máximo de {MAX_TRIMESTRES_CURSO} trimestres)."
+    return dict(nome=nome, instituicao=instituicao, tipo=tipo, ini=ini, fim=fim,
+                total_h=int(round(total_h)), total_v=total_v), None
+
+
+def _url_curso(key, aba=None, **extra):
+    return url_for("main.minhas_capacitacoes", curso=key, aba=aba, **extra)
 
 
 def resposta_documento_capacitacao(capacitacao):
@@ -450,178 +666,235 @@ def resposta_documento_capacitacao(capacitacao):
     return resp
 
 
+def _funcionario_capacitacoes():
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return None, redirect(url_for("main.login"))
+    if funcionario.senha_provisoria:
+        return None, redirect(url_for("main.trocar_senha"))
+    return funcionario, None
+
+
 @main_bp.route("/minhas-capacitacoes", methods=["GET", "POST"])
 def minhas_capacitacoes():
-    funcionario = funcionario_logado()
-    if not funcionario:
-        return redirect(url_for("main.login"))
-    if funcionario.senha_provisoria:
-        return redirect(url_for("main.trocar_senha"))
-
-    # Trimestre selecionado (padrão: o trimestre atual). No POST vem do
-    # formulário; no GET, da query string.
-    ano_padrao, tri_padrao = trimestre_atual()
-    origem = request.form if request.method == "POST" else request.args
-    try:
-        ano = int(origem.get("ano", ano_padrao))
-        trimestre = int(origem.get("trimestre", tri_padrao))
-    except (TypeError, ValueError):
-        ano, trimestre = ano_padrao, tri_padrao
-    if trimestre not in TRIMESTRES or not (2000 <= ano <= 2100):
-        ano, trimestre = ano_padrao, tri_padrao
+    funcionario, resp = _funcionario_capacitacoes()
+    if resp:
+        return resp
 
     if request.method == "POST":
-        nome_curso = request.form.get("nome_curso", "").strip()
-        arquivo_enviado = request.files.get("arquivo_comprovacao")
-        erro_campos = _erro_campos_obrigatorios(bool(arquivo_enviado and arquivo_enviado.filename))
-        if erro_campos:
-            flash(erro_campos, "danger")
-            return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
-
-        carga_horaria = _parse_carga_horaria_form()
-
-        # As datas precisam estar dentro do trimestre selecionado.
-        data_inicio = _parse_data_form("data_inicio")
-        data_conclusao = _parse_data_form("data_conclusao")
-        erro_datas = _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao)
-        if erro_datas:
-            flash(erro_datas, "danger")
-            return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
-
-        # Documento de comprovação (fica guardado no banco)
-        arquivo_nome, arquivo_tipo, arquivo_dados, erro_arquivo = _ler_comprovacao(
-            request.files.get("arquivo_comprovacao")
-        )
+        dados, erro = _dados_curso_form()
+        if erro:
+            flash(erro, "danger")
+            return redirect(url_for("main.minhas_capacitacoes", novo=1))
+        arquivo_nome, arquivo_tipo, arquivo_dados, erro_arquivo = _ler_comprovacao(request.files.get("arquivo_comprovacao"))
         if erro_arquivo:
             flash(erro_arquivo, "danger")
-            return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
+            return redirect(url_for("main.minhas_capacitacoes", novo=1))
 
-        capacitacao = Capacitacao(
-            funcionario_id=funcionario.id,
-            nome_curso=nome_curso,
-            instituicao=request.form.get("instituicao", "").strip() or None,
-            tipo=request.form.get("tipo") or None,
-            carga_horaria=carga_horaria,
-            data_inicio=data_inicio,
-            data_conclusao=data_conclusao,
-            status=request.form.get("status") or None,
-            arquivo_comprovacao=arquivo_nome,
-            arquivo_tipo=arquivo_tipo,
-            arquivo_dados=arquivo_dados,
-            valor_pago_senar=_parse_decimal_form("valor_pago_senar"),
-            observacoes=request.form.get("observacoes", "").strip() or None,
-            ano=ano,
-            trimestre=trimestre,
-        )
-        db.session.add(capacitacao)
+        grupo = uuid.uuid4()
+        chaves = list(_chaves_do_curso(dados["ini"], dados["fim"]))
+        if len(chaves) == 1 and not arquivo_dados:
+            flash("O comprovante é obrigatório: anexe o certificado ou a declaração de matrícula/frequência.", "danger")
+            return redirect(url_for("main.minhas_capacitacoes", novo=1))
+        horas = [_horas_proporcionais(dados["total_h"], dados["ini"], dados["fim"], *_de_chave(k)) for k in chaves]
+        horas[-1] = max(horas[-1] + dados["total_h"] - sum(horas), 0)  # a soma fecha com o total
+        total_v = float(dados["total_v"])
+        parcela = round(total_v / len(chaves), 2)
+        valores = [parcela] * len(chaves)
+        valores[-1] = round(max(total_v - parcela * (len(chaves) - 1), 0), 2)  # a soma fecha com o total
+        for k, h, v in zip(chaves, horas, valores):
+            a, t = _de_chave(k)
+            db.session.add(Capacitacao(
+                funcionario_id=funcionario.id, grupo_curso=grupo, previsto=True, status="Em andamento",
+                nome_curso=dados["nome"], instituicao=dados["instituicao"], tipo=dados["tipo"],
+                carga_horaria_total=dados["total_h"], valor_total_senar=dados["total_v"],
+                data_inicio=dados["ini"], data_conclusao=dados["fim"], ano=a, trimestre=t, carga_horaria=h,
+                valor_pago_senar=v,
+            ))
+        db.session.flush()
+        # Curso de um trimestre só, já com comprovante: fica confirmado na hora.
+        if len(chaves) == 1:
+            primeira = Capacitacao.query.filter_by(grupo_curso=grupo).first()
+            primeira.arquivo_comprovacao, primeira.arquivo_tipo, primeira.arquivo_dados = arquivo_nome, arquivo_tipo, arquivo_dados
+            primeira.previsto = False
+            primeira.valor_pago_senar = dados["total_v"]
         db.session.commit()
-        flash(f"Capacitação adicionada ao {trimestre}º trimestre de {ano}!", "success")
-        return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
-
-    lista = (
-        Capacitacao.query.filter_by(funcionario_id=funcionario.id, ano=ano, trimestre=trimestre)
-        .order_by(Capacitacao.data_conclusao.desc().nullslast(), Capacitacao.criado_em.desc())
-        .all()
-    )
-    ini_tri, fim_tri = limites_trimestre(ano, trimestre)
-
-    total_horas = sum(c.carga_horaria or 0 for c in lista)
-    total_valor = sum((c.valor_pago_senar or 0) for c in lista)
-    total_valor_fmt = (
-        f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
-    return render_template(
-        "minhas_capacitacoes.html",
-        inicio_trimestre=ini_tri,
-        fim_trimestre=fim_tri,
-        total_horas=total_horas,
-        total_valor_fmt=total_valor_fmt,
-        funcionario=funcionario,
-        capacitacoes=lista,
-        tipos=TIPOS_CAPACITACAO,
-        status_options=TIPOS_STATUS_CAPACITACAO,
-        ano=ano,
-        trimestre=trimestre,
-        trimestres=TRIMESTRES,
-        anos=list(range(ano_padrao - 3, ano_padrao + 2)),
-    )
-
-
-@main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/editar", methods=["GET", "POST"])
-def editar_minha_capacitacao(capacitacao_id):
-    funcionario = funcionario_logado()
-    if not funcionario:
-        return redirect(url_for("main.login"))
-    if funcionario.senha_provisoria:
-        return redirect(url_for("main.trocar_senha"))
-
-    capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
-    if str(capacitacao.funcionario_id) != str(funcionario.id):
-        flash("Você não tem permissão para editar esta capacitação.", "danger")
+        if len(chaves) > 1:
+            flash("Curso de longa duração cadastrado. Os trimestres foram criados: anexe o comprovante de cada um.", "success")
+            return redirect(_url_curso(f"g_{grupo}", "trimestres"))
+        flash("Curso cadastrado com o comprovante.", "success")
         return redirect(url_for("main.minhas_capacitacoes"))
 
-    # A capacitação continua no trimestre em que foi lançada.
-    ano, trimestre = capacitacao.ano, capacitacao.trimestre
-    voltar = url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre)
-    ini_tri, fim_tri = limites_trimestre(ano, trimestre)
+    filtro = request.args.get("filtro", "todos")
+    if filtro not in FILTROS_CURSO:
+        filtro = "todos"
+    busca = request.args.get("q", "").strip()
+    todos = _cursos_do_funcionario(funcionario.id)
+    anos = sorted({r.ano for c in todos for r in c["linhas"]}, reverse=True)
+    ano = request.args.get("ano", type=int)
+    if ano not in anos:
+        ano = None
+    cursos = [
+        c for c in todos
+        if (FILTROS_CURSO[filtro] is None or c["situacao"] == FILTROS_CURSO[filtro])
+        and (ano is None or any(r.ano == ano for r in c["linhas"]))
+        and (not busca or busca.lower() in (c["nome"] or "").lower() or busca.lower() in (c["instituicao"] or "").lower())
+    ]
+    selecionado = next((c for c in todos if c["key"] == request.args.get("curso")), None)
+    por_pagina = 8
+    total_paginas = max(-(-len(cursos) // por_pagina), 1)
+    pagina = min(max(request.args.get("pagina", 1, type=int), 1), total_paginas)
+    cursos_pagina = cursos[(pagina - 1) * por_pagina: pagina * por_pagina]
+    aba = request.args.get("aba", "trimestres")
+    if aba not in ("informacoes", "trimestres") or (selecionado and not selecionado["longo"]):
+        aba = "trimestres" if (selecionado and selecionado["longo"]) else "informacoes"
+    return render_template(
+        "minhas_capacitacoes.html",
+        funcionario=funcionario, cursos=cursos_pagina, total_filtrados=len(cursos), pagina=pagina, total_paginas=total_paginas, total_cursos=len(todos), selecionado=selecionado,
+        filtro=filtro, busca=busca, anos=anos, ano=ano, aba=aba, abrir_novo=bool(request.args.get("novo")) or not todos,
+        tipos=TIPOS_CAPACITACAO, filtros=list(FILTROS_CURSO),
+    )
+
+
+@main_bp.route("/minhas-capacitacoes/curso/<key>/editar", methods=["POST"])
+def editar_curso(key):
+    funcionario, resp = _funcionario_capacitacoes()
+    if resp:
+        return resp
+    linhas = _linhas_do_curso(funcionario.id, key)
+    if not linhas:
+        abort(404)
+    dados, erro = _dados_curso_form()
+    if erro:
+        flash(erro, "danger")
+        return redirect(_url_curso(key, "informacoes"))
+    curso = _montar_curso(linhas)
+    if dados["total_h"] < curso["horas_ok"]:
+        flash(f"A carga horária total não pode ser menor que as horas já comprovadas ({_fmt_h(curso['horas_ok'])}).", "danger")
+        return redirect(_url_curso(key, "informacoes"))
+    if float(dados["total_v"]) + 0.001 < curso["valor_ok"]:
+        flash(f"O valor total não pode ser menor que o já comprovado ({_fmt_reais(curso['valor_ok'])}).", "danger")
+        return redirect(_url_curso(key, "informacoes"))
+    grupo = linhas[0].grupo_curso or uuid.uuid4()
+    for r in linhas:
+        r.grupo_curso = grupo
+        r.nome_curso, r.instituicao, r.tipo = dados["nome"], dados["instituicao"], dados["tipo"]
+        r.data_inicio, r.data_conclusao = dados["ini"], dados["fim"]
+        r.carga_horaria_total, r.valor_total_senar = dados["total_h"], dados["total_v"]
+    db.session.flush()
+    _sincronizar_curso(linhas, interrompido=curso["situacao"] == "Desistente")
+    db.session.commit()
+    flash("Informações do curso atualizadas.", "success")
+    return redirect(_url_curso(f"g_{grupo}", "informacoes"))
+
+
+@main_bp.route("/minhas-capacitacoes/curso/<key>/excluir", methods=["POST"])
+def excluir_curso(key):
+    funcionario, resp = _funcionario_capacitacoes()
+    if resp:
+        return resp
+    linhas = _linhas_do_curso(funcionario.id, key)
+    if not linhas:
+        abort(404)
+    for r in linhas:
+        db.session.delete(r)
+    db.session.commit()
+    flash("Curso removido.", "success")
+    return redirect(url_for("main.minhas_capacitacoes"))
+
+
+@main_bp.route("/minhas-capacitacoes/curso/<key>/desistir", methods=["POST"])
+def desistir_curso(key):
+    funcionario, resp = _funcionario_capacitacoes()
+    if resp:
+        return resp
+    linhas = _linhas_do_curso(funcionario.id, key)
+    if not linhas:
+        abort(404)
+    volta = _url_curso(key, "informacoes")
+    d = _parse_data_form("data_desistencia")
+    if not d:
+        flash("Informe a data em que você parou o curso.", "danger")
+        return redirect(volta)
+    if linhas[0].data_inicio and d < linhas[0].data_inicio:
+        flash("A data não pode ser anterior ao início do curso.", "danger")
+        return redirect(volta)
+    chave_d = _chave_tri(*_tri_da_data(d))
+    for r in linhas:
+        k = _chave_tri(r.ano, r.trimestre)
+        if k > chave_d:
+            if r.previsto:
+                db.session.delete(r)
+            continue
+        r.data_conclusao = d
+        if k == chave_d:
+            r.status = "Desistente"
+    if not any(r.status == "Desistente" for r in linhas):  # data num trimestre sem linha: marca a última
+        linhas[-1].status = "Desistente"
+    db.session.commit()
+    flash(
+        f"Curso marcado como desistente em {d.strftime('%d/%m/%Y')}. Os trimestres seguintes que aguardavam "
+        "comprovante foram removidos; os já comprovados continuam como estavam.",
+        "success",
+    )
+    return redirect(volta)
+
+
+@main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/trimestre", methods=["GET", "POST"])
+def comprovar_trimestre(capacitacao_id):
+    funcionario, resp = _funcionario_capacitacoes()
+    if resp:
+        return resp
+    linha = Capacitacao.query.get_or_404(capacitacao_id)
+    if str(linha.funcionario_id) != str(funcionario.id):
+        flash("Você não tem permissão para alterar esta capacitação.", "danger")
+        return redirect(url_for("main.minhas_capacitacoes"))
+    key = _curso_key(linha)
+    volta = _url_curso(key, "trimestres")
 
     if request.method == "POST":
-        nome_curso = request.form.get("nome_curso", "").strip()
-        arquivo_enviado = request.files.get("arquivo_comprovacao")
-        vai_enviar_novo = bool(arquivo_enviado and arquivo_enviado.filename)
-        continua_com_atual = bool(capacitacao.arquivo_tipo) and not request.form.get("remover_arquivo")
-        erro_campos = _erro_campos_obrigatorios(vai_enviar_novo or continua_com_atual)
-        if erro_campos:
-            flash(erro_campos, "danger")
-            return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
-
-        data_inicio = _parse_data_form("data_inicio")
-        data_conclusao = _parse_data_form("data_conclusao")
-        erro_datas = _erro_datas_trimestre(ano, trimestre, data_inicio, data_conclusao)
-        if erro_datas:
-            flash(erro_datas, "danger")
-            return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
-
-        arquivo_nome, arquivo_tipo, arquivo_dados, erro_arquivo = _ler_comprovacao(
-            request.files.get("arquivo_comprovacao")
-        )
-        if erro_arquivo:
-            flash(erro_arquivo, "danger")
-            return redirect(url_for("main.editar_minha_capacitacao", capacitacao_id=capacitacao.id))
-
-        capacitacao.nome_curso = nome_curso
-        capacitacao.instituicao = request.form.get("instituicao", "").strip() or None
-        capacitacao.tipo = request.form.get("tipo") or None
-        capacitacao.status = request.form.get("status") or None
-        capacitacao.carga_horaria = _parse_carga_horaria_form()
-        capacitacao.data_inicio = data_inicio
-        capacitacao.data_conclusao = data_conclusao
-        capacitacao.valor_pago_senar = _parse_decimal_form("valor_pago_senar")
-        capacitacao.observacoes = request.form.get("observacoes", "").strip() or None
-
-        if arquivo_dados:  # novo comprovante substitui o anterior
-            capacitacao.arquivo_comprovacao = arquivo_nome
-            capacitacao.arquivo_tipo = arquivo_tipo
-            capacitacao.arquivo_dados = arquivo_dados
-        elif request.form.get("remover_arquivo"):
-            capacitacao.arquivo_comprovacao = None
-            capacitacao.arquivo_tipo = None
-            capacitacao.arquivo_dados = None
-
+        carga = _parse_carga_horaria_form()
+        gratuito = not (linha.valor_total_senar or 0)
+        valor = 0 if gratuito else _parse_decimal_form("valor_pago_senar")
+        arquivo = request.files.get("arquivo_comprovacao")
+        envia_novo = bool(arquivo and arquivo.filename)
+        faltando = []
+        if carga is None or carga < 0:
+            faltando.append("carga horária do trimestre")
+        if valor is None or valor < 0:
+            faltando.append("valor pago pelo SENAR (informe 0 se não houve custo)")
+        if not envia_novo and not linha.arquivo_tipo:
+            faltando.append("comprovante (declaração de matrícula ou frequência, ou certificado)")
+        if faltando:
+            flash("Preencha: " + ", ".join(faltando) + ".", "danger")
+            return redirect(url_for("main.comprovar_trimestre", capacitacao_id=linha.id))
+        erro = _erro_soma_trimestres(linha, carga, valor)
+        if erro:
+            flash(erro, "danger")
+            return redirect(url_for("main.comprovar_trimestre", capacitacao_id=linha.id))
+        nome, tipo, dados_arq, erro_arq = _ler_comprovacao(arquivo)
+        if erro_arq:
+            flash(erro_arq, "danger")
+            return redirect(url_for("main.comprovar_trimestre", capacitacao_id=linha.id))
+        linha.carga_horaria, linha.valor_pago_senar = carga, valor
+        linha.observacoes = request.form.get("observacoes", "").strip() or None
+        if dados_arq:
+            linha.arquivo_comprovacao, linha.arquivo_tipo, linha.arquivo_dados = nome, tipo, dados_arq
+        linha.previsto = False
         db.session.commit()
-        flash("Capacitação atualizada!", "success")
-        return redirect(voltar)
+        flash("Trimestre comprovado.", "success")
+        return redirect(volta)
 
+    curso = _montar_curso(_linhas_do_curso(funcionario.id, key))
+    outros_h = curso["horas_ok"] - (0 if linha.previsto else (linha.carga_horaria or 0))
+    outros_v = curso["valor_ok"] - (0 if linha.previsto else float(linha.valor_pago_senar or 0))
     return render_template(
-        "minhas_capacitacoes_editar.html",
-        capacitacao=capacitacao,
-        tipos=TIPOS_CAPACITACAO,
-        status_options=TIPOS_STATUS_CAPACITACAO,
-        ano=ano,
-        trimestre=trimestre,
-        inicio_trimestre=ini_tri,
-        fim_trimestre=fim_tri,
-        voltar=voltar,
+        "minhas_capacitacoes_trimestre.html", linha=linha, curso=curso, volta=volta,
+        restam_h=max((curso["total_h"] or 0) - outros_h, 0),
+        restam_v=max(float(curso["total_v"] or 0) - outros_v, 0),
+        gratuito=not (linha.valor_total_senar or 0),
+        fim_tri=limites_trimestre(linha.ano, linha.trimestre)[1],
+        ini_tri=limites_trimestre(linha.ano, linha.trimestre)[0],
     )
 
 
@@ -630,29 +903,11 @@ def documento_minha_capacitacao(capacitacao_id):
     funcionario = funcionario_logado()
     if not funcionario:
         return redirect(url_for("main.login"))
-
     capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
     if str(capacitacao.funcionario_id) != str(funcionario.id):
         abort(403)
     return resposta_documento_capacitacao(capacitacao)
 
-
-@main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/excluir", methods=["POST"])
-def excluir_minha_capacitacao(capacitacao_id):
-    funcionario = funcionario_logado()
-    if not funcionario:
-        return redirect(url_for("main.login"))
-
-    capacitacao = Capacitacao.query.get_or_404(capacitacao_id)
-    if str(capacitacao.funcionario_id) != str(funcionario.id):
-        flash("Você não tem permissão para excluir esta capacitação.", "danger")
-        return redirect(url_for("main.minhas_capacitacoes"))
-
-    ano, trimestre = capacitacao.ano, capacitacao.trimestre
-    db.session.delete(capacitacao)
-    db.session.commit()
-    flash("Capacitação removida.", "success")
-    return redirect(url_for("main.minhas_capacitacoes", ano=ano, trimestre=trimestre))
 
 
 def _sou_gestor_de(funcionario, avaliado_id):
@@ -665,6 +920,63 @@ def _sou_gestor_de(funcionario, avaliado_id):
             avaliador_id=funcionario.id, avaliado_id=avaliado_id
         ).first()
         is not None
+    )
+
+
+def _cursos_confirmados(funcionario_id, ano=None, trimestre=None):
+    """Todos os cursos cadastrados por uma pessoa (uma linha por curso), só leitura."""
+    linhas = (
+        Capacitacao.query.filter_by(funcionario_id=funcionario_id)
+        .order_by(Capacitacao.ano, Capacitacao.trimestre, Capacitacao.id).all()
+    )
+    grupos = {}
+    for r in linhas:
+        grupos.setdefault(_curso_key(r), []).append(r)
+    cursos = [_montar_curso(g) for g in grupos.values()]
+    cursos.sort(key=lambda c: (c["fim"] or _date.min), reverse=True)
+    return cursos
+
+
+@main_bp.route("/minha-equipe/capacitacoes")
+def capacitacoes_de_todos_da_equipe():
+    """Gestor vê, numa tela só, as capacitações de todos que ele avalia."""
+    funcionario = funcionario_logado()
+    if not funcionario:
+        return redirect(url_for("main.login"))
+    ciclo = ciclo_ativo()
+    if not ciclo:
+        flash("Nenhum ciclo de avaliação está aberto no momento.", "warning")
+        return redirect(url_for("main.minha_area"))
+
+
+    vinculos = (
+        VinculoAvaliacao.query.filter_by(ciclo_id=ciclo.id, avaliador_id=funcionario.id)
+        .join(Funcionario, VinculoAvaliacao.avaliado_id == Funcionario.id)
+        .order_by(Funcionario.nome)
+        .all()
+    )
+    ano = request.args.get("ano", type=int)
+    pessoa_id = request.args.get("pessoa", "")
+    if pessoa_id and any(str(v.avaliado_id) == pessoa_id for v in vinculos):
+        vinculos = [v for v in vinculos if str(v.avaliado_id) == pessoa_id]
+    else:
+        pessoa_id = ""
+    pessoas = []
+    anos = set()
+    for v in vinculos:
+        cursos_todos = _cursos_confirmados(v.avaliado_id)
+        anos |= {r.ano for c in cursos_todos for r in c["linhas"]}
+        cursos = [c for c in cursos_todos if ano is None or any(r.ano == ano for r in c["linhas"])]
+        pessoas.append({
+            "avaliado": v.avaliado,
+            "cursos": cursos,
+            "horas": sum(c["total_h"] or 0 for c in cursos),
+        })
+
+    return render_template(
+        "capacitacoes_equipe_todos.html",
+        pessoas=pessoas, anos=sorted(anos, reverse=True), ano_selecionado=ano, pessoa_id=pessoa_id,
+        com_cursos=sum(1 for p in pessoas if p["cursos"]),
     )
 
 
@@ -685,7 +997,8 @@ def capacitacoes_da_equipe(avaliado_id):
     if not request.args:
         ano, trimestre = trimestre_atual()
 
-    query = Capacitacao.query.filter_by(funcionario_id=avaliado.id)
+    # O gestor só vê o que já foi comprovado; trimestres pendentes não aparecem.
+    query = Capacitacao.query.filter_by(funcionario_id=avaliado.id, previsto=False)
     if ano:
         query = query.filter(Capacitacao.ano == ano)
     if trimestre in (1, 2, 3, 4):
@@ -711,8 +1024,22 @@ def capacitacoes_da_equipe(avaliado_id):
         anos.add(ano)
     anos = sorted(anos, reverse=True)
 
-    total_horas = sum(c.carga_horaria or 0 for c in lista)
-    total_valor = sum((c.valor_pago_senar or 0) for c in lista)
+    # Uma linha por curso (não por trimestre): horas/valor do período + dados do curso inteiro.
+    cursos = []
+    vistos = {}
+    for r in lista:
+        k = _curso_key(r)
+        if k not in vistos:
+            c = _montar_curso(_linhas_do_curso(avaliado.id, k) or [r])
+            c["horas_periodo"] = 0
+            c["valor_periodo"] = 0.0
+            vistos[k] = c
+            cursos.append(c)
+        vistos[k]["horas_periodo"] += r.carga_horaria or 0
+        vistos[k]["valor_periodo"] += float(r.valor_pago_senar or 0)
+
+    total_horas = sum(c.carga_horaria or 0 for c in lista if not c.previsto)
+    total_valor = sum((c.valor_pago_senar or 0) for c in lista if not c.previsto)
     total_valor_fmt = (
         f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
@@ -734,6 +1061,7 @@ def capacitacoes_da_equipe(avaliado_id):
         "capacitacoes_equipe.html",
         avaliado=avaliado,
         capacitacoes=lista,
+        cursos=cursos,
         anos=anos,
         ano_selecionado=ano,
         trimestre_selecionado=trimestre,

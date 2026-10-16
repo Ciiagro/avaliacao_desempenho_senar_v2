@@ -195,11 +195,14 @@ TIPOS_CAPACITACAO = [
     "Palestra",
     "Certificação",
     "Graduação",
+    "Especialização",
     "Pós-graduação",
     "Outro"
 ]
-TIPOS_STATUS_CAPACITACAO = ["Concluído", "Em andamento"]
+TIPOS_STATUS_CAPACITACAO = ["Concluído", "Em andamento", "Desistente"]
 TRIMESTRES = [1, 2, 3, 4]
+LIMITE_CURSO_CURTO_HORAS = 40  # até esse total de horas, o curso de um trimestre é "Curto"
+CLASSES_CURSO = ["Curto", "Médio", "Longo"]
 
 
 def trimestre_atual(hoje=None):
@@ -243,8 +246,31 @@ class Capacitacao(db.Model):
     ano = db.Column(db.Integer, nullable=False)
     trimestre = db.Column(db.Integer, nullable=False)  # 1 a 4
     criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    # Cursos que atravessam trimestres: uma linha por trimestre, ligadas pelo grupo_curso.
+    carga_horaria_total = db.Column(db.Integer)  # horas do curso inteiro
+    valor_total_senar = db.Column(db.Numeric(10, 2))  # valor do curso inteiro
+    grupo_curso = db.Column(UUID(as_uuid=True), index=True)
+    previsto = db.Column(db.Boolean, nullable=False, default=False)  # trimestre aguardando comprovante
 
     funcionario = db.relationship("Funcionario", foreign_keys=[funcionario_id])
+
+    @property
+    def classe(self):
+        """Curto/Médio: começa e termina no mesmo trimestre (Curto até 40h). Longo: atravessa trimestres."""
+        ini, fim = self.data_inicio, self.data_conclusao
+        if ini and fim and (ini.year, (ini.month - 1) // 3) != (fim.year, (fim.month - 1) // 3):
+            return "Longo"
+        total = self.carga_horaria_total or self.carga_horaria or 0
+        return "Curto" if total <= LIMITE_CURSO_CURTO_HORAS else "Médio"
+
+    @property
+    def situacao(self):
+        """Situação mostrada na tela: cursos de vários trimestres viram Concluído quando passa a data de término."""
+        if self.status == "Desistente":
+            return "Desistente"
+        if self.grupo_curso and self.data_conclusao:
+            return "Concluído" if self.data_conclusao < date.today() else "Em andamento"
+        return self.status
 
 
 class Formulario(db.Model):

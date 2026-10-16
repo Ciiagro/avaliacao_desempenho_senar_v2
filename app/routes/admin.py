@@ -50,6 +50,8 @@ from ..models import (
     EventoFuncionario,
     Progressao,
     TIPOS_EVENTO_FUNCIONARIO,
+    TIPOS_CAPACITACAO,
+    CLASSES_CURSO,
     RecursoAvaliacao,
     RECURSO_STATUS_ENCERRADO,
     DevolutivaPorFuncionario,
@@ -1725,6 +1727,20 @@ def alterar_nivel_manual(funcionario_id):
     return redirect(url_for("admin.progressao_nivel_detalhe", funcionario_id=funcionario.id))
 
 
+STATUS_FILTRO_CAPACITACAO = ["Em andamento", "Concluído", "Desistente"]
+
+
+def _filtrar_capacitacoes_status_tipo(lista, status, tipo, duracao=None):
+    """Filtra por situação do curso e por tipo (a situação é calculada, por isso o filtro é em Python)."""
+    if status:
+        lista = [c for c in lista if c.situacao == status]
+    if tipo:
+        lista = [c for c in lista if c.tipo == tipo]
+    if duracao:
+        lista = [c for c in lista if c.classe == duracao]
+    return lista
+
+
 @admin_bp.route("/capacitacoes")
 def capacitacoes():
     """Lista as capacitações de todos os funcionários (cadastradas por
@@ -1734,6 +1750,9 @@ def capacitacoes():
     funcionario_id = request.args.get("funcionario_id") or None
     ano = request.args.get("ano", type=int)
     trimestre = request.args.get("trimestre", type=int)
+    status = request.args.get("status") or None
+    tipo = request.args.get("tipo") or None
+    duracao = request.args.get("duracao") or None
 
     if not request.args:
         ano, trimestre = trimestre_atual()
@@ -1752,6 +1771,7 @@ def capacitacoes():
         Funcionario.nome, Capacitacao.ano.desc(), Capacitacao.trimestre.desc(),
         Capacitacao.data_conclusao.desc().nullslast()
     ).all()
+    lista = _filtrar_capacitacoes_status_tipo(lista, status, tipo, duracao)
 
     anos = {r[0] for r in db.session.query(Capacitacao.ano).distinct().all()}
     anos.add(trimestre_atual()[0])
@@ -1761,8 +1781,9 @@ def capacitacoes():
 
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
 
-    total_horas = sum(c.carga_horaria or 0 for c in lista)
-    total_valor = sum((c.valor_pago_senar or 0) for c in lista)
+    pessoas_com = len({c.funcionario_id for c in lista if not c.previsto})
+    total_horas = sum(c.carga_horaria or 0 for c in lista if not c.previsto)
+    total_valor = sum((c.valor_pago_senar or 0) for c in lista if not c.previsto)
     total_valor_fmt = (
         f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
@@ -1780,9 +1801,24 @@ def capacitacoes():
     else:
         periodo_txt = "Todos os períodos"
 
+    por_pagina = 20
+    total_registros = len(lista)
+    total_paginas = max(-(-total_registros // por_pagina), 1)
+    pagina = min(max(request.args.get("pagina", 1, type=int), 1), total_paginas)
+    lista_pagina = lista[(pagina - 1) * por_pagina: pagina * por_pagina]
+
     return render_template(
         "admin/capacitacoes.html",
-        capacitacoes=lista,
+        capacitacoes=lista_pagina,
+        status_selecionado=status,
+        tipo_selecionado=tipo,
+        duracao_selecionada=duracao,
+        duracao_opcoes=CLASSES_CURSO,
+        status_opcoes=STATUS_FILTRO_CAPACITACAO,
+        tipo_opcoes=TIPOS_CAPACITACAO,
+        total_registros=total_registros,
+        pagina=pagina,
+        total_paginas=total_paginas,
         funcionarios=funcionarios,
         funcionario_id_selecionado=funcionario_id,
         anos=anos,
@@ -1791,8 +1827,91 @@ def capacitacoes():
         trimestres=[1, 2, 3, 4],
         total_horas=total_horas,
         total_valor_fmt=total_valor_fmt,
-        total_pessoas=len({c.funcionario_id for c in lista}),
+        total_pessoas=pessoas_com,
+        total_ativos=len(funcionarios),
+        pct_pessoas=round(100 * pessoas_com / len(funcionarios)) if funcionarios and not funcionario_id else None,
         periodo_txt=periodo_txt,
+    )
+
+
+@admin_bp.route("/capacitacoes/exportar")
+def exportar_capacitacoes_excel():
+    """Baixa em Excel as capacitações com os mesmos filtros da tela (funcionário, ano, trimestre)."""
+    import pandas as pd
+
+    funcionario_id = request.args.get("funcionario_id") or None
+    ano = request.args.get("ano", type=int)
+    trimestre = request.args.get("trimestre", type=int)
+    status = request.args.get("status") or None
+    tipo = request.args.get("tipo") or None
+    duracao = request.args.get("duracao") or None
+
+    query = Capacitacao.query.join(Funcionario, Capacitacao.funcionario_id == Funcionario.id)
+    if funcionario_id:
+        query = query.filter(Capacitacao.funcionario_id == funcionario_id)
+    if ano:
+        query = query.filter(Capacitacao.ano == ano)
+    if trimestre in (1, 2, 3, 4):
+        query = query.filter(Capacitacao.trimestre == trimestre)
+    lista = query.order_by(
+        Funcionario.nome, Capacitacao.ano, Capacitacao.trimestre, Capacitacao.nome_curso
+    ).all()
+    lista = _filtrar_capacitacoes_status_tipo(lista, status, tipo, duracao)
+
+    def num(v):
+        return float(v) if v is not None else None
+
+    linhas = []
+    for c in lista:
+        linhas.append({
+            "Funcionário": c.funcionario.nome,
+            "Capacitação": c.nome_curso,
+            "Instituição": c.instituicao,
+            "Tipo": c.tipo,
+            "Duração": c.classe,
+            "Situação": c.situacao,
+            "Ano": c.ano,
+            "Trimestre": c.trimestre,
+            "Início": c.data_inicio,
+            "Término": c.data_conclusao,
+            "Comprovante": "Pendente" if c.previsto else ("Enviado" if c.arquivo_tipo else "Sem arquivo"),
+            "Horas no trimestre": None if c.previsto else c.carga_horaria,
+            "Horas previstas (sem comprovante)": c.carga_horaria if c.previsto else None,
+            "Carga horária total do curso": c.carga_horaria_total or c.carga_horaria,
+            "Valor SENAR no trimestre (R$)": None if c.previsto else num(c.valor_pago_senar),
+            "Valor total do curso (R$)": num(c.valor_total_senar) if c.valor_total_senar is not None else num(c.valor_pago_senar),
+        })
+    colunas = [
+        "Funcionário", "Capacitação", "Instituição", "Tipo", "Duração", "Situação", "Ano", "Trimestre", "Início", "Término",
+        "Comprovante", "Horas no trimestre", "Horas previstas (sem comprovante)", "Carga horária total do curso",
+        "Valor SENAR no trimestre (R$)", "Valor total do curso (R$)",
+    ]
+    df = pd.DataFrame(linhas, columns=colunas)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl", date_format="DD/MM/YYYY") as writer:
+        df.to_excel(writer, index=False, sheet_name="Capacitações")
+        planilha = writer.sheets["Capacitações"]
+        for i, col in enumerate(colunas, start=1):
+            letra = planilha.cell(row=1, column=i).column_letter
+            maior = max([len(str(col))] + [len(str(v)) for v in df[col].dropna().tolist()[:200]])
+            planilha.column_dimensions[letra].width = min(max(maior + 2, 10), 45)
+        for linha in planilha.iter_rows(min_row=2):
+            for cel in linha[:10]:
+                if cel.value is not None and hasattr(cel.value, "year"):
+                    cel.number_format = "DD/MM/YYYY"
+            linha[14].number_format = '#,##0.00'
+            linha[15].number_format = '#,##0.00'
+        planilha.freeze_panes = "A2"
+        planilha.auto_filter.ref = planilha.dimensions
+    buffer.seek(0)
+
+    periodo = (f"_{ano}" if ano else "") + (f"_T{trimestre}" if trimestre in (1, 2, 3, 4) else "")
+    nome_arquivo = f"capacitacoes{periodo}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return Response(
+        buffer.read(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome_arquivo}"},
     )
 
 

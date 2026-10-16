@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Comprovar trimestre{% endblock %}
+
+{% block content %}
+<a href="{{ volta }}" class="back-link">&larr; {{ curso.nome }}</a>
+<h1>{{ linha.trimestre }}º trimestre de {{ linha.ano }}</h1>
+<p class="muted">{{ curso.nome }} &middot; {{ curso.instituicao or '-' }} &middot; {{ ini_tri.strftime('%d/%m/%Y') }} a {{ fim_tri.strftime('%d/%m/%Y') }}</p>
+
+<div class="cap-aviso" role="note">
+    <strong>Como comprovar</strong>
+    Anexe a declaração de matrícula ou de frequência (ou o certificado) que mostre que você fez o curso neste trimestre.
+    Ainda cabem neste trimestre <b>até {{ '%g'|format(restam_h) }}h</b>{% if not gratuito %} e <b>{{ restam_v|brl }}</b>{% endif %} (total do curso: {{ curso.total_h }}h{% if not gratuito %} e {{ (curso.total_v or 0)|brl }}{% endif %}).
+</div>
+
+<div class="cap-painel">
+    <form method="post" enctype="multipart/form-data">
+        <div class="cap-grid">
+            <label class="cap-campo cap-3"><span>Horas feitas neste trimestre</span>
+                <input type="number" name="carga_horaria" min="0" step="0.5" required value="{{ linha.carga_horaria if linha.carga_horaria is not none else '' }}">
+            </label>
+            {% if not gratuito %}<label class="cap-campo cap-3"><span>Valor pago pelo SENAR neste trimestre (R$)</span>
+                <input type="number" name="valor_pago_senar" min="0" step="0.01" required placeholder="0,00 se não houve custo"
+                       value="{{ linha.valor_pago_senar if linha.valor_pago_senar is not none else '' }}">
+            </label>{% endif %}
+            <label class="cap-campo cap-3"><span>Comprovante (PDF, JPG ou PNG, PDF até 2 MB; fotos são reduzidas sozinhas){% if linha.arquivo_tipo %} &mdash; já enviado; anexe outro só se quiser trocar{% endif %}</span>
+                <input type="file" name="arquivo_comprovacao" id="arquivo" accept=".pdf,.jpg,.jpeg,.png" {% if not linha.arquivo_tipo %}required{% endif %}>
+            </label>
+            <label class="cap-campo cap-3"><span>Observações (opcional)</span>
+                <input type="text" name="observacoes" value="{{ linha.observacoes or '' }}">
+            </label>
+        </div>
+        <div class="cap-acoes">
+            <button type="submit" class="botao">Salvar comprovante</button>
+            <a class="botao botao-secundario" href="{{ volta }}">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% include "_capacitacao_estilos.html" %}
+<script>
+document.getElementById('arquivo').addEventListener('change', function () {
+    if (this.files[0] && this.files[0].size > (/pdf/i.test(this.files[0].type) ? 2 : 4) * 1024 * 1024) { alert('O arquivo é grande demais (PDF até 2 MB; foto até 4 MB). Escolha um arquivo menor.'); this.value = ''; }
+});
+</script>
+{% endblock %}
