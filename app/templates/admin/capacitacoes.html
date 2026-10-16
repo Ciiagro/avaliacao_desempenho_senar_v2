@@ -108,9 +108,9 @@
                     <td class="cap-nowrap">{% if c.previsto %}<span class="muted" title="Horas previstas: só contam depois do comprovante">{{ c.carga_horaria or 0 }}h prev.</span>{% else %}{{ (c.carga_horaria ~ 'h') if c.carga_horaria else '-' }}{% endif %}{% if c.carga_horaria_total %}<div class="muted cap-sub">total {{ c.carga_horaria_total }}h</div>{% endif %}</td>
                     <td class="cap-nowrap">
                         {% if c.data_inicio or c.data_conclusao %}
-                            {{ c.data_inicio.strftime('%d/%m') if c.data_inicio else '?' }}
+                            {{ c.data_inicio.strftime('%d/%m/%Y') if c.data_inicio else '?' }}
                             &rarr;
-                            {{ c.data_conclusao.strftime('%d/%m') if c.data_conclusao else '?' }}
+                            {{ c.data_conclusao.strftime('%d/%m/%Y') if c.data_conclusao else '?' }}
                         {% else %}-{% endif %}
                         {% if not (ano_selecionado and trimestre_selecionado) %}
                             <div class="muted cap-sub">{{ c.trimestre }}º tri/{{ c.ano }}</div>

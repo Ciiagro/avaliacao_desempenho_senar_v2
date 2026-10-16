@@ -451,14 +451,14 @@ def _tri_da_data(d):
 
 
 def _horas_proporcionais(total, ini_curso, fim_curso, ano, tri):
-    """Horas sugeridas do trimestre = total x (dias do curso no trimestre / dias do curso)."""
+    """Horas sugeridas do trimestre = carga total dividida em partes iguais entre os trimestres do curso
+    (quem lança ajusta o último trimestre para a soma fechar com o total)."""
     if not (total and ini_curso and fim_curso) or fim_curso < ini_curso:
         return 0
-    ini_tri, fim_tri = limites_trimestre(ano, tri)
-    dias = (min(fim_curso, fim_tri) - max(ini_curso, ini_tri)).days + 1
-    if dias <= 0:
+    chaves = _chaves_do_curso(ini_curso, fim_curso)
+    if _chave_tri(ano, tri) not in chaves:
         return 0
-    return int(round(total * dias / ((fim_curso - ini_curso).days + 1)))
+    return int(total) // len(chaves)
 
 
 def _chaves_do_curso(ini, fim):
@@ -482,6 +482,14 @@ def _linhas_do_curso(funcionario_id, key):
     except ValueError:
         return []
     return q.order_by(Capacitacao.ano, Capacitacao.trimestre, Capacitacao.id).all()
+
+
+def _anos_do_curso(c):
+    """Anos em que o curso aparece: os dos trimestres lançados e todos os do período do curso."""
+    anos = {r.ano for r in c["linhas"]}
+    if c["ini"] and c["fim"]:
+        anos |= set(range(c["ini"].year, c["fim"].year + 1))
+    return anos
 
 
 def _montar_curso(linhas):
@@ -509,6 +517,18 @@ def _montar_curso(linhas):
     }
 
 
+def _ratear_se_preciso(linhas):
+    """Só refaz a divisão do valor se a soma dos trimestres não bate com o total (ex.: o total foi
+    alterado). Assim as parcelas combinadas no cadastro não são desfeitas ao editar outros dados."""
+    base = linhas[0]
+    if base.valor_total_senar is None:
+        return False
+    soma = sum(float(r.valor_pago_senar or 0) for r in linhas)
+    if abs(soma - float(base.valor_total_senar)) < 0.01 and all(r.valor_pago_senar is not None for r in linhas):
+        return False
+    return _ratear_valores(linhas)
+
+
 def _ratear_valores(linhas, so_vazios=False):
     """Divide em parcelas IGUAIS o que falta do valor total entre os trimestres sem comprovante."""
     base = linhas[0]
@@ -519,8 +539,13 @@ def _ratear_valores(linhas, so_vazios=False):
         return False
     resta = float(base.valor_total_senar) - sum(float(r.valor_pago_senar or 0) for r in linhas if not r.previsto)
     resta = max(resta, 0)
-    parcela = round(resta / len(pend), 2)
-    novos = [parcela] * (len(pend) - 1) + [round(max(resta - parcela * (len(pend) - 1), 0), 2)]
+    # O valor só é distribuído do trimestre atual em diante; trimestres passados ficam sem valor.
+    atual = _chave_tri(*_tri_da_data(_date.today()))
+    alvo = [r for r in pend if _chave_tri(r.ano, r.trimestre) >= atual] or pend
+    parcela = round(resta / len(alvo), 2)
+    parcelas = [parcela] * (len(alvo) - 1) + [round(max(resta - parcela * (len(alvo) - 1), 0), 2)]
+    por_id = {id(r): v for r, v in zip(alvo, parcelas)}
+    novos = [por_id.get(id(r), 0.0) for r in pend]
     mudou = False
     for r, v in zip(pend, novos):
         if r.valor_pago_senar is None or abs(float(r.valor_pago_senar) - v) > 0.001:
@@ -585,6 +610,12 @@ def _sincronizar_curso(linhas, interrompido=False):
     if not (base.data_inicio and base.data_conclusao and base.carga_horaria_total):
         return
     chaves = set(_chaves_do_curso(base.data_inicio, base.data_conclusao))
+    if len(linhas) == 1 and not base.previsto and len(chaves) > 1 and not interrompido:
+        # Lançamento único (curso já concluído/pago de uma vez): tudo fica em um trimestre só.
+        base.carga_horaria = base.carga_horaria_total
+        if base.valor_total_senar is not None:
+            base.valor_pago_senar = base.valor_total_senar
+        return
     existentes = {}
     for r in linhas:
         k = _chave_tri(r.ano, r.trimestre)
@@ -598,7 +629,7 @@ def _sincronizar_curso(linhas, interrompido=False):
             )
     if interrompido:
         db.session.flush()
-        _ratear_valores(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
+        _ratear_se_preciso(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
         return
     for k in sorted(chaves):
         if k in existentes:
@@ -612,7 +643,7 @@ def _sincronizar_curso(linhas, interrompido=False):
             carga_horaria=_horas_proporcionais(base.carga_horaria_total, base.data_inicio, base.data_conclusao, a, t),
         ))
     db.session.flush()
-    _ratear_valores(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
+    _ratear_se_preciso(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
 
 
 def _dados_curso_form():
@@ -625,6 +656,8 @@ def _dados_curso_form():
     ini, fim = _parse_data_form("data_inicio"), _parse_data_form("data_conclusao")
     total_h = _parse_decimal_form("carga_horaria_total")
     total_v = _parse_decimal_form("valor_total_senar")
+    if fim and fim.year < _date.today().year:
+        total_v = 0  # curso de anos anteriores: o valor pago não é mais pedido
     faltando = []
     if not nome:
         faltando.append("nome do curso")
@@ -656,6 +689,13 @@ def _url_curso(key, aba=None, **extra):
 
 def resposta_documento_capacitacao(capacitacao):
     """Devolve o comprovante para ser aberto no navegador (usado também pelo admin)."""
+    if capacitacao.arquivo_tipo and not capacitacao.arquivo_dados and capacitacao.grupo_curso:
+        # Curso concluído lançado com um comprovante só: o arquivo fica guardado em um dos trimestres.
+        irma = Capacitacao.query.filter(
+            Capacitacao.grupo_curso == capacitacao.grupo_curso, Capacitacao.arquivo_dados.isnot(None)
+        ).first()
+        if irma:
+            capacitacao = irma
     if not capacitacao.arquivo_tipo or not capacitacao.arquivo_dados:
         abort(404)
     resp = Response(bytes(capacitacao.arquivo_dados), mimetype=capacitacao.arquivo_tipo)
@@ -693,19 +733,87 @@ def minhas_capacitacoes():
 
         grupo = uuid.uuid4()
         chaves = list(_chaves_do_curso(dados["ini"], dados["fim"]))
+        concluido = dados["fim"] < _date.today()
+        if len(chaves) > 1 and concluido:
+            # Curso já concluído: um comprovante só. As horas ficam nos trimestres em que o curso
+            # aconteceu (para o admin ver cada período) e o valor, se houver, no trimestre do término.
+            if not arquivo_dados:
+                flash("O comprovante é obrigatório: anexe o certificado ou a declaração de matrícula/frequência.", "danger")
+                return redirect(url_for("main.minhas_capacitacoes", novo=1))
+            horas = [_horas_proporcionais(dados["total_h"], dados["ini"], dados["fim"], *_de_chave(k)) for k in chaves]
+            horas[-1] = max(horas[-1] + dados["total_h"] - sum(horas), 0)
+            for i, (k, h) in enumerate(zip(chaves, horas)):
+                ultimo = i == len(chaves) - 1
+                a, t = _de_chave(k)
+                db.session.add(Capacitacao(
+                    funcionario_id=funcionario.id, grupo_curso=grupo, previsto=False, status="Em andamento",
+                    nome_curso=dados["nome"], instituicao=dados["instituicao"], tipo=dados["tipo"],
+                    carga_horaria_total=dados["total_h"], valor_total_senar=dados["total_v"],
+                    data_inicio=dados["ini"], data_conclusao=dados["fim"], ano=a, trimestre=t,
+                    carga_horaria=h, valor_pago_senar=dados["total_v"] if ultimo else 0,
+                    arquivo_comprovacao=arquivo_nome, arquivo_tipo=arquivo_tipo,
+                    arquivo_dados=arquivo_dados if ultimo else None,
+                ))
+            db.session.commit()
+            flash("Curso cadastrado com o comprovante. As horas foram distribuídas pelos trimestres do curso.", "success")
+            return redirect(url_for("main.minhas_capacitacoes"))
+        if len(chaves) > 1 and request.form.get("lancamento") == "unico":
+            # Curso em andamento, pago de uma vez: um comprovante e um trimestre só, à escolha da pessoa.
+            ano_u = request.form.get("ano_unico", type=int)
+            tri_u = request.form.get("tri_unico", type=int)
+            if tri_u not in (1, 2, 3, 4) or not ano_u or not (dados["ini"].year <= ano_u <= dados["fim"].year + 1):
+                flash("Escolha o ano e o trimestre em que o curso deve ser contado.", "danger")
+                return redirect(url_for("main.minhas_capacitacoes", novo=1))
+            if not arquivo_dados:
+                flash("O comprovante é obrigatório: anexe o certificado ou a declaração de matrícula/frequência.", "danger")
+                return redirect(url_for("main.minhas_capacitacoes", novo=1))
+            db.session.add(Capacitacao(
+                funcionario_id=funcionario.id, grupo_curso=grupo, previsto=False, status="Em andamento",
+                nome_curso=dados["nome"], instituicao=dados["instituicao"], tipo=dados["tipo"],
+                carga_horaria_total=dados["total_h"], valor_total_senar=dados["total_v"],
+                data_inicio=dados["ini"], data_conclusao=dados["fim"], ano=ano_u, trimestre=tri_u,
+                carga_horaria=dados["total_h"], valor_pago_senar=dados["total_v"],
+                arquivo_comprovacao=arquivo_nome, arquivo_tipo=arquivo_tipo, arquivo_dados=arquivo_dados,
+            ))
+            db.session.commit()
+            flash("Curso cadastrado com o comprovante, contado de uma vez no trimestre escolhido.", "success")
+            return redirect(url_for("main.minhas_capacitacoes"))
         if len(chaves) == 1 and not arquivo_dados:
             flash("O comprovante é obrigatório: anexe o certificado ou a declaração de matrícula/frequência.", "danger")
             return redirect(url_for("main.minhas_capacitacoes", novo=1))
         horas = [_horas_proporcionais(dados["total_h"], dados["ini"], dados["fim"], *_de_chave(k)) for k in chaves]
         horas[-1] = max(horas[-1] + dados["total_h"] - sum(horas), 0)  # a soma fecha com o total
         total_v = float(dados["total_v"])
-        parcela = round(total_v / len(chaves), 2)
-        valores = [parcela] * len(chaves)
-        valores[-1] = round(max(total_v - parcela * (len(chaves) - 1), 0), 2)  # a soma fecha com o total
+        # O valor é dividido em parcelas iguais só do trimestre atual em diante (o passado não conta).
+        atual = _chave_tri(*_tri_da_data(_date.today()))
+        alvo = [k for k in chaves if k >= atual] or list(chaves)
+        n_parc = request.form.get("n_parcelas", type=int)
+        if n_parc and n_parc > 0 and total_v > 0:
+            # Parcelas mensais a partir do mês atual: cada trimestre soma as parcelas que caem nele.
+            # Podem ser menos (ou mais) que os trimestres do curso.
+            valor_parc = round(total_v / n_parc, 2)
+            mapa = {}
+            try:
+                hoje = _date.fromisoformat(request.form.get("data_primeira_parcela", ""))
+            except ValueError:
+                hoje = _date.today()
+            for i in range(n_parc):
+                m = hoje.month - 1 + i
+                k = _chave_tri(*_tri_da_data(_date(hoje.year + m // 12, m % 12 + 1, 1)))
+                if k not in chaves:
+                    k = alvo[-1] if k > alvo[-1] else alvo[0]
+                mapa[k] = round(mapa.get(k, 0) + (valor_parc if i < n_parc - 1 else total_v - valor_parc * (n_parc - 1)), 2)
+        else:
+            parcela = round(total_v / len(alvo), 2)
+            parcelas = [parcela] * len(alvo)
+            parcelas[-1] = round(max(total_v - parcela * (len(alvo) - 1), 0), 2)  # a soma fecha com o total
+            mapa = dict(zip(alvo, parcelas))
+        valores = [mapa.get(k, 0) for k in chaves]
         for k, h, v in zip(chaves, horas, valores):
             a, t = _de_chave(k)
             db.session.add(Capacitacao(
-                funcionario_id=funcionario.id, grupo_curso=grupo, previsto=True, status="Em andamento",
+                # Trimestres que já passaram contam as horas sem pedir comprovante; do atual em diante ficam pendentes.
+                funcionario_id=funcionario.id, grupo_curso=grupo, previsto=(len(chaves) == 1 or k >= atual), status="Em andamento",
                 nome_curso=dados["nome"], instituicao=dados["instituicao"], tipo=dados["tipo"],
                 carga_horaria_total=dados["total_h"], valor_total_senar=dados["total_v"],
                 data_inicio=dados["ini"], data_conclusao=dados["fim"], ano=a, trimestre=t, carga_horaria=h,
@@ -720,7 +828,7 @@ def minhas_capacitacoes():
             primeira.valor_pago_senar = dados["total_v"]
         db.session.commit()
         if len(chaves) > 1:
-            flash("Curso de longa duração cadastrado. Os trimestres foram criados: anexe o comprovante de cada um.", "success")
+            flash("Curso de longa duração cadastrado. Os trimestres foram criados: anexe o comprovante dos trimestres a partir do atual.", "success")
             return redirect(_url_curso(f"g_{grupo}", "trimestres"))
         flash("Curso cadastrado com o comprovante.", "success")
         return redirect(url_for("main.minhas_capacitacoes"))
@@ -730,14 +838,14 @@ def minhas_capacitacoes():
         filtro = "todos"
     busca = request.args.get("q", "").strip()
     todos = _cursos_do_funcionario(funcionario.id)
-    anos = sorted({r.ano for c in todos for r in c["linhas"]}, reverse=True)
+    anos = sorted({a for c in todos for a in _anos_do_curso(c)}, reverse=True)
     ano = request.args.get("ano", type=int)
     if ano not in anos:
         ano = None
     cursos = [
         c for c in todos
         if (FILTROS_CURSO[filtro] is None or c["situacao"] == FILTROS_CURSO[filtro])
-        and (ano is None or any(r.ano == ano for r in c["linhas"]))
+        and (ano is None or ano in _anos_do_curso(c))
         and (not busca or busca.lower() in (c["nome"] or "").lower() or busca.lower() in (c["instituicao"] or "").lower())
     ]
     selecionado = next((c for c in todos if c["key"] == request.args.get("curso")), None)
@@ -745,6 +853,8 @@ def minhas_capacitacoes():
     total_paginas = max(-(-len(cursos) // por_pagina), 1)
     pagina = min(max(request.args.get("pagina", 1, type=int), 1), total_paginas)
     cursos_pagina = cursos[(pagina - 1) * por_pagina: pagina * por_pagina]
+    for c in cursos:
+        c["horas_ano"] = sum(r.carga_horaria or 0 for r in c["linhas"] if r.ano == ano) if ano else None
     aba = request.args.get("aba", "trimestres")
     if aba not in ("informacoes", "trimestres") or (selecionado and not selecionado["longo"]):
         aba = "trimestres" if (selecionado and selecionado["longo"]) else "informacoes"
@@ -851,6 +961,8 @@ def comprovar_trimestre(capacitacao_id):
         return redirect(url_for("main.minhas_capacitacoes"))
     key = _curso_key(linha)
     volta = _url_curso(key, "trimestres")
+    # O trimestre atual (e os passados) exigem comprovante; só os futuros podem ser ajustados sem ele.
+    pode_ajustar = _chave_tri(linha.ano, linha.trimestre) > _chave_tri(*_tri_da_data(_date.today()))
 
     if request.method == "POST":
         carga = _parse_carga_horaria_form()
@@ -863,7 +975,8 @@ def comprovar_trimestre(capacitacao_id):
             faltando.append("carga horária do trimestre")
         if valor is None or valor < 0:
             faltando.append("valor pago pelo SENAR (informe 0 se não houve custo)")
-        if not envia_novo and not linha.arquivo_tipo:
+        so_ajustar = linha.previsto and pode_ajustar and not envia_novo and request.form.get("acao") == "ajustar"
+        if not envia_novo and not linha.arquivo_tipo and not so_ajustar:
             faltando.append("comprovante (declaração de matrícula ou frequência, ou certificado)")
         if faltando:
             flash("Preencha: " + ", ".join(faltando) + ".", "danger")
@@ -880,6 +993,11 @@ def comprovar_trimestre(capacitacao_id):
         linha.observacoes = request.form.get("observacoes", "").strip() or None
         if dados_arq:
             linha.arquivo_comprovacao, linha.arquivo_tipo, linha.arquivo_dados = nome, tipo, dados_arq
+        if so_ajustar:
+            # Só acerta horas/valor previstos; o comprovante continua pendente.
+            db.session.commit()
+            flash("Horas e valor previstos atualizados. O comprovante ainda está pendente.", "success")
+            return redirect(volta)
         linha.previsto = False
         db.session.commit()
         flash("Trimestre comprovado.", "success")
@@ -889,7 +1007,7 @@ def comprovar_trimestre(capacitacao_id):
     outros_h = curso["horas_ok"] - (0 if linha.previsto else (linha.carga_horaria or 0))
     outros_v = curso["valor_ok"] - (0 if linha.previsto else float(linha.valor_pago_senar or 0))
     return render_template(
-        "minhas_capacitacoes_trimestre.html", linha=linha, curso=curso, volta=volta,
+        "minhas_capacitacoes_trimestre.html", linha=linha, curso=curso, volta=volta, pode_ajustar=pode_ajustar,
         restam_h=max((curso["total_h"] or 0) - outros_h, 0),
         restam_v=max(float(curso["total_v"] or 0) - outros_v, 0),
         gratuito=not (linha.valor_total_senar or 0),
@@ -965,8 +1083,10 @@ def capacitacoes_de_todos_da_equipe():
     anos = set()
     for v in vinculos:
         cursos_todos = _cursos_confirmados(v.avaliado_id)
-        anos |= {r.ano for c in cursos_todos for r in c["linhas"]}
-        cursos = [c for c in cursos_todos if ano is None or any(r.ano == ano for r in c["linhas"])]
+        anos |= {a for c in cursos_todos for a in _anos_do_curso(c)}
+        cursos = [c for c in cursos_todos if ano is None or ano in _anos_do_curso(c)]
+        for c in cursos:
+            c["horas_ano"] = sum(r.carga_horaria or 0 for r in c["linhas"] if r.ano == ano) if ano else None
         pessoas.append({
             "avaliado": v.avaliado,
             "cursos": cursos,
