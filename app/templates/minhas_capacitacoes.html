@@ -397,7 +397,7 @@ a.pg-b:hover { border-color: var(--navy-700); background: #f1f6f6; }
         // Curso em andamento e pago pelo SENAR: pergunta se é em parcelas ou de uma vez.
         var pergunta = longo && !concluido && comCusto;
         // Curso que terminou em ano anterior: o valor pago não é mais pedido.
-        var passado = fim.value && parseInt(fim.value.slice(0, 4), 10) < new Date().getFullYear();
+        var passado = !!fim.value && fim.value < hoje();
         document.getElementById('campo-valor').hidden = !!passado;
         valor.required = !passado;
         if (passado) { valor.value = ''; }

@@ -656,8 +656,8 @@ def _dados_curso_form():
     ini, fim = _parse_data_form("data_inicio"), _parse_data_form("data_conclusao")
     total_h = _parse_decimal_form("carga_horaria_total")
     total_v = _parse_decimal_form("valor_total_senar")
-    if fim and fim.year < _date.today().year:
-        total_v = 0  # curso de anos anteriores: o valor pago não é mais pedido
+    if fim and fim < _date.today():
+        total_v = 0  # curso já concluído: o valor pago não é mais pedido
     faltando = []
     if not nome:
         faltando.append("nome do curso")
@@ -797,6 +797,7 @@ def minhas_capacitacoes():
                 hoje = _date.fromisoformat(request.form.get("data_primeira_parcela", ""))
             except ValueError:
                 hoje = _date.today()
+            hoje = max(hoje, _date.today())  # parcelas que já passaram não entram
             for i in range(n_parc):
                 m = hoje.month - 1 + i
                 k = _chave_tri(*_tri_da_data(_date(hoje.year + m // 12, m % 12 + 1, 1)))
