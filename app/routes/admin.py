@@ -1784,6 +1784,7 @@ def capacitacoes():
     pessoas_com = len({c.funcionario_id for c in lista if not c.previsto})
     total_horas = sum(c.carga_horaria or 0 for c in lista if not c.previsto)
     total_valor = sum((c.valor_pago_senar or 0) for c in lista if not c.previsto)
+    pessoas_investidas = len({c.funcionario_id for c in lista if not c.previsto and (c.valor_pago_senar or 0) > 0})
     total_valor_fmt = (
         f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
@@ -1828,6 +1829,8 @@ def capacitacoes():
         total_horas=total_horas,
         total_valor_fmt=total_valor_fmt,
         total_pessoas=pessoas_com,
+        pessoas_investidas=pessoas_investidas,
+        pct_investidas=round(100 * pessoas_investidas / len(funcionarios)) if funcionarios and not funcionario_id else None,
         total_ativos=len(funcionarios),
         pct_pessoas=round(100 * pessoas_com / len(funcionarios)) if funcionarios and not funcionario_id else None,
         periodo_txt=periodo_txt,

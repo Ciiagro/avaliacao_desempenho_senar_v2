@@ -65,5 +65,18 @@
     <footer class="footer">
         <span>Sistema interno de Avaliação de Desempenho</span>
     </footer>
+<style>
+/* Tira as setinhas (spinner) dos campos numéricos: o valor só muda digitando. */
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+</style>
+<script>
+/* Evita que a roda do mouse altere sem querer o valor de um campo numérico selecionado (ex.: 7140 -> 7139,99). */
+document.addEventListener('wheel', function () {
+    var a = document.activeElement;
+    if (a && a.tagName === 'INPUT' && a.type === 'number') { a.blur(); }
+}, { passive: true });
+</script>
 </body>
 </html>

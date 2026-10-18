@@ -67,15 +67,15 @@
             <label class="cap-campo cap-3"><span>Carga horária total (h)</span><input type="number" name="carga_horaria_total" min="1" step="1" required></label>
             <label class="cap-campo cap-3" id="campo-valor"><span>Valor total pago pelo SENAR (R$)</span><input type="number" name="valor_total_senar" min="0" step="0.01" placeholder="0,00 se não houve custo" required></label>
             <div class="cap-campo cap-6" id="bloco-lancamento" hidden>
-                <span>Como lançar este curso?</span>
+                <span>O SENAR paga este curso em parcelas ou de uma só vez?</span>
                 <label class="mc-opcao"><input type="radio" name="lancamento" value="trimestres" checked>
-                    <span><b>Dividir por trimestre</b> &mdash; o SENAR paga em parcelas. As horas são divididas em partes iguais e o valor, do trimestre atual em diante. Você anexa o comprovante de cada trimestre e pode ajustar os números.</span></label>
+                    <span><b>Em parcelas</b> &mdash; o SENAR paga em parcelas mensais. Informe abaixo o mês/ano do primeiro pagamento e quantas parcelas. Você anexa o comprovante de cada trimestre.</span></label>
                 <label class="mc-opcao"><input type="radio" name="lancamento" value="unico">
-                    <span><b>Tudo de uma vez</b> &mdash; curso já concluído ou pago de uma só vez. Um único comprovante, contado em um trimestre.</span></label>
+                    <span><b>De uma só vez</b> &mdash; o SENAR pagou tudo de uma vez. Um único comprovante, contado em um trimestre.</span></label>
                 <div class="mc-unico" id="campos-parcelas">
-                    <label>Data do primeiro pagamento <input type="date" name="data_primeira_parcela" id="data_primeira_parcela"></label>
-                    <label>Em quantas parcelas mensais? <input type="number" name="n_parcelas" id="n_parcelas" min="1" max="60" step="1" placeholder="opcional" style="width:110px"></label>
-                    <small class="muted">Pode ser diferente do nº de trimestres. O valor é somado no trimestre em que cada parcela cai. Sem a data, conta a partir de hoje; sem o nº de parcelas, divide igualmente entre os trimestres.</small>
+                    <label>Mês/ano do primeiro pagamento <input type="month" name="data_primeira_parcela" id="data_primeira_parcela"></label>
+                    <label>Em quantas parcelas mensais? <input type="number" name="n_parcelas" id="n_parcelas" min="1" max="60" step="1" placeholder="mín. 1" style="width:110px"></label>
+                    <small class="muted">Pode ser diferente do nº de trimestres. O valor é somado no trimestre em que cada parcela cai; as parcelas de meses que já passaram não entram na conta. Os dois campos são obrigatórios (mínimo 1 parcela).</small>
                 </div>
                 <div class="mc-unico" id="campos-unico" hidden>
                     <label>Contar no trimestre
@@ -231,6 +231,16 @@
                 <label class="cap-campo cap-2"><span>Término</span><input type="date" name="data_conclusao" value="{{ s.fim.isoformat() if s.fim }}" required></label>
                 <label class="cap-campo cap-3"><span>Carga horária total (h)</span><span class="mc-inp">{{ ico('relogio') }}<input type="number" name="carga_horaria_total" min="1" value="{{ s.total_h }}" required></span></label>
                 <label class="cap-campo cap-3"><span>Valor total SENAR (R$)</span><span class="mc-inp">{{ ico('moeda') }}<input type="number" name="valor_total_senar" min="0" step="0.01" value="{{ '%.2f'|format(s.total_v or 0) }}" required></span></label>
+                {% if s.total_v %}
+                <div class="cap-campo cap-6 mc-refazer">
+                    <span>Refazer as parcelas do SENAR (opcional)</span>
+                    <div class="mc-unico">
+                        <label>Mês/ano do primeiro pagamento <input type="month" name="data_primeira_parcela"></label>
+                        <label>Nº de parcelas mensais <input type="number" name="n_parcelas" min="1" max="60" step="1" style="width:110px"></label>
+                    </div>
+                    <small class="muted">Preencha os dois (mínimo 1 parcela) para recalcular o valor previsto dos trimestres pendentes. Em branco: os valores dos trimestres não mudam (ajuste um a um pelo lápis, se preferir).</small>
+                </div>
+                {% endif %}
             </div>
             <div class="cap-acoes"><button type="submit" class="botao mc-salvar">{{ ico('check') }}Salvar alterações</button></div>
         </form>
@@ -410,6 +420,9 @@ a.pg-b:hover { border-color: var(--navy-700); background: #f1f6f6; }
         }
         camposUnico.hidden = !(pergunta && unico);
         document.getElementById('campos-parcelas').hidden = !(pergunta && !unico);
+        var pedeParc = !!(pergunta && !unico);
+        document.getElementById('n_parcelas').required = pedeParc;
+        document.getElementById('data_primeira_parcela').required = pedeParc;
         if (pergunta && unico && !selAno.options.length) { preencherUnico(); }
         arq.required = !longo || comprovanteUnico;
         arq.disabled = !!longo && !comprovanteUnico;

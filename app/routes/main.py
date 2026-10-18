@@ -524,8 +524,8 @@ def _ratear_se_preciso(linhas):
     if base.valor_total_senar is None:
         return False
     soma = sum(float(r.valor_pago_senar or 0) for r in linhas)
-    if abs(soma - float(base.valor_total_senar)) < 0.01 and all(r.valor_pago_senar is not None for r in linhas):
-        return False
+    if soma <= float(base.valor_total_senar) + 0.01 and all(r.valor_pago_senar is not None for r in linhas):
+        return False  # parcelas já pagas no passado deixam a soma abaixo do total: isso é normal
     return _ratear_valores(linhas)
 
 
@@ -555,8 +555,9 @@ def _ratear_valores(linhas, so_vazios=False):
 
 
 def _preencher_valores_previstos(linhas):
-    """Cursos criados antes da divisão automática: preenche o valor previsto dos trimestres sem comprovante."""
-    return _ratear_valores(linhas)
+    """Cursos criados antes da divisão automática: preenche o valor previsto dos trimestres sem comprovante.
+    Só age quando há trimestre sem valor; nunca refaz o que já foi definido (ex.: parcelas combinadas)."""
+    return _ratear_valores(linhas, so_vazios=True)
 
 
 def _cursos_do_funcionario(funcionario_id):
@@ -644,6 +645,30 @@ def _sincronizar_curso(linhas, interrompido=False):
         ))
     db.session.flush()
     _ratear_se_preciso(Capacitacao.query.filter_by(funcionario_id=base.funcionario_id, grupo_curso=base.grupo_curso).all())
+
+
+def _mapa_parcelas(total_v, n_parc, data_txt, chaves):
+    """Valor por trimestre quando o SENAR paga em n parcelas mensais a partir da data do 1º pagamento
+    (ou de hoje, se a data não vier). Parcelas de meses que já passaram não entram: o passado não conta."""
+    chaves = sorted(chaves)
+    valor_parc = round(total_v / n_parc, 2)
+    mapa = {}
+    try:  # aceita mês/ano ("2026-03") ou data completa
+        inicio_pag = _date.fromisoformat(data_txt + "-01") if len(data_txt or "") == 7 else _date.fromisoformat(data_txt or "")
+    except ValueError:
+        inicio_pag = _date.today()
+    hoje_d = _date.today()
+    for i in range(n_parc):
+        m = inicio_pag.month - 1 + i
+        ano_p, mes_p = inicio_pag.year + m // 12, m % 12 + 1
+        if (ano_p, mes_p) < (hoje_d.year, hoje_d.month):
+            continue
+        k = _chave_tri(*_tri_da_data(_date(ano_p, mes_p, 1)))
+        if k not in chaves:
+            k = chaves[-1] if k > chaves[-1] else chaves[0]
+        v = valor_parc if i < n_parc - 1 else round(total_v - valor_parc * (n_parc - 1), 2)
+        mapa[k] = round(mapa.get(k, 0) + v, 2)
+    return mapa
 
 
 def _dados_curso_form():
@@ -788,22 +813,11 @@ def minhas_capacitacoes():
         atual = _chave_tri(*_tri_da_data(_date.today()))
         alvo = [k for k in chaves if k >= atual] or list(chaves)
         n_parc = request.form.get("n_parcelas", type=int)
+        if total_v > 0 and (not n_parc or n_parc < 1 or not request.form.get("data_primeira_parcela")):
+            flash("Informe o mês/ano do primeiro pagamento e em quantas parcelas o SENAR vai pagar (mínimo 1).", "danger")
+            return redirect(url_for("main.minhas_capacitacoes", novo=1))
         if n_parc and n_parc > 0 and total_v > 0:
-            # Parcelas mensais a partir do mês atual: cada trimestre soma as parcelas que caem nele.
-            # Podem ser menos (ou mais) que os trimestres do curso.
-            valor_parc = round(total_v / n_parc, 2)
-            mapa = {}
-            try:
-                hoje = _date.fromisoformat(request.form.get("data_primeira_parcela", ""))
-            except ValueError:
-                hoje = _date.today()
-            hoje = max(hoje, _date.today())  # parcelas que já passaram não entram
-            for i in range(n_parc):
-                m = hoje.month - 1 + i
-                k = _chave_tri(*_tri_da_data(_date(hoje.year + m // 12, m % 12 + 1, 1)))
-                if k not in chaves:
-                    k = alvo[-1] if k > alvo[-1] else alvo[0]
-                mapa[k] = round(mapa.get(k, 0) + (valor_parc if i < n_parc - 1 else total_v - valor_parc * (n_parc - 1)), 2)
+            mapa = _mapa_parcelas(total_v, n_parc, request.form.get("data_primeira_parcela", ""), chaves)
         else:
             parcela = round(total_v / len(alvo), 2)
             parcelas = [parcela] * len(alvo)
@@ -887,16 +901,37 @@ def editar_curso(key):
         flash(f"O valor total não pode ser menor que o já comprovado ({_fmt_reais(curso['valor_ok'])}).", "danger")
         return redirect(_url_curso(key, "informacoes"))
     grupo = linhas[0].grupo_curso or uuid.uuid4()
+    total_antigo = float(linhas[0].valor_total_senar) if linhas[0].valor_total_senar is not None else None
     for r in linhas:
         r.grupo_curso = grupo
         r.nome_curso, r.instituicao, r.tipo = dados["nome"], dados["instituicao"], dados["tipo"]
         r.data_inicio, r.data_conclusao = dados["ini"], dados["fim"]
         r.carga_horaria_total, r.valor_total_senar = dados["total_h"], dados["total_v"]
+    n_parc = request.form.get("n_parcelas", type=int)
+    if not n_parc and total_antigo is not None and abs(float(dados["total_v"]) - total_antigo) > 0.001:
+        # Total corrigido sem refazer as parcelas: a diferença vai para a última parcela ainda prevista.
+        com_valor = sorted((r for r in linhas if r.previsto and float(r.valor_pago_senar or 0) > 0), key=lambda r: (r.ano, r.trimestre))
+        if com_valor:
+            ult = com_valor[-1]
+            novo = round(float(ult.valor_pago_senar) + float(dados["total_v"]) - total_antigo, 2)
+            ult.valor_pago_senar = max(novo, 0)
     db.session.flush()
     _sincronizar_curso(linhas, interrompido=curso["situacao"] == "Desistente")
+    n_parc = request.form.get("n_parcelas", type=int)
+    if bool(n_parc) != bool(request.form.get("data_primeira_parcela")) or (n_parc is not None and n_parc < 1):
+        db.session.rollback()
+        flash("Para refazer as parcelas, informe o mês/ano do primeiro pagamento e o número de parcelas (mínimo 1).", "danger")
+        return redirect(_url_curso(key, "informacoes"))
+    if n_parc and n_parc > 0 and float(dados["total_v"]) > 0:
+        # Refaz o valor previsto dos trimestres ainda pendentes (os comprovados não mudam).
+        pend = [r for r in Capacitacao.query.filter_by(funcionario_id=linhas[0].funcionario_id, grupo_curso=grupo).all() if r.previsto]
+        mapa = _mapa_parcelas(float(dados["total_v"]), n_parc, request.form.get("data_primeira_parcela", ""),
+                              [_chave_tri(r.ano, r.trimestre) for r in Capacitacao.query.filter_by(funcionario_id=linhas[0].funcionario_id, grupo_curso=grupo).all()])
+        for r in pend:
+            r.valor_pago_senar = mapa.get(_chave_tri(r.ano, r.trimestre), 0)
     db.session.commit()
     flash("Informações do curso atualizadas.", "success")
-    return redirect(_url_curso(f"g_{grupo}", "informacoes"))
+    return redirect(_url_curso(f"g_{grupo}", "trimestres"))
 
 
 @main_bp.route("/minhas-capacitacoes/curso/<key>/excluir", methods=["POST"])
@@ -951,6 +986,35 @@ def desistir_curso(key):
     return redirect(volta)
 
 
+def _redistribuir_pendentes(linha, horas_antes, valor_antes):
+    """Depois de ajustar um trimestre (lápis), os outros trimestres ainda pendentes absorvem a diferença:
+    a soma de horas e de valor do curso continua a mesma. Horas: partes iguais. Valor: mantém a proporção
+    que cada trimestre já tinha (quem estava em R$ 0,00 continua assim)."""
+    if not linha.grupo_curso:
+        return
+    todas = Capacitacao.query.filter_by(funcionario_id=linha.funcionario_id, grupo_curso=linha.grupo_curso).all()
+    outras = sorted((r for r in todas if r.previsto and r.id != linha.id), key=lambda r: (r.ano, r.trimestre))
+    if not outras:
+        return
+    fixas = [r for r in todas if r not in outras]
+    horas_resto = max(horas_antes - sum(r.carga_horaria or 0 for r in fixas), 0)
+    cada = int(horas_resto) // len(outras)
+    for r in outras:
+        r.carga_horaria = cada
+    outras[-1].carga_horaria = cada + int(horas_resto) - cada * len(outras)
+    valor_resto = max(round(valor_antes - sum(float(r.valor_pago_senar or 0) for r in fixas), 2), 0)
+    pesos = [float(r.valor_pago_senar or 0) for r in outras]
+    if sum(pesos) <= 0:
+        pesos = [1.0] * len(outras) if valor_resto > 0 else pesos
+    if sum(pesos) <= 0:
+        return
+    novos = [round(valor_resto * w / sum(pesos), 2) for w in pesos]
+    com_valor = [i for i, w in enumerate(pesos) if w > 0]
+    novos[com_valor[-1]] = round(novos[com_valor[-1]] + valor_resto - sum(novos), 2)
+    for r, v in zip(outras, novos):
+        r.valor_pago_senar = max(v, 0)
+
+
 @main_bp.route("/minhas-capacitacoes/<int:capacitacao_id>/trimestre", methods=["GET", "POST"])
 def comprovar_trimestre(capacitacao_id):
     funcionario, resp = _funcionario_capacitacoes()
@@ -990,18 +1054,24 @@ def comprovar_trimestre(capacitacao_id):
         if erro_arq:
             flash(erro_arq, "danger")
             return redirect(url_for("main.comprovar_trimestre", capacitacao_id=linha.id))
+        irmas = Capacitacao.query.filter_by(funcionario_id=linha.funcionario_id, grupo_curso=linha.grupo_curso).all() if linha.grupo_curso else []
+        horas_antes = sum(r.carga_horaria or 0 for r in irmas)
+        valor_antes = sum(float(r.valor_pago_senar or 0) for r in irmas)
         linha.carga_horaria, linha.valor_pago_senar = carga, valor
         linha.observacoes = request.form.get("observacoes", "").strip() or None
         if dados_arq:
             linha.arquivo_comprovacao, linha.arquivo_tipo, linha.arquivo_dados = nome, tipo, dados_arq
         if so_ajustar:
             # Só acerta horas/valor previstos; o comprovante continua pendente.
+            _redistribuir_pendentes(linha, horas_antes, valor_antes)
             db.session.commit()
             flash("Horas e valor previstos atualizados. O comprovante ainda está pendente.", "success")
             return redirect(volta)
         linha.previsto = False
+        db.session.flush()
+        _redistribuir_pendentes(linha, horas_antes, valor_antes)
         db.session.commit()
-        flash("Trimestre comprovado.", "success")
+        flash("Trimestre comprovado. Os trimestres pendentes foram reajustados para a soma continuar igual.", "success")
         return redirect(volta)
 
     curso = _montar_curso(_linhas_do_curso(funcionario.id, key))
