@@ -13,7 +13,10 @@ mandar o mesmo lembrete duas vezes para a mesma pessoa, mesmo que a
 rotina seja chamada mais de uma vez no mesmo dia.
 """
 
+import time
 from datetime import datetime, timezone
+
+from flask import current_app
 
 from sqlalchemy.orm import joinedload
 
@@ -23,8 +26,17 @@ from .utils import para_fortaleza, adicionar_dias_uteis
 from .email_service import avisar_prazo_avaliacao, avisar_prazo_ciencia_resultado
 
 DIAS_DE_AVISO = (5, 1, 0)
+ORCAMENTO_SEGUNDOS = 40  # para antes do limite do Vercel e responder com o que deu tempo de fazer
 DIAS_DE_AVISO_CIENCIA = (2, 0)  # prazo de ciência é curto (5 dias úteis), não cabe um aviso de "5 dias"
 PRAZO_CIENCIA_DIAS_UTEIS = 5
+
+
+def _sem_tempo(resumo):
+    """True quando o tempo da rotina acabou (o que ficou pendente sai na próxima execução)."""
+    if time.monotonic() - resumo["_inicio"] > ORCAMENTO_SEGUNDOS:
+        resumo["interrompido"] = True
+        return True
+    return False
 
 
 def _hoje_fortaleza():
@@ -114,7 +126,14 @@ def _lembretes_avaliacao(hoje, resumo):
                 if ja_enviado:
                     continue
 
+                if _sem_tempo(resumo):
+                    return
+                t0 = time.monotonic()
                 enviado = avisar_prazo_avaliacao(pessoa, tipo, dias_restantes, prazo_pessoa)
+                current_app.logger.info(
+                    "Lembrete %s/%s para %s: %s em %.1fs", tipo, dias_restantes, pessoa.nome,
+                    "enviado" if enviado else "FALHOU", time.monotonic() - t0,
+                )
                 if not enviado:
                     # Falhou (SMTP/config): não registra, assim a próxima
                     # execução do cron tenta de novo.
@@ -176,6 +195,8 @@ def _lembretes_ciencia_resultado(hoje, resumo):
         if ja_enviado:
             continue
 
+        if _sem_tempo(resumo):
+            return
         avisar_prazo_ciencia_resultado(pessoa, dias_restantes, prazo)
         db.session.add(
             NotificacaoPrazo(
@@ -198,9 +219,15 @@ def enviar_lembretes_prazo():
     que foi feito, pra rota que chama isso poder responder algo útil (e
     pro log do Vercel Cron)."""
     hoje = _hoje_fortaleza()
-    resumo = {"verificados": 0, "enviados": 0, "detalhes": []}
+    resumo = {"verificados": 0, "enviados": 0, "detalhes": [], "_inicio": time.monotonic()}
 
+    t0 = time.monotonic()
     _lembretes_avaliacao(hoje, resumo)
-    _lembretes_ciencia_resultado(hoje, resumo)
+    current_app.logger.info("Lembretes de avaliação verificados em %.1fs", time.monotonic() - t0)
+    if not _sem_tempo(resumo):
+        t0 = time.monotonic()
+        _lembretes_ciencia_resultado(hoje, resumo)
+        current_app.logger.info("Lembretes de ciência verificados em %.1fs", time.monotonic() - t0)
 
+    resumo["segundos"] = round(time.monotonic() - resumo.pop("_inicio"), 1)
     return resumo

@@ -277,7 +277,7 @@ def _enviar_email(destinatarios, assunto, titulo, paragrafos, destaque=None, lin
     # Gmail demore a responder.
     try:
         contexto = ssl.create_default_context()
-        with smtplib.SMTP_SSL(servidor, porta, context=contexto, timeout=20) as smtp:
+        with smtplib.SMTP_SSL(servidor, porta, context=contexto, timeout=10) as smtp:
             smtp.login(usuario, senha)
             smtp.send_message(msg)
         return True
