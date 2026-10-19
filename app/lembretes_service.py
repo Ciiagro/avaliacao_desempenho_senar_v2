@@ -84,15 +84,25 @@ def _lembretes_avaliacao(hoje, resumo):
                 # prorrogação individual dela quando for maior).
                 prazo_pessoa = max(prazo, prorrogacoes.get(pessoa.id, prazo))
                 dias_restantes = (prazo_pessoa - hoje).days
-                if dias_restantes not in DIAS_DE_AVISO:
+                if dias_restantes in DIAS_DE_AVISO:
+                    ja_enviado = NotificacaoPrazo.query.filter_by(
+                        ciclo_id=ciclo.id,
+                        tipo=tipo,
+                        avaliador_id=pessoa.id,
+                        dias_restantes=dias_restantes,
+                    ).first()
+                elif 1 < dias_restantes < max(DIAS_DE_AVISO):
+                    # Recuperação: o aviso de "5 dias" não saiu no dia certo (e-mail falhou, rotina
+                    # não rodou, prazo cadastrado depois...). Manda uma vez com os dias que faltam,
+                    # a menos que a pessoa já tenha recebido algum aviso nessa janela.
+                    ja_enviado = NotificacaoPrazo.query.filter(
+                        NotificacaoPrazo.ciclo_id == ciclo.id,
+                        NotificacaoPrazo.tipo == tipo,
+                        NotificacaoPrazo.avaliador_id == pessoa.id,
+                        NotificacaoPrazo.dias_restantes >= dias_restantes,
+                    ).first()
+                else:
                     continue
-
-                ja_enviado = NotificacaoPrazo.query.filter_by(
-                    ciclo_id=ciclo.id,
-                    tipo=tipo,
-                    avaliador_id=pessoa.id,
-                    dias_restantes=dias_restantes,
-                ).first()
                 if ja_enviado:
                     continue
 
