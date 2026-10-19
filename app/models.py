@@ -201,8 +201,9 @@ TIPOS_CAPACITACAO = [
 ]
 TIPOS_STATUS_CAPACITACAO = ["Concluído", "Em andamento", "Desistente"]
 TRIMESTRES = [1, 2, 3, 4]
-LIMITE_CURSO_CURTO_HORAS = 40  # até esse total de horas, o curso de um trimestre é "Curto"
-CLASSES_CURSO = ["Curto", "Médio", "Longo"]
+LIMITE_CURSO_CURTO_HORAS = 99   # até esse total de horas: curta duração
+LIMITE_CURSO_MEDIO_HORAS = 199  # de 100 a 199 horas: média duração; de 200 em diante: longa duração
+CLASSES_CURSO = ["Curta duração", "Média duração", "Longa duração"]
 
 
 def trimestre_atual(hoje=None):
@@ -255,13 +256,22 @@ class Capacitacao(db.Model):
     funcionario = db.relationship("Funcionario", foreign_keys=[funcionario_id])
 
     @property
-    def classe(self):
-        """Curto/Médio: começa e termina no mesmo trimestre (Curto até 40h). Longo: atravessa trimestres."""
+    def atravessa_trimestres(self):
+        """True quando o curso começa e termina em trimestres diferentes (comprovação trimestre a trimestre)."""
         ini, fim = self.data_inicio, self.data_conclusao
-        if ini and fim and (ini.year, (ini.month - 1) // 3) != (fim.year, (fim.month - 1) // 3):
-            return "Longo"
+        return bool(ini and fim and (ini.year, (ini.month - 1) // 3) != (fim.year, (fim.month - 1) // 3))
+
+    @property
+    def classe(self):
+        """Duração pela carga horária total: curta até 99h, média de 100 a 199h, longa de 200h em diante."""
         total = self.carga_horaria_total or self.carga_horaria or 0
-        return "Curto" if total <= LIMITE_CURSO_CURTO_HORAS else "Médio"
+        if total <= LIMITE_CURSO_CURTO_HORAS:
+            return "Curta duração"
+        return "Média duração" if total <= LIMITE_CURSO_MEDIO_HORAS else "Longa duração"
+
+    @property
+    def classe_css(self):
+        return {"Curta duração": "curto", "Média duração": "medio", "Longa duração": "longo"}[self.classe]
 
     @property
     def situacao(self):

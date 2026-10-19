@@ -507,7 +507,7 @@ def _montar_curso(linhas):
         situacao = base.status or "Em andamento"
     return {
         "key": _curso_key(base), "base": base, "linhas": linhas, "grupo": grupo,
-        "classe": base.classe, "longo": base.classe == "Longo",
+        "classe": base.classe, "classe_css": base.classe_css, "longo": base.atravessa_trimestres,
         "nome": base.nome_curso, "instituicao": base.instituicao, "tipo": base.tipo,
         "ini": base.data_inicio, "fim": base.data_conclusao,
         "total_h": total_h, "total_v": total_v, "situacao": situacao,
@@ -894,6 +894,11 @@ def editar_curso(key):
         flash(erro, "danger")
         return redirect(_url_curso(key, "informacoes"))
     curso = _montar_curso(linhas)
+    if dados["fim"] < _date.today():
+        # Curso já concluído: _dados_curso_form zera o valor, mas ao editar vale o que o usuário digitou
+        # (ou o valor que o curso já tinha), senão a edição falha com "valor menor que o já comprovado".
+        digitado = _parse_decimal_form("valor_total_senar")
+        dados["total_v"] = digitado if digitado else (curso["total_v"] or 0)
     if dados["total_h"] < curso["horas_ok"]:
         flash(f"A carga horária total não pode ser menor que as horas já comprovadas ({_fmt_h(curso['horas_ok'])}).", "danger")
         return redirect(_url_curso(key, "informacoes"))

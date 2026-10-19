@@ -37,7 +37,7 @@
                 </span>
             </span>
             <span class="mc-dir">
-                <span class="mc-col-cls"><span class="mc-classe mc-classe-{{ c.classe|lower|replace('é','e') }}">{{ c.classe }}</span></span>
+                <span class="mc-col-cls"><span class="mc-classe mc-classe-{{ c.classe_css }}">{{ c.classe }}</span></span>
                 <span class="mc-col-sit">
                     {%- if c.situacao == 'Desistente' %}<span class="badge badge-danger">Desistente</span>
                     {%- elif c.situacao == 'Concluído' %}<span class="badge badge-ok">Concluído</span>

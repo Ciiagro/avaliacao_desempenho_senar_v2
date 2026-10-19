@@ -134,7 +134,7 @@
                     </span>
                 </span>
                 <span class="mc-dir">
-                    <span class="mc-col-cls"><span class="mc-classe mc-classe-{{ c.classe|lower|replace('é','e') }}">{{ c.classe }}</span></span>
+                    <span class="mc-col-cls"><span class="mc-classe mc-classe-{{ c.classe_css }}">{{ c.classe }}</span></span>
                     <span class="mc-col-pend">{% if c.pendentes %}<span class="mc-aviso" title="Trimestres ainda sem comprovante. Anexe o comprovante de cada um para as horas contarem."><b>{{ c.pendentes }}</b> comprovante{{ 's' if c.pendentes > 1 }} pendente{{ 's' if c.pendentes > 1 }}</span>{% endif %}</span>
                     <span class="mc-col-sit">{{ badge(c.situacao) }}</span>
                 </span>
@@ -159,7 +159,7 @@
                 <h2>{{ s.nome|titulo }}</h2>
                 <div class="muted">{{ (s.instituicao or '-')|upper }} &middot; {{ s.tipo or '-' }}{% if s.ini and s.fim %} &middot; {{ s.ini.strftime('%d/%m/%Y') }} a {{ s.fim.strftime('%d/%m/%Y') }}{% endif %}</div>
             </div>
-            <span class="mc-classe mc-classe-{{ s.classe|lower|replace('é','e') }}">{{ s.classe }}</span>
+            <span class="mc-classe mc-classe-{{ s.classe_css }}">{{ s.classe }}</span>
             {{ badge(s.situacao) }}
         </div>
         <div class="cap-resumo">
@@ -218,7 +218,8 @@
         <p class="mc-nota">Só os trimestres com comprovante entram na soma de horas. A soma de todos não pode passar da carga horária total do curso.
             Errou o valor ou a carga horária total? <a href="{{ url_for('main.minhas_capacitacoes', curso=s.key, aba='informacoes', filtro=filtro, q=busca or None) }}"><b>Corrigir nas Informações do curso</b></a>.</p>
         {% else %}
-        <form method="post" action="{{ url_for('main.editar_curso', key=s.key) }}">
+        <h3 style="margin:18px 0 10px;font-size:1rem;color:var(--navy-900)">{{ ico('info') }} Editar informações do curso <small class="muted" style="font-weight:400">— altere os campos e clique em "Salvar alterações"</small></h3>
+        <form method="post" id="form-editar-curso" action="{{ url_for('main.editar_curso', key=s.key) }}">
             <div class="cap-grid">
                 <label class="cap-campo cap-3"><span>Nome do curso</span><input type="text" name="nome_curso" value="{{ s.nome|titulo }}" required></label>
                 <label class="cap-campo cap-3"><span>Instituição</span><input type="text" style="text-transform:uppercase" name="instituicao" value="{{ s.instituicao or '' }}" required></label>
@@ -242,11 +243,11 @@
                 </div>
                 {% endif %}
             </div>
-            <div class="cap-acoes"><button type="submit" class="botao mc-salvar">{{ ico('check') }}Salvar alterações</button></div>
         </form>
         {% endif %}
 
         <div class="mc-rodape">
+            {% if not (aba == 'trimestres' and s.longo) %}<button type="submit" form="form-editar-curso" class="botao mc-salvar">{{ ico('check') }}Salvar alterações</button>{% endif %}
             {% if s.longo and s.situacao != 'Desistente' %}
             <form method="post" action="{{ url_for('main.desistir_curso', key=s.key) }}" class="mc-desistir"
                   onsubmit="return confirm('Marcar este curso como desistente? Os trimestres seguintes sem comprovante serão removidos.');">
