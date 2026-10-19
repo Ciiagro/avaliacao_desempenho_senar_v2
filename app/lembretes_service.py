@@ -15,6 +15,8 @@ rotina seja chamada mais de uma vez no mesmo dia.
 
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import joinedload
+
 from .extensions import db
 from .models import CicloAvaliacao, VinculoAvaliacao, Avaliacao, ResultadoFinal, NotificacaoPrazo, prorrogacoes_do_ciclo
 from .utils import para_fortaleza, adicionar_dias_uteis
@@ -40,7 +42,13 @@ def _pendentes_do_ciclo(ciclo, tipo):
     Uma pessoa só é considerada pendente se tiver e-mail cadastrado —
     sem e-mail não tem pra onde mandar o aviso.
     """
-    vinculos = VinculoAvaliacao.query.filter_by(ciclo_id=ciclo.id).all()
+    # joinedload: traz avaliado e avaliador na mesma consulta. Sem isso, cada vínculo fazia 1-2
+    # consultas extras ao banco e a rotina estourava os 30 s do Vercel.
+    vinculos = (
+        VinculoAvaliacao.query.options(joinedload(VinculoAvaliacao.avaliado), joinedload(VinculoAvaliacao.avaliador))
+        .filter_by(ciclo_id=ciclo.id)
+        .all()
+    )
 
     concluidas = {
         (a.avaliado_id, a.avaliador_id)
@@ -131,7 +139,11 @@ def _lembretes_ciencia_resultado(hoje, resumo):
     """Quem já teve o resultado final liberado mas ainda não deu ciência
     (independente de pretender recorrer ou não) — o prazo é de 5 dias
     úteis a partir da liberação."""
-    pendentes = ResultadoFinal.query.filter_by(liberado=True, ciente_avaliado=False).all()
+    pendentes = (
+        ResultadoFinal.query.options(joinedload(ResultadoFinal.avaliado))
+        .filter_by(liberado=True, ciente_avaliado=False)
+        .all()
+    )
 
     for registro in pendentes:
         if not registro.liberado_em:
