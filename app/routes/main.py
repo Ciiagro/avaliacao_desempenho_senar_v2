@@ -442,6 +442,19 @@ def _chave_tri(ano, tri):
     return ano * 4 + (tri - 1)
 
 
+# A partir deste trimestre, cursos pagos pelo SENAR exigem comprovante; antes dele não.
+PRIMEIRO_TRI_COM_COMPROVANTE = (2026, 4)
+
+
+def _exige_comprovante(linha):
+    """Curso de longa duração (gratuito ou pago pelo SENAR): trimestres anteriores ao 4º tri/2026 não
+    têm comprovante; do 4º tri/2026 em diante passa a ser obrigatório.
+    Qualquer outro curso (curta e média duração): comprovante sempre obrigatório."""
+    if linha.classe != "Longa duração":
+        return True
+    return _chave_tri(linha.ano, linha.trimestre) >= _chave_tri(*PRIMEIRO_TRI_COM_COMPROVANTE)
+
+
 def _de_chave(chave):
     return chave // 4, chave % 4 + 1
 
@@ -1007,7 +1020,11 @@ def _redistribuir_pendentes(linha, horas_antes, valor_antes):
     for r in outras:
         r.carga_horaria = cada
     outras[-1].carga_horaria = cada + int(horas_resto) - cada * len(outras)
-    valor_resto = max(round(valor_antes - sum(float(r.valor_pago_senar or 0) for r in fixas), 2), 0)
+    # O que falta é calculado sobre o valor total do curso (valor pago pelo SENAR), e não sobre a soma
+    # antiga das parcelas, que pode estar errada se o total foi corrigido depois.
+    total_curso = linha.valor_total_senar
+    base_valor = float(total_curso) if total_curso is not None else valor_antes
+    valor_resto = max(round(base_valor - sum(float(r.valor_pago_senar or 0) for r in fixas), 2), 0)
     pesos = [float(r.valor_pago_senar or 0) for r in outras]
     if sum(pesos) <= 0:
         pesos = [1.0] * len(outras) if valor_resto > 0 else pesos
@@ -1031,8 +1048,11 @@ def comprovar_trimestre(capacitacao_id):
         return redirect(url_for("main.minhas_capacitacoes"))
     key = _curso_key(linha)
     volta = _url_curso(key, "trimestres")
-    # O trimestre atual (e os passados) exigem comprovante; só os futuros podem ser ajustados sem ele.
-    pode_ajustar = _chave_tri(linha.ano, linha.trimestre) > _chave_tri(*_tri_da_data(_date.today()))
+    # Trimestres anteriores ao 4º/2026 (ou de curso não pago pelo SENAR) não exigem comprovante: basta
+    # informar horas e valor. A partir do 4º/2026, curso pago pelo SENAR exige comprovante; até anexar,
+    # dá para "salvar sem comprovante" (ajusta horas/valor previstos e os demais pendentes absorvem a diferença).
+    exige_comprovante = _exige_comprovante(linha)
+    pode_ajustar = exige_comprovante
 
     if request.method == "POST":
         carga = _parse_carga_horaria_form()
@@ -1046,7 +1066,7 @@ def comprovar_trimestre(capacitacao_id):
         if valor is None or valor < 0:
             faltando.append("valor pago pelo SENAR (informe 0 se não houve custo)")
         so_ajustar = linha.previsto and pode_ajustar and not envia_novo and request.form.get("acao") == "ajustar"
-        if not envia_novo and not linha.arquivo_tipo and not so_ajustar:
+        if exige_comprovante and not envia_novo and not linha.arquivo_tipo and not so_ajustar:
             faltando.append("comprovante (declaração de matrícula ou frequência, ou certificado)")
         if faltando:
             flash("Preencha: " + ", ".join(faltando) + ".", "danger")
@@ -1083,7 +1103,7 @@ def comprovar_trimestre(capacitacao_id):
     outros_h = curso["horas_ok"] - (0 if linha.previsto else (linha.carga_horaria or 0))
     outros_v = curso["valor_ok"] - (0 if linha.previsto else float(linha.valor_pago_senar or 0))
     return render_template(
-        "minhas_capacitacoes_trimestre.html", linha=linha, curso=curso, volta=volta, pode_ajustar=pode_ajustar,
+        "minhas_capacitacoes_trimestre.html", linha=linha, curso=curso, volta=volta, pode_ajustar=pode_ajustar, exige_comprovante=exige_comprovante,
         restam_h=max((curso["total_h"] or 0) - outros_h, 0),
         restam_v=max(float(curso["total_v"] or 0) - outros_v, 0),
         gratuito=not (linha.valor_total_senar or 0),

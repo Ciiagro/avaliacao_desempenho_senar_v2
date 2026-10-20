@@ -7,8 +7,11 @@
 <p class="muted">{{ curso.nome }} &middot; {{ curso.instituicao or '-' }} &middot; {{ ini_tri.strftime('%d/%m/%Y') }} a {{ fim_tri.strftime('%d/%m/%Y') }}</p>
 
 <div class="cap-aviso" role="note">
-    <strong>Como comprovar</strong>
+    {% if exige_comprovante %}<strong>Como comprovar</strong>
     Anexe a declaração de matrícula ou de frequência (ou o certificado) que mostre que você fez o curso neste trimestre.
+    {% else %}<strong>Trimestre sem comprovante obrigatório</strong>
+    Informe as horas e o valor deste trimestre. O comprovante é opcional.
+    {% endif %}
     Ainda cabem neste trimestre <b>até {{ '%g'|format(restam_h) }}h</b>{% if not gratuito %} e <b>{{ restam_v|brl }}</b>{% endif %} (total do curso: {{ curso.total_h }}h{% if not gratuito %} e {{ (curso.total_v or 0)|brl }}{% endif %}).
     <a href="{{ url_for('main.minhas_capacitacoes', curso=curso.key, aba='informacoes') }}"><b>Alterar o valor ou a carga horária total do curso</b></a>
 </div>
@@ -23,15 +26,15 @@
                 <input type="number" name="valor_pago_senar" min="0" step="0.01" required placeholder="0,00 se não houve custo"
                        value="{{ linha.valor_pago_senar if linha.valor_pago_senar is not none else '' }}">
             </label>{% endif %}
-            <label class="cap-campo cap-3"><span>Comprovante (PDF, JPG ou PNG, PDF até 2 MB; fotos são reduzidas sozinhas){% if linha.arquivo_tipo %} &mdash; já enviado; anexe outro só se quiser trocar{% endif %}</span>
-                <input type="file" name="arquivo_comprovacao" id="arquivo" accept=".pdf,.jpg,.jpeg,.png" {% if not linha.arquivo_tipo %}required{% endif %}>
+            <label class="cap-campo cap-3"><span>Comprovante{% if not exige_comprovante %} (opcional){% endif %} (PDF, JPG ou PNG, PDF até 2 MB; fotos são reduzidas sozinhas){% if linha.arquivo_tipo %} &mdash; já enviado; anexe outro só se quiser trocar{% endif %}</span>
+                <input type="file" name="arquivo_comprovacao" id="arquivo" accept=".pdf,.jpg,.jpeg,.png" {% if exige_comprovante and not linha.arquivo_tipo %}required{% endif %}>
             </label>
             <label class="cap-campo cap-3"><span>Observações (opcional)</span>
                 <input type="text" name="observacoes" value="{{ linha.observacoes or '' }}">
             </label>
         </div>
         <div class="cap-acoes">
-            <button type="submit" class="botao">Salvar comprovante</button>
+            <button type="submit" class="botao">{{ 'Salvar comprovante' if exige_comprovante else 'Salvar' }}</button>
             {% if linha.previsto and pode_ajustar %}<button type="submit" name="acao" value="ajustar" formnovalidate class="botao botao-secundario" title="Acerta horas e valor previstos sem anexar o comprovante agora">Salvar sem comprovante</button>{% endif %}
             <a class="botao botao-secundario" href="{{ volta }}">Cancelar</a>
         </div>
