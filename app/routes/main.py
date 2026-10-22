@@ -153,7 +153,8 @@ def esqueci_senha():
             token = regras_senha.criar_token_redefinicao(funcionario)
             db.session.commit()
             if token:
-                link = url_for("main.redefinir_senha", token=token, _external=True)
+                from ..email_service import url_externa
+                link = url_externa("main.redefinir_senha", token=token)
                 email_service.avisar_redefinicao_senha(
                     funcionario, link, regras_senha.TOKEN_VALIDADE_MINUTOS
                 )

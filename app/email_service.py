@@ -494,41 +494,40 @@ def avisar_empregado_devolutiva_marcada(funcionario, data_devolutiva, data_limit
     )
 
 
-def _link_minha_area():
+def url_externa(endpoint, **valores):
+    """Monta o link absoluto de uma tela para usar nos e-mails.
+
+    Se APP_BASE_URL estiver definida (ex.: https://avaliacaodesempenho.senarce.org.br),
+    usa SEMPRE esse endereço. Sem isso, o Flask usa o endereço de quem disparou o
+    envio (no cron da Vercel, o endereço interno da implantação, que pede login da
+    Vercel)."""
+    import os
     from flask import url_for
 
+    base = (os.environ.get("APP_BASE_URL") or "").strip().rstrip("/")
     try:
-        return url_for("main.minha_area", _external=True)
-    except RuntimeError:
-        return ""
-
-
-def _link_comissao():
-    from flask import url_for
-
-    try:
-        return url_for("recursos.recurso_comissao_area", _external=True)
+        if base:
+            return base + url_for(endpoint, _external=False, **valores)
+        return url_for(endpoint, _external=True, **valores)
     except RuntimeError:
         # fora de um contexto de requisição (ex: script/rotina manual)
         return ""
 
 
-def _link_gestor():
-    from flask import url_for
+def _link_minha_area():
+    return url_externa("main.minha_area")
 
-    try:
-        return url_for("recursos.recurso_gestor_area", _external=True)
-    except RuntimeError:
-        return ""
+
+def _link_comissao():
+    return url_externa("recursos.recurso_comissao_area")
+
+
+def _link_gestor():
+    return url_externa("recursos.recurso_gestor_area")
 
 
 def _link_empregado():
-    from flask import url_for
-
-    try:
-        return url_for("recursos.recurso_area", _external=True)
-    except RuntimeError:
-        return ""
+    return url_externa("recursos.recurso_area")
 
 
 # ---------------------------------------------------------------------------
@@ -569,12 +568,7 @@ def avisar_senha_alterada(funcionario):
 
 def avisar_senha_provisoria(funcionario, senha):
     """Envia a senha provisória (aleatória) direto para o colaborador."""
-    from flask import url_for
-
-    try:
-        link = url_for("main.login", _external=True)
-    except RuntimeError:
-        link = ""
+    link = url_externa("main.login")
     return _enviar_email(
         _email_funcionario(funcionario),
         "[Avaliação de Desempenho] Seu acesso ao sistema",
