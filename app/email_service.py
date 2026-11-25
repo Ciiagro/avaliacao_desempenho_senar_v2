@@ -505,6 +505,10 @@ def url_externa(endpoint, **valores):
     from flask import url_for
 
     base = (os.environ.get("APP_BASE_URL") or "").strip().rstrip("/")
+    if not base and os.environ.get("VERCEL"):
+        # Na Vercel, se APP_BASE_URL não estiver configurada, usa o endereço
+        # oficial em vez do endereço interno da implantação (que pede login).
+        base = "https://avaliacaodesempenho.senarce.org.br"
     try:
         if base:
             return base + url_for(endpoint, _external=False, **valores)
