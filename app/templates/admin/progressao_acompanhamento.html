@@ -43,7 +43,7 @@
             <tr>
                 <th>Mat.</th><th>Nome</th><th>Admissão</th>
                 <th>Nota {{ dados.par[0] }}</th><th>Nota {{ dados.par[1] }}</th>
-                <th>Nível</th><th>Situação</th>
+                <th>Situação</th>
             </tr>
         </thead>
         <tbody>
@@ -54,9 +54,6 @@
                 <td>{{ l.admissao.strftime("%d/%m/%Y") if l.admissao else "—" }}</td>
                 <td>{{ "%.2f"|format(l.nota_a) if l.nota_a is not none else "—" }}</td>
                 <td>{{ "%.2f"|format(l.nota_b) if l.nota_b is not none else "—" }}</td>
-                <td>
-                    {% if l.nivel_novo %}{{ l.nivel_anterior or "—" }} &rarr; {{ l.nivel_novo }}{% else %}{{ l.nivel_anterior or "—" }}{% endif %}
-                </td>
                 <td>{{ l.motivo }}</td>
             </tr>
             {% endfor %}

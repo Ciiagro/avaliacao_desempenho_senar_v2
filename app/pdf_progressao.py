@@ -1,4 +1,5 @@
 import io
+import unicodedata
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -13,8 +14,9 @@ META = {"A": 0.20, "B": 0.65, "C": 0.15}
 
 
 def _chave_ordem(l):
-    mat = str(l["matricula"] or "")
-    return (0, int(mat), l["nome"]) if mat.isdigit() else (1, 0, l["nome"])
+    """Ordem alfabética pelo nome, ignorando acentos e maiúsculas."""
+    nome = unicodedata.normalize("NFKD", l["nome"] or "")
+    return "".join(c for c in nome if not unicodedata.combining(c)).casefold()
 
 
 def gerar_pdf_acompanhamento(dados):
