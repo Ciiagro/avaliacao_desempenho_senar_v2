@@ -1132,6 +1132,117 @@ def progressao_nivel():
     return render_template("admin/progressao_nivel.html", linhas=linhas)
 
 
+def _ano_acompanhamento():
+    from ..progressao_acompanhamento import anos_disponiveis
+    anos = anos_disponiveis()
+    try:
+        ano = int(request.args.get("ano", ""))
+    except ValueError:
+        ano = anos[-1] if anos else datetime.now().year
+    return ano, anos
+
+
+@admin_bp.route("/progressao-nivel/acompanhamento")
+def progressao_acompanhamento():
+    from ..progressao_acompanhamento import montar_acompanhamento, GRUPOS
+    ano, anos = _ano_acompanhamento()
+    if ano not in anos:
+        anos = sorted(set(anos) | {ano})
+    dados = montar_acompanhamento(ano)
+    return render_template(
+        "admin/progressao_acompanhamento.html", dados=dados, anos=anos, grupos=GRUPOS
+    )
+
+
+@admin_bp.route("/progressao-nivel/acompanhamento/pdf")
+def progressao_acompanhamento_pdf():
+    from ..progressao_acompanhamento import montar_acompanhamento
+    from ..pdf_progressao import gerar_pdf_acompanhamento
+    ano, _anos = _ano_acompanhamento()
+    pdf_buffer = gerar_pdf_acompanhamento(montar_acompanhamento(ano))
+    return Response(
+        pdf_buffer.read(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=progressao_{ano}_acompanhamento.pdf"},
+    )
+
+
+@admin_bp.route("/progressao-nivel/acompanhamento/excel")
+def progressao_acompanhamento_excel():
+    import pandas as pd
+    from ..progressao_acompanhamento import montar_acompanhamento, GRUPOS
+    ano, _anos = _ano_acompanhamento()
+    dados = montar_acompanhamento(ano)
+    a, b = dados["par"]
+    nomes = {g[0]: g[1] for g in GRUPOS}
+    linhas = []
+    for chave, itens in dados["grupos"].items():
+        for l in itens:
+            linhas.append({
+                "grupo": nomes[chave],
+                "matricula": l["matricula"],
+                "nome": l["nome"],
+                "admissao": l["admissao"].strftime("%d/%m/%Y") if l["admissao"] else "-",
+                f"nota_{a}": l["nota_a"] if l["nota_a"] is not None else "-",
+                f"nota_{b}": l["nota_b"] if l["nota_b"] is not None else "-",
+                "nivel_anterior": l["nivel_anterior"] or "-",
+                "nivel_novo": l["nivel_novo"] or "-",
+                "situacao": l["motivo"],
+            })
+    colunas = ["grupo", "matricula", "nome", "admissao", f"nota_{a}", f"nota_{b}", "nivel_anterior", "nivel_novo", "situacao"]
+    df = pd.DataFrame(linhas, columns=colunas)
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=f"Progressao {ano}")
+        planilha = writer.sheets[f"Progressao {ano}"]
+        for coluna, largura in {"A": 20, "B": 12, "C": 34, "D": 12, "E": 11, "F": 11, "G": 18, "H": 18, "I": 44}.items():
+            planilha.column_dimensions[coluna].width = largura
+    buffer.seek(0)
+    return Response(
+        buffer.read(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=progressao_{ano}_acompanhamento.xlsx"},
+    )
+
+
+@admin_bp.route("/progressao-nivel/exportar-pdf")
+def exportar_progressao_nivel_pdf():
+    """PDF com o mesmo conteúdo da tabela da tela de Progressão de Nível."""
+    from ..pdf_progressao import gerar_pdf_tabela_progressao
+    linhas = _linhas_progressao_nivel()
+
+    rotulo_decisao = {"sim": "Sim, sobe", "nao": "Não sobe", "a_decidir": "A decidir"}
+
+    def decisao_texto(l):
+        if l["rotulo_bloqueado"]:
+            return l["rotulo_bloqueado"]
+        if l["par_ainda_nao_fechou"]:
+            return "Sem progressão"
+        return rotulo_decisao.get(l["decisao_atual"], "-")
+
+    itens = []
+    for l in linhas:
+        par = f"{l['par_inicio']}-{l['par_fim']}" if l["par_inicio"] and l["par_fim"] else "-"
+        itens.append(
+            {
+                "nome": l["funcionario"].nome,
+                "nota_2023": l["nota_2023"],
+                "nota_2024": l["nota_2024"],
+                "nota_2025": l["nota_2025"],
+                "par": par,
+                "decisao": decisao_texto(l),
+            }
+        )
+    pdf_buffer = gerar_pdf_tabela_progressao(itens)
+    return Response(
+        pdf_buffer.read(),
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=progressao_nivel_{datetime.now().strftime('%Y%m%d')}.pdf"
+        },
+    )
+
+
 @admin_bp.route("/progressao-nivel/exportar")
 def exportar_progressao_nivel():
     """Exporta a tabela de Progressão de Nível pra Excel: notas de 2023,

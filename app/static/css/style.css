@@ -545,6 +545,10 @@ a { color: var(--navy-700); }
 
 /* Tabela de resultado final — mesma lógica: layout fixo e mais compacto */
 .tabela-resultados { table-layout: fixed; font-size: 0.8rem; }
+/* Resultado final: sem caixa de rolagem interna. A tabela cresce até o fim e
+   a página rola normalmente (o cabeçalho continua fixo no topo ao rolar). */
+.tabela-container:has(.tabela-resultados) { max-height: none; overflow: visible; }
+.tabela-container:has(.tabela-resultados) .tabela-resultados th { position: sticky; top: 0; z-index: 2; }
 .tabela-resultados th, .tabela-resultados td { padding: 8px 10px; }
 .tabela-resultados td { white-space: normal; }
 .tabela-resultados .funcionario-subinfo { white-space: normal; }

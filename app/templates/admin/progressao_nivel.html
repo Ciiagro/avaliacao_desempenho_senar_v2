@@ -10,22 +10,30 @@
     decisão de cada linha e clique em "Salvar decisões" no final pra aplicar tudo de uma vez.
 </p>
 
-<div style="display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin:16px 0;">
+<div style="display:flex; flex-direction:column; gap:14px; margin:16px 0;">
     <form method="post" action="{{ url_for('admin.importar_progressao_nivel') }}"
-          enctype="multipart/form-data" class="form-inline" style="margin:0;">
-        <input type="file" name="arquivo" accept=".xlsx,.csv" required>
-        <button type="submit" class="botao">Importar histórico</button>
+          enctype="multipart/form-data"
+          style="margin:0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <input type="file" name="arquivo" accept=".xlsx,.csv" required style="margin:0;">
+        <button type="submit" class="botao" style="margin:0; white-space:nowrap;">Importar histórico</button>
     </form>
-    <input type="text" id="busca-nome" placeholder="Buscar por nome..."
-           style="width:320px; padding:10px 14px; font-size:1rem;"
-           oninput="
-             var termo = this.value.toLowerCase();
-             document.querySelectorAll('#tabela-progressao tbody tr').forEach(function(linha) {
-                 var nome = linha.getAttribute('data-nome');
-                 linha.style.display = nome.indexOf(termo) === -1 ? 'none' : '';
-             });
-           ">
-    <a href="{{ url_for('admin.exportar_progressao_nivel') }}" class="botao botao-secundario">Exportar para Excel</a>
+
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:space-between;">
+        <input type="text" id="busca-nome" placeholder="Buscar por nome..."
+               style="width:320px; max-width:100%; padding:10px 14px; font-size:1rem; margin:0;"
+               oninput="
+                 var termo = this.value.toLowerCase();
+                 document.querySelectorAll('#tabela-progressao tbody tr').forEach(function(linha) {
+                     var nome = linha.getAttribute('data-nome');
+                     linha.style.display = nome.indexOf(termo) === -1 ? 'none' : '';
+                 });
+               ">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <a href="{{ url_for('admin.progressao_acompanhamento') }}" class="botao" style="margin:0; white-space:nowrap;">Acompanhamento por par</a>
+            <a href="{{ url_for('admin.exportar_progressao_nivel') }}" class="botao" style="margin:0; white-space:nowrap;">Exportar para Excel</a>
+            <a href="{{ url_for('admin.progressao_acompanhamento_pdf') }}" class="botao" style="margin:0; white-space:nowrap;">Baixar PDF - Resultado final</a>
+        </div>
+    </div>
 </div>
 
 {% macro opcoes_exclusao() %}
